@@ -1,46 +1,25 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import math
-import re
 import sys
 import time
-import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "mpreis.json"
 STATUS = ROOT / "data" / "update-status.json"
 
-MPREIS_BASE = "https://uzxors8tl2-dsn.algolia.net/1/indexes/prod_mpreis_8450/browse"
-MPREIS_API_KEY = "6d27574257fd3a92542ff880585333f1"
-MPREIS_APP_ID = "UZXORS8TL2"
-
-UNITS = {
-    "grm": ("g", 1.0),
-    "kgm": ("g", 1000.0),
-    "ltr": ("ml", 1000.0),
-    "mlt": ("ml", 1.0),
-    "mtr": ("m", 1.0),
-    "anw": ("Stk", 1.0),
-    "bl.": ("Stk", 1.0),
-    "pkg": ("Stk", 1.0),
-    "gr": ("g", 1.0),
-    "er": ("Stk", 1.0),
-}
-FALLBACK_PACKAGING_CODES = {"xro", "h87", "hlt"}
+SOURCE_URL = "https://heisse-preise.io/data/latest-canonical.json"
+MIN_EXPECTED_PRODUCTS = 100
 
 
-def now_iso():
+def now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def today_vienna():
-    return datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
 
 
 def number(value):
@@ -51,92 +30,57 @@ def number(value):
         return None
 
 
-def deep_get(obj, *path, default=None):
-    cur = obj
-    for key in path:
-        if not isinstance(cur, dict):
-            return default
-        cur = cur.get(key)
-        if cur is None:
-            return default
-    return cur
-
-
-def request_json(url, attempts=4):
+def fetch_json(url: str, attempts: int = 4):
     headers = {
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0 PreisPilot-Osttirol-GitHubAction/1.0",
     }
-    error = None
+
+    last_error = None
 
     for attempt in range(attempts):
         try:
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=60) as response:
+            with urllib.request.urlopen(req, timeout=90) as response:
                 return json.load(response)
         except Exception as exc:
-            error = exc
+            last_error = exc
             if attempt + 1 < attempts:
                 time.sleep(2 ** attempt)
 
-    raise RuntimeError(f"MPREIS-Abruf fehlgeschlagen: {error}")
+    raise RuntimeError(f"Rohdaten-Abruf fehlgeschlagen: {last_error}")
 
 
-def fetch_all_hits():
-    hits = []
-    cursor = None
-    page = 0
-
-    while True:
-        params = {
-            "X-Algolia-API-Key": MPREIS_API_KEY,
-            "X-Algolia-Application-Id": MPREIS_APP_ID,
-            "X-Algolia-Agent": "Vue.js",
-        }
-        if cursor:
-            params["cursor"] = cursor
-
-        url = MPREIS_BASE + "?" + urllib.parse.urlencode(params)
-        payload = request_json(url)
-        page_hits = payload.get("hits") or []
-
-        if not isinstance(page_hits, list):
-            raise RuntimeError("Ungültige MPREIS-Trefferliste.")
-
-        hits.extend(page_hits)
-        cursor = payload.get("cursor")
-        page += 1
-        print(f"MPREIS Seite {page}: +{len(page_hits)}")
-
-        if not cursor:
-            break
-        if page > 120:
-            raise RuntimeError("MPREIS-Import nach 120 Seiten abgebrochen.")
-
-    return hits
+def stable_fallback_id(item: dict) -> str:
+    material = "|".join([
+        str(item.get("store") or ""),
+        str(item.get("name") or ""),
+        str(item.get("quantity") or ""),
+        str(item.get("unit") or ""),
+        str(item.get("description") or ""),
+    ])
+    return "hp-" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:20]
 
 
-def first_name(raw):
-    name = raw.get("name")
-    if isinstance(name, list):
-        return str(name[0]).strip() if name else ""
-    return str(name or "").strip()
+def normalize_unit(raw_unit):
+    unit = str(raw_unit or "stk").strip().lower()
+
+    mapping = {
+        "stk": "Stk",
+        "st": "Stk",
+        "stück": "Stk",
+        "pcs": "Stk",
+        "pc": "Stk",
+        "g": "g",
+        "kg": "kg",
+        "ml": "ml",
+        "l": "l",
+    }
+
+    return mapping.get(unit, unit or "Stk")
 
 
-def parse_packaging(value):
-    text = str(value or "").replace(",", ".")
-    match = re.search(r"(\d+(?:\.\d+)?)\s*(kg|g|l|ml|stk|stück)\b", text, re.I)
-    if not match:
-        return None
-
-    amount = float(match.group(1))
-    unit = match.group(2).lower()
-    if unit in {"stk", "stück"}:
-        unit = "Stk"
-    return amount, unit
-
-
-def base_unit(unit):
+def base_unit(unit: str) -> str:
     if unit in {"g", "kg"}:
         return "kg"
     if unit in {"ml", "l"}:
@@ -144,167 +88,192 @@ def base_unit(unit):
     return "Stk"
 
 
-def calc_unit_price(price, amount, unit):
-    if price is None or amount is None or amount <= 0:
+def calc_unit_price(price, quantity, unit):
+    price = number(price)
+    quantity = number(quantity)
+
+    if price is None or quantity is None or quantity <= 0:
         return None
+
     if unit == "g":
-        return round(price / (amount / 1000.0), 2)
+        return round(price / (quantity / 1000.0), 2)
+    if unit == "kg":
+        return round(price / quantity, 2)
     if unit == "ml":
-        return round(price / (amount / 1000.0), 2)
-    if unit in {"kg", "l", "Stk"}:
-        return round(price / amount, 2)
+        return round(price / (quantity / 1000.0), 2)
+    if unit == "l":
+        return round(price / quantity, 2)
+    if unit == "Stk":
+        return round(price / quantity, 2)
+
     return None
 
 
-def normalize_hit(raw):
-    name = first_name(raw)
-    prices = raw.get("prices") or []
-    if not name or not prices or not isinstance(prices[0], dict):
+def normalize_history(raw_history, current_price):
+    result = []
+    seen = set()
+
+    for entry in raw_history or []:
+        if not isinstance(entry, dict):
+            continue
+
+        date = str(entry.get("date") or "").strip()
+        price = number(entry.get("price"))
+
+        if not date or price is None:
+            continue
+
+        key = (date, round(price, 2))
+        if key in seen:
+            continue
+
+        seen.add(key)
+        result.append({"date": date, "price": round(price, 2)})
+
+    # Heisse Preise documents newest-first. We normalize to oldest -> newest
+    # inside the published file; the app can sort it as needed.
+    result.sort(key=lambda x: x["date"])
+
+    if not result and current_price is not None:
+        result.append({
+            "date": datetime.now(timezone.utc).date().isoformat(),
+            "price": round(current_price, 2)
+        })
+
+    return result[-250:]
+
+
+def normalize_item(item: dict):
+    if str(item.get("store") or "").lower() != "mpreis":
         return None
 
-    price_record = prices[0]
-    presentation = price_record.get("presentationPrice") or {}
-    measurement = presentation.get("measurementUnit") or {}
+    name = str(item.get("name") or "").strip()
+    price = number(item.get("price"))
 
-    quantity = number(measurement.get("quantity"))
-    unit_code = str(measurement.get("unitCode") or "").lower()
-    unit, factor = UNITS.get(unit_code, ("Stk", 1.0))
+    if not name or price is None:
+        return None
 
-    if unit_code in FALLBACK_PACKAGING_CODES:
-        parsed = parse_packaging(deep_get(raw, "mixins", "productCustomAttributes", "packagingUnit"))
-        if parsed:
-            quantity, unit = parsed
-            factor = 1.0
-
-    if quantity is None:
+    quantity = number(item.get("quantity"))
+    if quantity is None or quantity <= 0:
         quantity = 1.0
 
-    amount = quantity * factor
-    weighted = str(
-        deep_get(raw, "mixins", "productCustomAttributes", "packagingDescription", default="") or ""
-    ).startswith("Gewichtsware")
+    unit = normalize_unit(item.get("unit"))
 
-    price = number(price_record.get("effectiveAmount") if weighted else presentation.get("effectiveAmount"))
-    if price is None:
-        price = number(presentation.get("effectiveAmount") or price_record.get("effectiveAmount"))
-    if price is None:
-        return None
+    raw_id = (
+        item.get("id")
+        or item.get("productId")
+        or item.get("code")
+        or item.get("sku")
+    )
 
-    remote_id = str(raw.get("objectID") or raw.get("code") or "").strip()
-    retailer_id = str(raw.get("code") or raw.get("objectID") or "").strip()
-    if not remote_id or not retailer_id:
-        return None
+    product_id = str(raw_id).strip() if raw_id is not None else ""
+    if not product_id:
+        product_id = stable_fallback_id(item)
 
-    properties = deep_get(raw, "mixins", "mpreisAttributes", "properties", default=[]) or []
-    bio = isinstance(properties, list) and "BIO" in properties
+    description = str(item.get("description") or "").strip()
 
-    description = str(
-        deep_get(raw, "mixins", "productCustomAttributes", "longDescription", default="") or ""
-    ).strip()
+    history = normalize_history(item.get("priceHistory"), price)
+
+    amount = int(quantity) if float(quantity).is_integer() else round(quantity, 3)
 
     return {
         "store": "mpreis",
-        "remoteObjectId": remote_id,
-        "retailerProductId": retailer_id,
+        "remoteObjectId": product_id,
+        "retailerProductId": product_id,
         "name": name,
         "description": description,
-        "amount": int(amount) if float(amount).is_integer() else round(amount, 3),
+        "amount": amount,
         "unit": unit,
         "currentPrice": round(price, 2),
-        "unitPrice": calc_unit_price(price, amount, unit),
+        "unitPrice": calc_unit_price(price, quantity, unit),
         "unitPriceUnit": base_unit(unit),
-        "weighted": bool(weighted),
-        "bio": bool(bio),
-        "source": "mpreis.at",
-        "productUrl": f"https://www.mpreis.at/shop/p/{retailer_id}",
+        "weighted": bool(item.get("isWeighted", False)),
+        "bio": bool(item.get("bio", False)),
+        "source": "heisse-preise.io (MPREIS)",
+        "history": history,
     }
 
 
-def load_previous():
+def load_existing_count() -> int:
     if not OUT.exists():
-        return {}
+        return 0
+
     try:
         payload = json.loads(OUT.read_text(encoding="utf-8"))
+        products = payload.get("products") or []
+        return len(products) if isinstance(products, list) else 0
     except Exception:
-        return {}
-
-    result = {}
-    for item in payload.get("products", []):
-        key = str(item.get("remoteObjectId") or item.get("retailerProductId") or "")
-        if key:
-            result[key] = item
-    return result
+        return 0
 
 
-def merge_history(item, previous, today):
-    history = []
-    if previous and isinstance(previous.get("history"), list):
-        for entry in previous["history"]:
-            p = number(entry.get("price"))
-            date = entry.get("date")
-            if date and p is not None:
-                history.append({"date": str(date), "price": round(p, 2)})
+def write_status(status: str, updated_at: str, product_count: int, error=None, stale=False):
+    payload = {
+        "schemaVersion": 1,
+        "updatedAt": updated_at,
+        "stores": {
+            "mpreis": {
+                "status": status,
+                "productCount": product_count,
+                "stale": bool(stale),
+                "error": error,
+                "provider": "heisse-preise.io",
+            }
+        },
+    }
 
-    history.sort(key=lambda x: x["date"])
-    current = item["currentPrice"]
-
-    if not history:
-        history.append({"date": today, "price": current})
-    elif history[-1]["date"] == today:
-        history[-1]["price"] = current
-    elif history[-1]["price"] != current:
-        history.append({"date": today, "price": current})
-
-    item["history"] = history[-250:]
-
-
-def write_status(ok, updated_at, product_count=0, error=None):
     STATUS.write_text(
-        json.dumps({
-            "schemaVersion": 1,
-            "updatedAt": updated_at,
-            "stores": {
-                "mpreis": {
-                    "status": "ok" if ok else "error",
-                    "productCount": product_count,
-                    "error": error,
-                }
-            },
-        }, ensure_ascii=False, indent=2) + "\n",
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
 
-def main():
+def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     updated_at = now_iso()
-    today = today_vienna()
+    existing_count = load_existing_count()
 
     try:
-        raw_hits = fetch_all_hits()
-        previous = load_previous()
+        raw = fetch_json(SOURCE_URL)
+
+        if not isinstance(raw, list):
+            raise RuntimeError("Rohdaten haben nicht das erwartete Array-Format.")
 
         products = []
         skipped = 0
 
-        for raw in raw_hits:
-            item = normalize_hit(raw)
-            if not item:
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+
+            if str(item.get("store") or "").lower() != "mpreis":
+                continue
+
+            normalized = normalize_item(item)
+
+            if normalized is None:
                 skipped += 1
                 continue
-            merge_history(item, previous.get(item["remoteObjectId"]), today)
-            products.append(item)
 
-        products.sort(key=lambda p: (p["name"].casefold(), p["retailerProductId"]))
+            products.append(normalized)
 
-        if len(products) < 100:
-            raise RuntimeError(f"Unplausibel wenige MPREIS-Produkte: {len(products)}")
+        products.sort(key=lambda p: (
+            str(p["name"]).casefold(),
+            str(p["retailerProductId"])
+        ))
+
+        if len(products) < MIN_EXPECTED_PRODUCTS:
+            raise RuntimeError(
+                f"Unplausibel wenige MPREIS-Produkte ({len(products)}). "
+                "Vorhandene Daten werden nicht überschrieben."
+            )
 
         payload = {
             "schemaVersion": 1,
-            "importerVersion": 1,
+            "importerVersion": 2,
             "store": "mpreis",
-            "scope": "MPREIS Online-Produktindex",
+            "scope": "MPREIS-Daten aus Heisse Preise",
+            "provider": "heisse-preise.io",
+            "providerUrl": SOURCE_URL,
             "updatedAt": updated_at,
             "productCount": len(products),
             "skippedCount": skipped,
@@ -312,15 +281,47 @@ def main():
         }
 
         temp = OUT.with_suffix(".json.tmp")
-        temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temp.write_text(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
         temp.replace(OUT)
 
-        write_status(True, updated_at, len(products))
-        print(f"MPREIS: {len(products)} Produkte gespeichert; {skipped} übersprungen.")
+        write_status("ok", updated_at, len(products))
+
+        print(
+            f"MPREIS: {len(products)} Produkte importiert; "
+            f"{skipped} MPREIS-Einträge übersprungen."
+        )
         return 0
 
     except Exception as exc:
-        write_status(False, updated_at, 0, str(exc))
+        # Sobald ein gültiger Datenbestand existiert, bleibt er bei einem
+        # temporären Quellenfehler erhalten. Das ist für die App robuster.
+        if existing_count >= MIN_EXPECTED_PRODUCTS:
+            write_status(
+                "stale",
+                updated_at,
+                existing_count,
+                error=str(exc),
+                stale=True,
+            )
+            print(
+                f"WARNUNG: MPREIS konnte nicht aktualisiert werden. "
+                f"Vorhandene {existing_count} Produkte bleiben aktiv. Fehler: {exc}",
+                file=sys.stderr,
+            )
+            return 0
+
+        # Beim allerersten Import darf der Workflow NICHT grün werden,
+        # solange die öffentliche MPREIS-Datei noch leer ist.
+        write_status(
+            "error",
+            updated_at,
+            existing_count,
+            error=str(exc),
+            stale=False,
+        )
         print(f"FEHLER: {exc}", file=sys.stderr)
         return 1
 
