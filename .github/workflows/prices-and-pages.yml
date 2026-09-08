@@ -36,6 +36,8 @@ jobs:
           python-version: "3.13"
 
       - name: MPREIS-Daten aktualisieren
+        id: mpreis
+        continue-on-error: true
         run: python scripts/update_mpreis.py
 
       - name: Öffentliche Preisdaten speichern
@@ -50,6 +52,11 @@ jobs:
             git commit -m "chore: Preisdaten aktualisieren"
             git push
           fi
+
+      - name: Hinweis bei Importfehler
+        if: steps.mpreis.outcome == 'failure'
+        run: |
+          echo "::warning::MPREIS konnte diesmal nicht aktualisiert werden. GitHub Pages wird mit dem vorhandenen Datenstand bereitgestellt."
 
       - name: GitHub Pages konfigurieren
         uses: actions/configure-pages@v5
