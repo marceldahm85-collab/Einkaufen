@@ -1,0 +1,18 @@
+{
+  "name": "PreisPilot Osttirol",
+  "short_name": "PreisPilot",
+  "description": "Private Einkaufs- und Preisvergleichs-App für Osttirol",
+  "lang": "de-AT",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f3ee",
+  "theme_color": "#f6f3ee",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

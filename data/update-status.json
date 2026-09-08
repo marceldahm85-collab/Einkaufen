@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": null,
+  "stores": {
+    "mpreis": {
+      "status": "pending",
+      "productCount": 0,
+      "error": null
+    }
+  }
+}
