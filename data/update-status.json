@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "updatedAt": null,
+  "updatedAt": "2026-09-08T13:28:16Z",
   "stores": {
     "mpreis": {
-      "status": "pending",
+      "status": "error",
       "productCount": 0,
-      "error": null
+      "error": "MPREIS-Abruf fehlgeschlagen: HTTP Error 403: Forbidden"
     }
   }
 }
