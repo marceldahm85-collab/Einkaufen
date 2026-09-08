@@ -1,11 +1,13 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-08T13:31:56Z",
+  "updatedAt": "2026-09-08T13:41:03Z",
   "stores": {
     "mpreis": {
-      "status": "error",
-      "productCount": 0,
-      "error": "MPREIS-Abruf fehlgeschlagen: HTTP Error 403: Forbidden"
+      "status": "ok",
+      "productCount": 27364,
+      "stale": false,
+      "error": null,
+      "provider": "heisse-preise.io"
     }
   }
 }
