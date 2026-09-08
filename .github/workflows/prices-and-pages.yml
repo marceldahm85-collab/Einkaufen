@@ -58,6 +58,9 @@ jobs:
               )
           PY
 
+      - name: MPREIS-Aktionen ergänzen
+        run: python scripts/update_mpreis_actions.py
+
       - name: Öffentliche Preisdaten speichern
         shell: bash
         run: |
