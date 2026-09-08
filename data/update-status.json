@@ -1,13 +1,21 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-08T14:22:05Z",
+  "updatedAt": "2026-09-08T14:29:38Z",
   "stores": {
     "mpreis": {
       "status": "ok",
       "productCount": 27364,
       "stale": false,
       "error": null,
-      "provider": "heisse-preise.io"
+      "provider": "heisse-preise.io",
+      "promotions": {
+        "status": "ok",
+        "verifiedCount": 33,
+        "pagesChecked": 3,
+        "updatedAt": "2026-09-08T14:30:06Z",
+        "error": null,
+        "source": "mpreis.at"
+      }
     }
   }
 }
