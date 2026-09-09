@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-09T05:51:20Z",
+  "updatedAt": "2026-09-09T06:03:22Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -9,11 +9,11 @@
       "error": null,
       "provider": "heisse-preise.io",
       "promotions": {
-        "status": "ok",
+        "status": "stale",
         "verifiedCount": 1171,
-        "pagesChecked": 40,
-        "updatedAt": "2026-09-09T05:51:20Z",
-        "error": null,
+        "pagesChecked": 2,
+        "updatedAt": "2026-09-09T06:03:22Z",
+        "error": "Zu wenige eindeutig erkannte Aktionen (0). Grundpreise bleiben unverändert.",
         "source": "mpreis.at"
       }
     },
@@ -22,7 +22,15 @@
       "productCount": 33191,
       "stale": false,
       "error": null,
-      "provider": "heisse-preise.io"
+      "provider": "heisse-preise.io",
+      "promotions": {
+        "status": "ok",
+        "verifiedCount": 131,
+        "rawProductsScanned": 5000,
+        "updatedAt": "2026-09-09T06:04:09Z",
+        "error": null,
+        "source": "spar.at / FactFinder"
+      }
     }
   }
 }
