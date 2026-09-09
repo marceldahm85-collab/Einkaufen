@@ -278,7 +278,9 @@ def parse_special_actions(lines):
             "store": "tg",
             "remoteObjectId": product_id,
             "retailerProductId": product_id,
+            "sourceKind": "special",
             "kind": "product",
+            "optimizerEligible": True,
             "name": name,
             "description": description,
             "amountText": description or None,
@@ -323,7 +325,9 @@ def parse_special_actions(lines):
             "store": "tg",
             "remoteObjectId": product_id,
             "retailerProductId": product_id,
+            "sourceKind": "special",
             "kind": "category",
+            "optimizerEligible": False,
             "name": category,
             "description": line,
             "amountText": None,
@@ -490,7 +494,19 @@ def main():
                 previous_map.get(str(item.get("retailerProductId")))
             )
 
-        priced_count = sum(1 for x in actions if x.get("salePrice") is not None)
+        preserved_flyer = []
+        if isinstance(previous_payload, dict):
+            preserved_flyer = [
+                item for item in (previous_payload.get("products") or [])
+                if isinstance(item, dict) and item.get("sourceKind") == "flyer"
+            ]
+
+        combined_products = actions + preserved_flyer
+
+        priced_count = sum(
+            1 for x in combined_products
+            if x.get("salePrice") is not None or x.get("displayPrice") is not None
+        )
 
         payload = {
             "schemaVersion": 1,
@@ -502,12 +518,30 @@ def main():
             "providerUrl": SOURCE_URL,
             "updatedAt": updated_at,
             "productCount": priced_count,
-            "promotionCount": len(actions),
+            "promotionCount": len(combined_products),
             "validFrom": valid_from,
             "validUntil": valid_until,
             "flyer": flyer,
-            "products": actions,
+            "products": combined_products,
         }
+
+        if isinstance(previous_payload, dict):
+            for key in (
+                "linkableCount",
+                "flyerProductCount",
+                "flyerLinkableCount",
+                "flyerUpdatedAt",
+                "flyerStale",
+                "flyerLastError",
+            ):
+                if key in previous_payload:
+                    payload[key] = previous_payload[key]
+
+            previous_flyer_meta = previous_payload.get("flyer") or {}
+            if isinstance(previous_flyer_meta, dict):
+                for key in ("pdfUrl", "pageCount"):
+                    if key in previous_flyer_meta:
+                        payload["flyer"][key] = previous_flyer_meta[key]
 
         temp = OUT.with_suffix(".json.tmp")
         temp.write_text(
