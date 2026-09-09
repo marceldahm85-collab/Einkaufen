@@ -37,7 +37,7 @@ assert mod.derive_display_price(desc2) == 15.0
 prices = mod.extract_standalone_prices(sample)
 assert mod.snap_display_price(15.0, prices) == 14.90
 
-products, matched = mod.build_page_products(
+products, matched, spatial = mod.build_page_products(
     sample,
     1,
     "https://example.invalid/viewer",
@@ -48,6 +48,7 @@ products, matched = mod.build_page_products(
 
 assert len(products) == 2
 assert matched == 1
+assert spatial == 0
 
 drink = next(item for item in products if item["name"] == "Other Drink")
 assert drink["displayPrice"] == 14.90
@@ -79,3 +80,39 @@ valid = [
 assert mod.extract_validity(valid) == ("2026-08-27", "2026-09-09")
 
 print("OK")
+
+
+# Synthetic positioned-text test: the plain text has no BEI/regular-price record,
+# but the PDF layout places an "AB 2 PKG." marker in the same card.
+layout_sample = """
+Test Pasta
+500 g, 3.98 €/kg
+1.99
+AB 2 PKG.
+"""
+layout = [
+    {"text": "Test Pasta", "x": 50.0, "y": 700.0, "fontSize": 10.0, "width": 55.0},
+    {"text": "500 g, 3.98 €/kg", "x": 50.0, "y": 680.0, "fontSize": 8.0, "width": 80.0},
+    {"text": "AB 2 PKG.", "x": 52.0, "y": 635.0, "fontSize": 9.0, "width": 55.0},
+]
+spatial_products, text_count, spatial_count = mod.build_page_products(
+    layout_sample,
+    1,
+    "https://example.invalid/viewer",
+    "https://example.invalid/flyer.pdf",
+    "2026-09-01",
+    "2026-09-09",
+    page_layout=layout,
+)
+assert text_count == 0
+assert spatial_count == 1
+assert len(spatial_products) == 1
+sp = spatial_products[0]
+assert sp["displayPrice"] == 1.99
+assert sp["salePrice"] == 1.99
+assert sp["optimizerEligible"] is True
+assert sp["promotion"]["type"] == "quantity"
+assert sp["promotion"]["requiredQuantity"] == 2
+assert sp["promotionMatchMethod"] == "pdf-position"
+
+print("Spatial condition assignment OK")

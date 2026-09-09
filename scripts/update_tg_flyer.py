@@ -152,6 +152,338 @@ def extract_page_texts(pdf_path):
     return result
 
 
+def extract_page_layouts(pdf_path):
+    """Extract positioned text fragments with pypdf's visitor callback.
+
+    This is supplementary evidence only. If coordinates are unusable, the
+    importer falls back to the proven plain-text logic instead of guessing.
+    """
+    try:
+        from pypdf import PdfReader
+    except Exception as exc:
+        raise RuntimeError("pypdf ist nicht installiert.") from exc
+
+    reader = PdfReader(str(pdf_path))
+    pages = []
+
+    for page in reader.pages:
+        fragments = []
+
+        def visitor(text, cm, tm, font_dict, font_size):
+            raw = " ".join(str(text or "").split())
+            if not raw:
+                return
+
+            try:
+                x = float(tm[4])
+                y = float(tm[5])
+                size = max(5.0, float(font_size or 9.0))
+            except Exception:
+                return
+
+            # Width is an approximation used only to split concatenated labels
+            # like "AB 2 PKG.AB 2 FL." into separate spatial markers.
+            width = max(size * 0.5 * len(raw), size)
+
+            fragments.append({
+                "text": raw,
+                "x": x,
+                "y": y,
+                "fontSize": size,
+                "width": width,
+            })
+
+        page.extract_text(visitor_text=visitor)
+        pages.append(fragments)
+
+    return pages
+
+
+def compact_layout_text(value):
+    value = str(value or "").casefold()
+    value = value.replace(",", ".")
+    value = value.replace("–", "-").replace("—", "-")
+    return re.sub(r"\s+", "", value)
+
+
+def unit_price_signature(description):
+    matches = re.findall(
+        r"(\d+(?:[.,]\d+)?(?:\s*[–-]\s*\d+(?:[.,]\d+)?)?"
+        r"\s*€\s*/\s*[0-9.,]*\s*(?:kg|g|l|ml|Stk\.?|Rolle|m))",
+        str(description or ""),
+        flags=re.I,
+    )
+    return compact_layout_text(matches[-1]) if matches else ""
+
+
+def _marker_x(fragment, start, end):
+    text_len = max(1, len(fragment["text"]))
+    center_fraction = ((start + end) / 2) / text_len
+    return fragment["x"] + fragment["width"] * center_fraction
+
+
+def extract_layout_markers(layout):
+    quantity = []
+    bundles = []
+
+    quantity_rx = re.compile(
+        r"\bAB\s+(\d+)\s*(PKG\.?|FL\.?|DS\.?|STK\.?|KISTEN?|GL\.?|TRAYS?)",
+        flags=re.I,
+    )
+    bundle_rx = re.compile(
+        r"(?<!\d)(\d{1,2})\s*\+\s*(\d{1,2})(?!\d)",
+        flags=re.I,
+    )
+
+    for fragment in layout or []:
+        text = fragment.get("text") or ""
+
+        for match in quantity_rx.finditer(text):
+            required = int(match.group(1))
+            unit = match.group(2).rstrip(".").upper()
+            quantity.append({
+                "x": _marker_x(fragment, match.start(), match.end()),
+                "y": fragment["y"],
+                "requiredQuantity": required,
+                "unit": unit,
+                "raw": match.group(0),
+            })
+
+        for match in bundle_rx.finditer(text):
+            paid = int(match.group(1))
+            free = int(match.group(2))
+            total = paid + free
+
+            # Guard against concatenated text such as "1+12+1" becoming 1+12.
+            if paid <= 0 or free <= 0 or total > 24:
+                continue
+
+            bundles.append({
+                "x": _marker_x(fragment, match.start(), match.end()),
+                "y": fragment["y"],
+                "paidQuantity": paid,
+                "freeQuantity": free,
+                "requiredQuantity": total,
+                "raw": match.group(0),
+            })
+
+    return quantity, bundles
+
+
+def _name_tokens(name):
+    return [
+        token for token in normalize_name(name).split()
+        if len(token) >= 2
+    ]
+
+
+def find_product_anchor(product, layout):
+    if not layout:
+        return None
+
+    signature = unit_price_signature(product.get("description"))
+    unit_candidates = []
+
+    if signature:
+        for fragment in layout:
+            compact = compact_layout_text(fragment.get("text"))
+            if signature in compact or compact in signature:
+                unit_candidates.append(fragment)
+
+    tokens = _name_tokens(product.get("name"))
+    name_candidates = []
+
+    if tokens:
+        for fragment in layout:
+            text = normalize_name(fragment.get("text"))
+            if not text:
+                continue
+
+            score = 0
+            if tokens[0] in text.split() or text.startswith(tokens[0]):
+                score += 2
+            if len(tokens) > 1 and tokens[1] in text:
+                score += 2
+            if len(tokens) > 2 and tokens[2] in text:
+                score += 1
+
+            if score >= 2:
+                name_candidates.append((score, fragment))
+
+    if unit_candidates and name_candidates:
+        pairs = []
+        for unit in unit_candidates:
+            for name_score, name in name_candidates:
+                dx = abs(unit["x"] - name["x"])
+                dy = abs(unit["y"] - name["y"])
+                if dx <= 125 and dy <= 170:
+                    pairs.append((dx * 1.4 + dy - name_score * 8, unit))
+
+        if pairs:
+            return min(pairs, key=lambda item: item[0])[1]
+
+    if len(unit_candidates) == 1:
+        return unit_candidates[0]
+
+    if name_candidates:
+        name_candidates.sort(key=lambda item: (-item[0], item[1]["y"], item[1]["x"]))
+        if len(name_candidates) == 1 or name_candidates[0][0] > name_candidates[1][0]:
+            return name_candidates[0][1]
+
+    return None
+
+
+def spatial_distance(anchor, marker):
+    dx = abs(float(anchor["x"]) - float(marker["x"]))
+    dy = abs(float(anchor["y"]) - float(marker["y"]))
+
+    if dx > 95 or dy > 120:
+        return None
+
+    return dx * 1.8 + dy
+
+
+def assign_markers_to_products(products, layout, markers, blocked_products=None):
+    blocked_products = set(blocked_products or [])
+    anchors = {
+        index: find_product_anchor(product, layout)
+        for index, product in enumerate(products)
+        if index not in blocked_products
+    }
+
+    marker_candidates = {}
+
+    for marker_index, marker in enumerate(markers):
+        candidates = []
+
+        for product_index, anchor in anchors.items():
+            if not anchor:
+                continue
+
+            distance = spatial_distance(anchor, marker)
+            if distance is None or distance > 135:
+                continue
+
+            candidates.append((distance, product_index))
+
+        candidates.sort(key=lambda item: item[0])
+
+        if not candidates:
+            continue
+
+        # Require a clear winner. If two product cards are almost equally near,
+        # the marker stays unresolved instead of being guessed.
+        if len(candidates) > 1 and candidates[1][0] - candidates[0][0] < 20:
+            continue
+
+        marker_candidates[marker_index] = candidates[0]
+
+    pairs = [
+        (distance, marker_index, product_index)
+        for marker_index, (distance, product_index) in marker_candidates.items()
+    ]
+    pairs.sort(key=lambda item: item[0])
+
+    used_products = set()
+    assignments = {}
+
+    for distance, marker_index, product_index in pairs:
+        if product_index in used_products:
+            continue
+
+        used_products.add(product_index)
+        assignments[product_index] = markers[marker_index]
+
+    return assignments
+
+
+def quantity_unit_label(unit):
+    labels = {
+        "PKG": "Packungen",
+        "FL": "Flaschen",
+        "DS": "Dosen",
+        "STK": "Stück",
+        "KISTE": "Kisten",
+        "KISTEN": "Kisten",
+        "GL": "Gläser",
+        "TRAY": "Trays",
+        "TRAYS": "Trays",
+    }
+    return labels.get(str(unit or "").upper(), str(unit or "").upper())
+
+
+def apply_spatial_conditions(products, layout, text_matched_indices):
+    if not layout:
+        return 0
+
+    quantity_markers, bundle_markers = extract_layout_markers(layout)
+    quantity_assignments = assign_markers_to_products(
+        products,
+        layout,
+        quantity_markers,
+        blocked_products=text_matched_indices,
+    )
+
+    newly_safe = 0
+
+    for product_index, marker in quantity_assignments.items():
+        product = products[product_index]
+        required = int(marker["requiredQuantity"])
+
+        if required <= 1 or product.get("displayPrice") is None:
+            continue
+
+        # A bundle label is only accepted when it is spatially near the same
+        # product AND its total quantity agrees with the independently found
+        # "AB N" marker. This avoids false parsing of concatenated labels.
+        anchor = find_product_anchor(product, layout)
+        compatible_bundles = []
+
+        for bundle in bundle_markers:
+            if bundle["requiredQuantity"] != required or not anchor:
+                continue
+            distance = spatial_distance(anchor, bundle)
+            if distance is not None and distance <= 125:
+                compatible_bundles.append((distance, bundle))
+
+        bundle = min(compatible_bundles, key=lambda item: item[0])[1] if compatible_bundles else None
+
+        product["currentPrice"] = product["displayPrice"]
+        product["salePrice"] = product["displayPrice"]
+        product["promotionConditionKnown"] = True
+        product["optimizerEligible"] = True
+        product["promotionMatchMethod"] = "pdf-position"
+        product.pop("displayOnlyReason", None)
+
+        if bundle:
+            paid = bundle["paidQuantity"]
+            free = bundle["freeQuantity"]
+            product["promotion"] = {
+                "type": "bundle",
+                "label": f"{paid}+{free} gratis",
+                "requiredQuantity": required,
+                "paidQuantity": paid,
+                "freeQuantity": free,
+                "conditionUnit": marker["unit"],
+                "verified": True,
+                "source": "T&G Osttirol Flugblatt (Positionszuordnung)",
+            }
+        else:
+            label_unit = quantity_unit_label(marker["unit"])
+            product["promotion"] = {
+                "type": "quantity",
+                "label": f"ab {required} {label_unit}",
+                "requiredQuantity": required,
+                "conditionUnit": marker["unit"],
+                "verified": True,
+                "source": "T&G Osttirol Flugblatt (Positionszuordnung)",
+            }
+
+        newly_safe += 1
+
+    return newly_safe
+
+
 def stable_id(name, description):
     material = f"{name}|{description}".casefold()
     return "tg-flyer-" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:20]
@@ -818,6 +1150,7 @@ def build_page_products(
     pdf_url,
     valid_from,
     valid_until,
+    page_layout=None,
 ):
     page_prices = extract_standalone_prices(page_text)
     products = []
@@ -894,6 +1227,7 @@ def build_page_products(
         product["regularPrice"] = record["regularPrice"]
         product["promotionConditionKnown"] = True
         product["optimizerEligible"] = True
+        product["promotionMatchMethod"] = "pdf-text"
         product.pop("displayOnlyReason", None)
 
         bundle = record.get("bundle")
@@ -922,7 +1256,13 @@ def build_page_products(
 
         product["promotion"] = promotion
 
-    return products, len(matched)
+    spatial_matched = apply_spatial_conditions(
+        products,
+        page_layout,
+        text_matched_indices=set(matched.keys()),
+    )
+
+    return products, len(matched), spatial_matched
 
 
 def merge_history(item, previous):
@@ -1023,22 +1363,40 @@ def main():
         pdf_url = download_pdf(viewer_url)
         page_texts = extract_page_texts(TMP_PDF)
 
+        try:
+            page_layouts = extract_page_layouts(TMP_PDF)
+        except Exception as layout_error:
+            print(
+                f"WARNUNG: PDF-Positionsdaten konnten nicht gelesen werden: {layout_error}",
+                file=sys.stderr,
+            )
+            page_layouts = [None] * len(page_texts)
+
         valid_from, valid_until = extract_validity(page_texts)
 
         flyer_products = []
-        safely_linkable = 0
+        text_linkable = 0
+        spatial_linkable = 0
 
         for page_number, page_text in enumerate(page_texts, start=1):
-            products, matched = build_page_products(
+            page_layout = (
+                page_layouts[page_number - 1]
+                if page_number - 1 < len(page_layouts)
+                else None
+            )
+
+            products, text_matched, spatial_matched = build_page_products(
                 page_text,
                 page_number,
                 viewer_url,
                 pdf_url,
                 valid_from,
                 valid_until,
+                page_layout=page_layout,
             )
             flyer_products.extend(products)
-            safely_linkable += matched
+            text_linkable += text_matched
+            spatial_linkable += spatial_matched
 
             flyer_products.extend(
                 extract_category_actions(
@@ -1111,7 +1469,9 @@ def main():
             and item.get("salePrice") is not None
         )
         payload["flyerProductCount"] = len(priced_flyer)
-        payload["flyerLinkableCount"] = safely_linkable
+        payload["flyerLinkableCount"] = text_linkable + spatial_linkable
+        payload["flyerTextLinkableCount"] = text_linkable
+        payload["flyerSpatialLinkableCount"] = spatial_linkable
         payload["flyerUpdatedAt"] = now_iso()
         payload["flyerStale"] = False
         payload.pop("flyerLastError", None)
@@ -1137,13 +1497,15 @@ def main():
         update_status(
             "ok",
             len(priced_flyer),
-            safely_linkable,
+            text_linkable + spatial_linkable,
         )
 
         print("=== T&G OSTTIROL FLUGBLATT-IMPORT ===")
         print(f"PDF-Seiten: {len(page_texts)}")
         print(f"Flugblattprodukte mit erkanntem Preis: {len(priced_flyer)}")
-        print(f"Davon mit sicher zugeordneter Mengenbedingung: {safely_linkable}")
+        print(f"Sicher über Textstruktur zugeordnet: {text_linkable}")
+        print(f"Zusätzlich über PDF-Positionen zugeordnet: {spatial_linkable}")
+        print(f"Insgesamt sicher verknüpfbar: {text_linkable + spatial_linkable}")
         print(
             "Weitere Flugblattpreise werden in der App angezeigt, "
             "aber aus Sicherheitsgründen noch nicht für den Optimierer verwendet."
