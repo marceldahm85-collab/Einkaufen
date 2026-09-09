@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09T10:05:33Z",
+  "generatedAt": "2026-09-09T10:54:41Z",
   "region": "Osttirol",
   "viewerUrl": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/index.html",
   "viewerMarkers": {
@@ -46,27 +46,121 @@
     {
       "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/flowpaper_handlers.js",
       "size": 7409,
-      "pdfCandidates": [
-        "https://mydomain.com/abc.pdf"
-      ],
+      "pdfCandidates": [],
       "flowpaperMention": true
     }
   ],
   "pdfCandidates": [
-    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206",
-    "https://mydomain.com/abc.pdf"
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol.pdf?reload=1787207674206"
   ],
   "pdfAttempts": [
     {
-      "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206",
-      "error": "Abruf fehlgeschlagen: https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206: HTTP Error 404: Not Found"
-    },
-    {
-      "url": "https://mydomain.com/abc.pdf",
-      "error": "Abruf fehlgeschlagen: https://mydomain.com/abc.pdf: <urlopen error [Errno -5] No address associated with hostname>"
+      "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol.pdf?reload=1787207674206",
+      "size": 15682818,
+      "contentType": "application/pdf",
+      "isPdf": true
     }
   ],
-  "pdfUrl": null,
+  "pdfUrl": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol.pdf?reload=1787207674206",
   "viewerHtmlPreview": "\n<!doctype html>\n<html>\n<head>\n    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n    <meta name=\"viewport\" content=\"initial-scale=1,user-scalable=0,maximum-scale=1,width=device-width\" />\n    <meta content=\"IE=Edge\" http-equiv=\"X-UA-Compatible\" />\n    <meta name=\"format-detection\" content=\"telephone=no\"/>\n    <meta property=\"og:title\" content=\"T&amp;G_KW35_36_2026.indd\" />\n    <meta name=\"twitter:title\" content=\"T&amp;G_KW35_36_2026.indd\" />\n    <meta name=\"twitter:image:src\" content=\"docs/T-G_KW35_36_2026_Osttirol.pdf_1.jpg\" />\n    <meta name=\"twitter:card\" content=\"player\">\n    <meta name=\"twitter:player\" content=\"\">\n    <meta name=\"twitter:player:width\" content=\"400\">\n    <meta name=\"twitter:player:height\" content=\"300\">\n\n    <meta property=\"og:url\" content=\"\" />\n    <meta property=\"og:image\" content=\"docs/T-G_KW35_36_2026_Osttirol.pdf_1.jpg\" />    \n    <meta property=\"og:image:width\" content=\"110\" /> \n    <meta property=\"og:image:height\" content=\"158\" /> \n    \n\n    <style type=\"text/css\" media=\"screen\">\n        html, body\t{ height:100%; }\n        body { margin:0; padding:0; overflow:auto; }\n        #flashContent { display:none; }\n\n        \n    </style>\n    <link rel=\"stylesheet\" type=\"text/css\" href=\"css/flowpaper.css\" />\n    \n    <script type=\"text/javascript\" src=\"js/jquery.min.js\"></script>\n    <script type=\"text/javascript\" src=\"js/jquery.extensions.min.js\"></script>\n    <!--[if gte IE 10 | !IE ]><!-->\n    <script type=\"text/javascript\" src=\"js/three.min.js\"></script>\n    <!--<![endif]-->\n    <script type=\"text/javascript\" src=\"js/flowpaper.js\"></script>\n    <script type=\"text/javascript\" src=\"js/flowpaper_handlers.js\"></script>\n    <title>T&G_KW35_36_2026.indd</title>\n</head>\n<body>\n<div id=\"documentViewer\" class=\"flowpaper_viewer\" style=\"position:absolute;;width:100%;height:100%;background-color:#222222;;\"></div>\n<script type=\"text/javascript\">\n    // viewer start\n    $('#documentViewer').FlowPaperViewer(\n            { config : {\n                \"PDFFile\"                 : \"docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206\",\n                \"IMGFiles\"                : \"docs/T-G_KW35_36_2026_Osttirol.pdf_{page}.jpg?reload=1787207674206\",\n                \"HighResIMGFiles\"         : \"\",\n                \"JSONFile\"                : \"docs/T-G_KW35_36_2026_Osttirol.pdf_{page}.bin?reload=1787207674206\",\n                \"JSONDataType\"            : \"lz\",\n                \"ThumbIMGFiles\"           : \"docs/T-G_KW35_36_2026_Osttirol.pdf_{page}_thumb.jpg?reload=1787207674206\",\n                \"SWFFile\"                 : \"\",\n                \"FontsToLoad\"             : null,\n\n                \"Scale\"                   : 0.1,\n                \"ZoomTransition\"          : \"easeOut\",\n                \"ZoomTime\"                : 0.4,\n                \"ZoomInterval\"            : 0.001,\n                \"FitPageOnLoad\"           : true,\n                \"FitWidthOnLoad\"          : false,\n                \"AutoAdjustPrintSize\"     : true,\n                \"PrintPaperAsBitmap\"      : false,\n                \"AutoDetectLinks\"         : true,\n                \"ImprovedAccessibility\"   : false,\n                \"FullScreenAsMaxWindow\"   : false,\n                \"EnableCornerDragging\"    : true,\n                \"ProgressiveLoading\"      : false,\n                \"MinZoomSize\"             : 0.1,\n                \"MaxZoomSize\"             : 5,\n                \"SearchMatchAll\"          : true,\n                \"InitViewMode\"            : \"Zine\",\n                \"RTLMode\"                 : false,\n                \"RenderingOrder\"          : \"html5,html\",\n                \"StartAtPage\"             : 1,\n                \"EnableWebGL\"             : false,\n                \"PreviewMode\"             : \"\",\n                \"PublicationTitle\"        : \"T&G_KW35_36_2026.indd\",\n                \"AnimatedLoader\"          : false,\n                \"LinkTarget\"              : \"New window\",\n                \"RestrictToDomains\"       : [\"AllowedDomains:*\"],\n                \"MixedMode\"               : true,\n\n                \"UIConfig\"                : \"T-G_KW35_36_2026_Osttirol.xml?reload=1787207674206\",\n                \"BrandingLogo\"            : \"\",\n                \"BrandingUrl\"             : \"http://www.tundg.at\",\n\n                \"WMode\"                   : \"transparent\",\n\n                \"key\"                     : \"$549fadd1cc682e5fcaa\",\n                \"TrackingNumber\"          : \"\",\n                \"localeDirectory\"         : \"locale/\",\n                \"localeChain\"             : \"en_US\"\n            }}\n    );\n    // viewer end\n\n    var url = window.location.href.toString();\n    if(location.length==0){\n        url = document.URL.toString();\n    }\n    if(url.indexOf(\"file:\")>=0){\n        jQuery('#documentViewer').html(\"<div style='position:relative;background-color:#ffffff;width:420px;font-family:Verdana;font-size:10pt;left:22%;top:20%;padding: 10px 10px 10px 10px;border-style:solid;border-width:5px;'><img src='data:image/gif;base64,R0lGODlhEAAPAMQPAPS+GvXAIfrjnP/89vnZePrhlvS9F//+/PrfjfS/HfrgkPS+GP/9+YJiACAYAP////O3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAA8ALAAAAAAQAA8AAAVQ4COOD0GQKElA0JmSg7EsxvCOCMsi9xPrkNpNwXI0WIoXA1A8QgCMVEFn1BVQS6rzGR1NtcCriJEAVnWJrgDI1gkehwD7rAsc1u28QJ5vB0IAOw%3D%3D'>&nbsp;<b>You are trying to use FlowPaper from a local directory.</b><br/><br/> Use the 'View in browser' button in the Desktop Publisher publish & preview dialog window to preview your publication or copy the contents of your publication directory to a web server and access this html file through a http:// url.</div>\");\n    }\n</script>\n</body>\n</html>",
-  "pdf": null
+  "pdf": {
+    "pageCount": 8,
+    "characters": 7298,
+    "signalTotals": {
+      "billiger": 0,
+      "gratis": 0,
+      "abQuantity": 30,
+      "prices": 233
+    },
+    "pages": [
+      {
+        "page": 1,
+        "characters": 1024,
+        "preview": "tundg.atAngebote gültig ab Donnerstag, 27.08.2026 bis Mittwoch, 09.09.2026 in allen T&G Filialen in Osttirol. KW35-37\nDa hast du mehr davon.\nCoca-Cola\n330 ml,\nversch. Sorten,\nexkl. Einwegpfand,\n2.39 €/l\nEristoff\nVodka\n0.7 l, versch. Sorten,\nEinweg, 14.27 €/l\nNiemetz\nSchweden-\nbomben\n360 g, 15.25 €/kg\nPER KG JE PKG. AB 2 DS.\n-29% -30%\nLavazza\nKaffee\n1 kg, ganze Bohne,\nversch. Sorten,\n17.99 €/kg\nT&G XL\nSchweinefilet\nper kg,\n2-Stück-Packung,\n9.99 €/kg\n9.99\n13.99\n13.99\n19.99\n-38% -26%-31%\n17.99\n28.99\n9.99\n13.49\n5.49\n7.99\n0.79\n1.39\nAB 2 PKG. AB 2 FL.AB 2 PKG.\nAB 2 STK.AB 24 DS.\nFelix\nGulaschsuppe\noder Chili\ncon Carne\n2.9 kg, 4.82 €/kg\n-43%\nGösser\nMärzen Kiste\n20 x 0.5 l, exkl. Pfand, 0.75 € /0.5 l\nGÜLTIG VON\n27.08. – 02.09.\n1+1\n14.90\n1 KISTE 29.80\nBEI 2 KISTEN JE\nZipfer\nMärzen Kiste\n20 x 0.5 l, exkl. Pfand, 0.70 € /0.5 l\nGÜLTIG VON\n03.09. – 09.09.\n1+1\n14.00\n1 KISTE 28.00\nBEI 2 KISTEN JE\n15.99\n23.83\nSchärdinger\nTeebutter\n10 x 250 g, 6.40 € /kg\n-33%\n-42%\n0.99\n1.70\nAB 2 STK.\nEissalat\naus Tirol, per Stück,\n0.99 €/Stk.",
+        "signals": {
+          "billiger": 0,
+          "gratis": 0,
+          "abQuantity": 7,
+          "prices": 36
+        }
+      },
+      {
+        "page": 2,
+        "characters": 752,
+        "preview": "Hubers\nDuo Hendl\nca. 2.5 kg, 3.99 € /kg\nM\nFarmerschinken\n120 g, geschnitten,\n1.24 €/100 g\nGreisinger\nBratwürstel\n800 g, 2 x 8 Paar,\n9.36 €/kg\nT&G XL\nSchweine Bauch\nper kg, im Ganzen,\n7.99 €/kg\nBerger\nFrühstücks-\nSchinken\n500 g, geschnitten,\n13.98 €/kg\nGurken\naus Österreich,\nper Stück, 0.79 €/Stk.\nNektarinen\nper 1 kg Tasse\nChiquita\nBananen\nper kg\n3.99\n4.99\n7.49\n9.99\n7.99\n9.99\n2.99\n4.99\n6.99\n9.99\n1.79\n2.49\n0.79\n1.32\nPER KG\nJE PKG.\nAB 2 PKG. JE PKG.\nPER KG\nJE PKG.\nAB 2 STK.\nPER TS.\nPER KG\n-20%\n-40%\n-25%\n-28%\n-28%\n-40%\n1+1\n1.49\n1 PKG. 2.99\nBEI 2 PKG. JE\nTIEFKÜHLFRISCH TIEFKÜHLFRISCH\nIglo\nBackfisch-\nstäbchen\n728 g,\n26-Stück-Packung,\n8.91 €/kg\nPirulo\nEis\n160 – 411 ml,\nversch. Sorten,\n7.27 – 18.69 €/l\nVITAMINE\nPUR!\n-30%\n6.49\n9.49\n-32%\n1.79\n2.49\n-20%",
+        "signals": {
+          "billiger": 0,
+          "gratis": 0,
+          "abQuantity": 2,
+          "prices": 29
+        }
+      },
+      {
+        "page": 3,
+        "characters": 897,
+        "preview": "Alpiland\nGouda\n400 g, geschnitten,\n9.98 €/kg\nFormil\nH-Vollmilch oder\nH-Haferdrink\n1 l, 3.6 % F.i.T.,\n0.90 €/l\nAlpiland\nEmmentaler\noder Großloch-\nkäse\n1 kg, geschnitten,\n9.99 €/kg\nSchärdinger\nGouda\n1 kg, 45 % F.i.T.,\n7.49 €/kg\nMeggle\nBaguette\n160 g, versch. Sorten,\n10.56 €/kg\nMeisterbrezen\nLaugenbrezen\n750 g, 3.59 €/kg\nDanone\nActimel\n600 g, versch. Sorten,\n6-Stück-Packung,\n2.37 €/kg\n7.49\n12.99\n1.69\n2.09\n3.99\n5.59\n0.90\n1.61/1.69\nJE PKG.\nAB 12 PKG.\nJE PKG.AB 2 PKG.\nAB 2 PKG.\nJE PKG.\n-24%\nÖlz\nSuper Soft\nSandwich\n750 g, 3.72 € /kg\nGalbani\nMozzarella\n125 g, 9.12 €/kg\n1+1 1+1\n2+2\n0.67\n1 PKG. 1.35\nBEI 2 PKG. JE\n1.42\n1 PKG. 2.85\nBEI 2 PKG. JE\n1.14\n1 PKG. 2.29\nBEI 4 PKG. JE\nTIEFKÜHLFRISCH\nLattella\nFruchtmolke\n0.5 l, versch. Sorten,\n1.34 € /l\n9.99\n12.99\nAB 2 PKG.\n-23%\n-19%\n2.79\n3.69\n-42%\n-29%\n4.49\n5.19\n2.69\n3.19 Huober\nBio Brezel\n400 g,\n20-Stück-Packung,\n11.23 €/kg\nAB 2 PKG.\n-13%-16%\n-47%\nbis zu",
+        "signals": {
+          "billiger": 0,
+          "gratis": 0,
+          "abQuantity": 5,
+          "prices": 34
+        }
+      },
+      {
+        "page": 4,
+        "characters": 680,
+        "preview": "Amica\nChips\n400 g, gesalzen,\n6.98 €/kg\nKatjes\nYoghurt Gums\n210 g, 4.71 €/kg\nAlpenbrezel\nHonig-Senf\n125 g, 7.92 €/kg\n\nJeden Tag\nZucker\n1 kg, 0.79 €/kg\nTreets\nPretzel Bites\nvegan\n175 g, 11.37 € /kg\n12.99\nAB 2 PKG.\nAB 10 PKG.\nAB 2 PKG.\nAB 2 PKG.\nLotus\nBiscoff\nKaramellgebäck\n1.875 kg, 6.93 €/kg\n1.99\n2.79\n2.79\n3.49\n8.99\n11.99\n0.79\n0.99\n-29%\n-20%\n-25%\nJE PKG.\nTirol Milch\nKaffeeobers\n200 x 10 g, € 4.50/kg\n-25%\nauf alle Artikel von\nJACOBS\n-25%\nauf alle Artikel von\nNIMM2\n-20%\n1+1\n0.99\n1 PKG. 1.98\nBEI 2 PKG. JE\n0.99\n1 PKG. 1.99\nBEI 2 PKG. JE\n1+1\nDebic\nSprühsahne\n0.7 l, ungesüßt,\n10.70 €/l\n7.49\n9.99\nJE FL.\n-25%\nLebkuchenherz\nOktoberfest\n180 g, versch. Motive,\n27.72 €/kg\n4.99\nJE STK.",
+        "signals": {
+          "billiger": 0,
+          "gratis": 0,
+          "abQuantity": 4,
+          "prices": 25
+        }
+      },
+      {
+        "page": 5,
+        "characters": 552,
+        "preview": "20 L\nDeveley\nWeisswurst\nSenf\n250 ml, 4.76 €/l\nMautner\nMarkhof\nSaucen\n1.2 – 1.4 kg,\nversch. Sorten,\n2.49 – 2.91 €/kg\nefko\nKartoffel Salat\n3 kg, 3.00 €/kg\nKnorr\nBratensaft\n1 kg, 24.99 €/kg\n3.49\n3.99/5.99\n44.99\n8.99\n11.99\n1.19\n1.79\nAB 2 PKG.\nJE DS.\nAB 2 GL.\n\nMy Price\nFrittierfett\n20 l, halbflüssig, 2.25 € /l\n\nEfko\nDelikatess\nGurken\n360 g, 5.53 €/kg\nKronenöl\nRapsöl\n2 l, 3.50 €/l\n1.99\n3.29\n6.99\n9.99\nJE FASSAB 2 DS.\nAB 2 GL.\n-40%\n-30%\n-25%\n-34%\n-25%\nauf alle Artikel von\nKOTÁNYI\n-20%\nauf alle Artikel von\nRIO MARE\n-42%\nbis zu\n24.99\n-20%\nauf\nESSIG\nJE PKG.",
+        "signals": {
+          "billiger": 0,
+          "gratis": 0,
+          "abQuantity": 3,
+          "prices": 21
+        }
+      },
+      {
+        "page": 6,
+        "characters": 971,
+        "preview": "5 L\nFelix\nKatzenfutter\nJumbo Pack\n44 x 85 g,\nversch. Sorten,\n3.74 €/kg\n\nVöslauer\nMineralwasser\n1.5 l, versch. Sorten,  exkl. Einwegpfand, 0.33 €/l\nPlenty White\nKüchenrolle\n8 x 45 Blatt, 2-lagig,\nversch. Sorten,\n0.62 €/Rolle\nCosy\nToilettenpapier\nWeiß\n20 x 150 Blatt, 3-lagig,\n0.34 €/Rolle\nDreamies\nKatzenfutter\nMega Box\n350 g, versch. Sorten,\n22.83 €/kg\n\nMautner\nMarkhof\nSirup\n5 l, versch. Sorten,\n2.80 €/l\nAlufix\nAlufolie\n300 m x 29 cm,\n0.08 €/m\n\nSilberquelle\nMineralwasser\n6 x 0.5 l, versch. Sorten,\nexkl. Einwegpfand, 0.69 € /l\n4.99\n6.49\n24.99\n32.99\n13.99\n15.99\n6.79\n7.99\n7.99\nJE PKG. JE PKG.\nJE PKG. JE PKG.\nJE KANISTER\n3+3\n4+26+6\n0.49\n1 FL. 0.99\nBEI 6 FL. JE\n2.07\n1 TRAY 4.14\nBEI 2 TRAYS JE\n1.72\n1 FL. 2.59\nBEI 6 FL. JE\n0.64\n1 FL. 1.29\nBEI 12 FL. JE\nSilberquelle\n10 Vitamine Ace\n0.5 l,\nexkl. Einwegpfand,\n1.28 €/l\n13.99\n19.99\n\nSchweppes\nOriginal\n1.25 l, versch. Sorten,\nexkl. Einwegpfand,\n1.38 € /l\n-30%\n-23% -24%\nJE PKG.\n1+1\n-15%\n-13%\n-25%\nauf alle Artikel von\nLENOR",
+        "signals": {
+          "billiger": 0,
+          "gratis": 0,
+          "abQuantity": 0,
+          "prices": 30
+        }
+      },
+      {
+        "page": 7,
+        "characters": 815,
+        "preview": "1L\nRauch\nEistee\n0.33 l, versch. Sorten, exkl. Einwegpfand, 1.48 € /l\n2.59\n2.99\n4.99\n7.99Valdo\nProsecco\n0.75 l, Einweg,\n6.65 €/l\nSan Cisalto\nWein\n0.75 l, versch. Sorten,\nEinweg, 2.65 € /l\n\nLillet\nBlanc oder Rosé\n0.75 l, Einweg,\n13.32 € /l\n\nBerliner Luft\n9er Pack\n180 ml, versch. Sorten,\nEinweg, 38.83 €/l\nRed Bull\nOrganics\n0.25 – 0.33 l,\nversch. Sorten,\nexkl. Einwegpfand,\n3.00 – 3.96 €/l\nEristoff\nAlco Pops\n0.25 l,\nexkl. Einwegpfand,\n5.56 €/l\nCa‘Miani\nLugana Stelle\n0.75 l, versch. Sorten,\nEinweg, 9.32 € /l\n1.39\n1.99\n0.49\n1.19\n9.99\n17.99\n6.99\n9.99\nJE FL.\nAB 2 PKG.AB 2 DS.\nAB 24 DS. AB 12 DS.\n-30%\n-30%\n1+12+1\n6.99\n1 FL. 13.98\nBEI 2 FL. JE\n0.99\n1.69\n-41%\n-44%\nAichenberg-\nkellerei\nWein\n1 l, versch. Sorten,\nEinweg, 2.59 € /l\nAB 6 FL. AB 6 FL.\n-13% -38%\n1.99\n1 FL. 2.99\nBEI 3 FL. JE\n-25%\nauf alle\nFRUCHT-\nSÄFTE\n-59%",
+        "signals": {
+          "billiger": 0,
+          "gratis": 0,
+          "abQuantity": 6,
+          "prices": 35
+        }
+      },
+      {
+        "page": 8,
+        "characters": 1600,
+        "preview": "Nicht jeder beworbene Artikel ist in ganz Österreich erhältlich. Abgabe nur in haushaltsüblichen Mengen und solange der Vorrat reicht. Preis inkl. Steuern, exkl.\nPfand. Statt-Preise sind unsere bisherigen Verkaufspreise im Sinne des Preisauszeichnungsgesetztes. Preise und Rabatte werden kaufmännisch gerundet.\nSatz- und Druckfehler vorbehalten. Medieninhaber/Herausgeber/Redaktion: MPREIS Warenvertriebs GmbH, Landesstraße 16, A-6176 Völs. Druck: Ferdinand\nBerger & Söhne GmbH, Druck-, Verlags- und Herstellungsort: Horn. Gültig ab Donnerstag, 27.08.2026 bis Mittwoch, 09.09.2026. KW35-37\nwww.tundg.at\n Das Österreichische Umweltzeichen\nfür Druckerzeugnisse, UZ 24, UW 686\nFerdinand Berger & Söhne GmbH.\nUnbenannt-1   1 07.07.2009   13:28:58\nZu unseren Öffnungszeiten & Standorten.\nJETZT NEU: DIE BESTEN DEALS IM ABO!\nJetzt kostenlos für den T&G WhatsApp Newsletter anmelden & kein Angebot mehr verpassen.\nSchwechater\nBier Dose\n0.5 l, 0.69 € /0.5 l,\nexkl. Einwegpfand\nKALEA\nWiesn Tragerl\n10 x 0.5 l, exkl. Pfand,\n2.39 €/0.5 l\nHILL Liter\nWein\n1 l, versch. Sorten,\nEinweg, 4.66 €/l\nAugustiner\nHell Kiste\n20 x 0.5 l, exkl. Pfand,\n1.00 €/0.5 l\n\nAlmdudler\nKiste oder Spezi\nCola-Mix\n24 x  0.35 l,\nversch. Sorten,\nexkl. Pfand,\n2.02 €/l\nCorona\nExtra Kiste\n24 x 0.355 l, exkl. Pfand,\n1.46 €/0.5 l\nHacker Pschorr\nOktoberfest\nBier Kiste\n20 x 0.5 l,\nexkl. Pfand,\n1.24 €/0.5 l\n24.90\n38.16\n24.80\n16.99\n30.96\n19.90\n29.80\n23.90\nAB 2 KISTEN AB 2 KISTEN JE KISTE\nAB 2 KISTEN\n-35%-33%\n-45% -25% auf alle\nSCHNÄPSE &\nBRÄNDE\n0.69\n1 DS. 1.39\nBEI 24 DS. JE\n12+12\n4.66\n1 FL. 6.99\nBEI 6 FL. JE\n4+2\n-25% auf alle\nFASSBIERE\n1 L",
+        "signals": {
+          "billiger": 0,
+          "gratis": 0,
+          "abQuantity": 3,
+          "prices": 23
+        }
+      }
+    ]
+  }
 }
