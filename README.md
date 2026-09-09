@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 10.0
+# PreisPilot Osttirol – Version 10.1
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -530,3 +530,28 @@ Preisverlauf bleibt erhalten.
 
 Persönliche Produktverknüpfungen, Einkaufsliste und Einstellungen bleiben
 weiterhin ausschließlich im localStorage des Browsers.
+
+
+## Version 10.1 – T&G-Osttirol-Flugblatt-Diagnose
+
+Ziel ist, künftig nicht nur die wenigen T&G-Spezialaktionen der Website,
+sondern die vollständigen Angebote des regionalen Osttirol-Flugblatts zu
+importieren.
+
+Neue Datei:
+`scripts/diagnose_tg_flyer.py`
+
+Der Diagnose-Schritt:
+- lädt den FlowPaper-Viewer
+- untersucht HTML- und JavaScript-Assets
+- sucht die zugrunde liegende PDF-Datei
+- lädt sie, sofern auffindbar
+- extrahiert den vorhandenen PDF-Text mit `pypdf`
+- zählt typische Aktionssignale wie `BILLIGER`, `GRATIS`, Mengenbedingungen
+  und Preiswerte
+- speichert Seitenvorschauen und technische Informationen in
+  `data/tg-flyer-diagnostics.json`
+
+Noch werden aus dem Flugblatt keine zusätzlichen Preise in `data/tg.json`
+übernommen. Erst nach Sichtung der echten PDF-Textstruktur wird der Parser
+für das vollständige Osttirol-Flugblatt gebaut.
