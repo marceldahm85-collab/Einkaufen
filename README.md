@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 10.4
+# PreisPilot Osttirol – Version 11.0
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -682,3 +682,53 @@ Damit können Mengenaktionen nicht mehr fälschlich als normaler Einzelpreis in
 
 Die T&G-Aktionsansicht bleibt unverändert vollständig: nicht sicher zuordenbare
 Flyerpreise werden weiterhin als `nur Anzeige` dargestellt.
+
+
+## Version 11.0 – Händlerkatalog
+
+Die Seite `Artikel` besitzt nun zwei Ansichten:
+
+- `Meine Artikel`
+- `Händlerkatalog`
+
+Der Händlerkatalog umfasst derzeit alle bereits importierten Produktbestände von:
+
+- MPREIS
+- SPAR
+- T&G
+
+### Browsing
+
+Ein leerer Suchbegriff zeigt den vollständigen Händlerbestand alphabetisch an.
+Damit die mobile App bei zehntausenden Produkten flüssig bleibt, werden immer
+nur 50 Produkte gerendert. Über `Weitere Produkte laden` wird seitenweise
+nachgeladen.
+
+Die Suche läuft trotzdem über den vollständigen Händlerbestand und nicht nur
+über die gerade sichtbaren 50 Karten.
+
+Optional kann mit `🔥 Aktionen` ausschließlich nach aktuell erkannten
+Aktionsartikeln gefiltert werden.
+
+### Verknüpfen vom Händlerprodukt aus
+
+Jede Händlerproduktkarte besitzt nun `Verknüpfen`.
+
+Danach kann:
+- ein bestehender persönlicher Artikel ausgewählt werden oder
+- das Händlerprodukt direkt als neuer persönlicher Artikel übernommen werden.
+
+Die neue Richtung ergänzt den bisherigen Workflow
+`persönlicher Artikel → Händlerprodukt suchen`.
+
+### Datenschutz
+
+Der Händlerkatalog liest ausschließlich die öffentlichen JSON-Preisdateien.
+Welche Produkte mit welchen persönlichen Artikeln verknüpft wurden, bleibt
+weiterhin ausschließlich im localStorage des Browsers.
+
+### Performance
+
+Die Live-Module MPREIS, SPAR und T&G besitzen nun eine gemeinsame paginierte
+`browse()`-Schnittstelle. Der alphabetische Index wird erst beim ersten Öffnen
+des jeweiligen Katalogs im Browser aufgebaut und anschließend wiederverwendet.

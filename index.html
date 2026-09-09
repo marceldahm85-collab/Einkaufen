@@ -54,17 +54,53 @@
       </section>
 
       <section class="view" data-view="articles">
-        <div class="search-wrap">
-          <input id="articleSearch" class="search-input" type="search" placeholder="Artikel suchen …" autocomplete="off">
+        <div class="segmented article-mode-segmented" id="articleModeSegmented">
+          <button data-article-mode="personal" class="is-active">Meine Artikel</button>
+          <button data-article-mode="catalog">Händlerkatalog</button>
         </div>
-        <div id="categoryChips" class="chip-row" aria-label="Kategorien"></div>
-        <div class="section-head">
-          <div>
-            <h2>Artikelübersicht</h2>
-            <p class="muted" id="articleCountLabel"></p>
+
+        <div id="personalArticlesPanel">
+          <div class="search-wrap article-search-wrap">
+            <input id="articleSearch" class="search-input" type="search" placeholder="Artikel suchen …" autocomplete="off">
           </div>
+          <div id="categoryChips" class="chip-row" aria-label="Kategorien"></div>
+          <div class="section-head">
+            <div>
+              <h2>Artikelübersicht</h2>
+              <p class="muted" id="articleCountLabel"></p>
+            </div>
+          </div>
+          <div id="articleList" class="stack"></div>
         </div>
-        <div id="articleList" class="stack"></div>
+
+        <div id="retailerCatalogPanel" class="hidden">
+          <div class="catalog-store-row" id="catalogStoreTabs" aria-label="Händlerkatalog">
+            <button data-catalog-store="mpreis" style="--catalog-store:#d50057">MPREIS</button>
+            <button data-catalog-store="spar" style="--catalog-store:#00843d">SPAR</button>
+            <button data-catalog-store="tg" style="--catalog-store:#ef7d00">T&G</button>
+          </div>
+
+          <div class="search-wrap catalog-search-wrap">
+            <input id="retailerCatalogSearch" class="search-input" type="search"
+                   placeholder="MPREIS-Produkte suchen …" autocomplete="off">
+          </div>
+
+          <div class="catalog-toolbar">
+            <div>
+              <div class="eyebrow" id="catalogEyebrow">MPREIS KATALOG</div>
+              <div class="catalog-count" id="retailerCatalogCount">Produkte werden geladen …</div>
+            </div>
+            <button class="catalog-filter-btn" id="catalogPromotionFilter" type="button"
+                    aria-pressed="false">🔥 Aktionen</button>
+          </div>
+
+          <div id="retailerCatalogState" class="muted small catalog-state"></div>
+          <div id="retailerCatalogList" class="stack catalog-list"></div>
+
+          <button id="retailerCatalogMoreBtn" class="secondary-btn full catalog-more hidden" type="button">
+            Weitere Produkte laden
+          </button>
+        </div>
       </section>
 
       <section class="view" data-view="markets">
@@ -487,6 +523,34 @@
       T&G-Aktionen werden geladen …
     </div>
     <div id="tgPromotionsList" class="stack live-result-list"></div>
+  </section>
+
+  <section class="bottom-sheet" id="catalogLinkSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow" id="catalogLinkEyebrow">HÄNDLERPRODUKT</div>
+        <h2 id="catalogLinkTitle">Verknüpfen</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+
+    <div id="catalogLinkSummary" class="catalog-link-summary"></div>
+
+    <button class="primary-btn full catalog-create-btn" id="catalogCreatePersonalBtn" type="button">
+      ＋ Als neuen persönlichen Artikel übernehmen
+    </button>
+
+    <div class="divider"></div>
+    <div class="eyebrow">MIT VORHANDENEM ARTIKEL VERKNÜPFEN</div>
+
+    <div class="search-wrap sheet-search catalog-target-search">
+      <input id="catalogPersonalSearch" class="search-input" type="search"
+             placeholder="Persönlichen Artikel suchen …" autocomplete="off">
+    </div>
+
+    <div id="catalogPersonalState" class="muted small live-search-state"></div>
+    <div id="catalogPersonalResults" class="stack catalog-personal-results"></div>
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

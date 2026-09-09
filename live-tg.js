@@ -5,6 +5,7 @@
   let payloadCache = null;
   let loadPromise = null;
   let lookup = null;
+  let browseIndex = null;
 
   async function load(force = false) {
     if (!force && payloadCache) return payloadCache;
@@ -105,6 +106,90 @@
       .map(item => enrich(item, payload));
   }
 
+
+  function ensureBrowseIndex(payload) {
+    if (browseIndex) return browseIndex;
+
+    browseIndex = payload.products
+      .map(item => ({
+        item,
+        name: normalize(item.name),
+        description: normalize(item.description),
+        originalName: String(item.name || "")
+      }))
+      .sort((a, b) =>
+        a.originalName.localeCompare(b.originalName, "de", {
+          sensitivity: "base",
+          numeric: true
+        })
+      );
+
+    return browseIndex;
+  }
+
+  function browseScore(entry, query, tokens) {
+    if (!query) return 0;
+
+    const name = entry.name;
+    const hay = `${entry.name} ${entry.description}`;
+
+    if (name === query) return 0;
+    if (name.startsWith(query)) return 1;
+    if (name.includes(query)) return 2;
+    if (tokens.every(token => hay.includes(token))) return 3;
+
+    const matches = tokens.filter(token => hay.includes(token)).length;
+    if (matches) return 10 - Math.min(matches, 6);
+
+    return 999;
+  }
+
+  async function browse(options = {}) {
+    const payload = await load(false);
+    const query = normalize(options.query || "");
+    const tokens = query.split(/\s+/).filter(Boolean);
+    const offset = Math.max(0, Number(options.offset) || 0);
+    const limit = Math.min(100, Math.max(1, Number(options.limit) || 50));
+    const promotionsOnly = Boolean(options.promotionsOnly);
+
+    let rows = ensureBrowseIndex(payload);
+
+    if (promotionsOnly) {
+      rows = rows.filter(entry => entry.item.promotionVerified === true);
+    }
+
+    if (query) {
+      rows = rows
+        .map(entry => ({
+          entry,
+          score: browseScore(entry, query, tokens)
+        }))
+        .filter(row => row.score < 999)
+        .sort((a, b) =>
+          (a.score - b.score) ||
+          a.entry.originalName.localeCompare(
+            b.entry.originalName,
+            "de",
+            { sensitivity: "base", numeric: true }
+          )
+        )
+        .map(row => row.entry);
+    }
+
+    const total = rows.length;
+    const page = rows
+      .slice(offset, offset + limit)
+      .map(entry => enrich(entry.item, payload));
+
+    return {
+      items: page,
+      total,
+      offset,
+      limit,
+      hasMore: offset + page.length < total
+    };
+  }
+
   async function status(force = false) {
     const payload = await load(force);
 
@@ -129,6 +214,7 @@
   async function reload() {
     payloadCache = null;
     lookup = null;
+    browseIndex = null;
     loadPromise = null;
     return status(true);
   }
@@ -150,5 +236,5 @@
       .trim();
   }
 
-  window.TgLive = { search, getObject, promotions, status, reload };
+  window.TgLive = { search, browse, getObject, promotions, status, reload };
 })();

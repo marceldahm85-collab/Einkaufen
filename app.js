@@ -96,6 +96,18 @@
   let currentView = "shopping";
   let currentCategory = "Alle";
   let currentMarket = "all";
+  let currentArticleMode = "personal";
+  let currentCatalogRetailer = "mpreis";
+  let catalogPromotionsOnly = false;
+  let catalogSearchTimer = null;
+  let catalogRequestSerial = 0;
+  let catalogQueryKey = "";
+  let catalogItems = [];
+  let catalogTotal = 0;
+  let catalogHasMore = false;
+  let catalogLoading = false;
+  let selectedCatalogItem = null;
+  const CATALOG_PAGE_SIZE = 50;
   let currentMpreisLinkProductId = null;
   let currentSparLinkProductId = null;
   let currentTgLinkProductId = null;
@@ -751,6 +763,22 @@
   }
 
   function renderArticles() {
+    const personalPanel = $("#personalArticlesPanel");
+    const catalogPanel = $("#retailerCatalogPanel");
+
+    if (personalPanel) personalPanel.classList.toggle("hidden", currentArticleMode !== "personal");
+    if (catalogPanel) catalogPanel.classList.toggle("hidden", currentArticleMode !== "catalog");
+
+    $$("#articleModeSegmented [data-article-mode]").forEach(button => {
+      button.classList.toggle("is-active", button.dataset.articleMode === currentArticleMode);
+    });
+
+    if (currentArticleMode === "catalog") {
+      renderCatalogTabs();
+      renderCatalogView();
+      return;
+    }
+
     const q = ($("#articleSearch")?.value || "").trim().toLowerCase();
     const filtered = state.products.filter(p =>
       (currentCategory === "Alle" || p.category === currentCategory) &&
@@ -764,6 +792,444 @@
     $("#categoryChips").innerHTML = cats.map(c =>
       `<button class="chip ${c === currentCategory ? "is-active" : ""}" data-category="${escapeAttr(c)}">${escapeHtml(c)}</button>`
     ).join("");
+  }
+
+  function setArticleMode(mode) {
+    if (!["personal", "catalog"].includes(mode)) return;
+    if (currentArticleMode === mode) return;
+
+    currentArticleMode = mode;
+    renderArticles();
+
+    if (mode === "catalog") {
+      resetAndLoadCatalog();
+    }
+  }
+
+  function catalogLiveModule(store = currentCatalogRetailer) {
+    if (store === "mpreis") return window.MPreisLive;
+    if (store === "spar") return window.SparLive;
+    if (store === "tg") return window.TgLive;
+    return null;
+  }
+
+  function renderCatalogTabs() {
+    const store = retailer(currentCatalogRetailer);
+
+    $$("#catalogStoreTabs [data-catalog-store]").forEach(button => {
+      button.classList.toggle(
+        "is-active",
+        button.dataset.catalogStore === currentCatalogRetailer
+      );
+    });
+
+    const input = $("#retailerCatalogSearch");
+    if (input) input.placeholder = `${store.name}-Produkte suchen …`;
+
+    const eyebrow = $("#catalogEyebrow");
+    if (eyebrow) eyebrow.textContent = `${store.name.toUpperCase()} KATALOG`;
+
+    const promoButton = $("#catalogPromotionFilter");
+    if (promoButton) {
+      promoButton.classList.toggle("is-active", catalogPromotionsOnly);
+      promoButton.setAttribute("aria-pressed", catalogPromotionsOnly ? "true" : "false");
+    }
+  }
+
+  function setCatalogRetailer(store) {
+    if (!["mpreis", "spar", "tg"].includes(store)) return;
+    if (currentCatalogRetailer === store) return;
+
+    currentCatalogRetailer = store;
+    catalogPromotionsOnly = false;
+
+    const input = $("#retailerCatalogSearch");
+    if (input) input.value = "";
+
+    renderCatalogTabs();
+    resetAndLoadCatalog();
+  }
+
+  function catalogCurrentQuery() {
+    return ($("#retailerCatalogSearch")?.value || "").trim();
+  }
+
+  function catalogKey() {
+    return [
+      currentCatalogRetailer,
+      catalogCurrentQuery().toLowerCase(),
+      catalogPromotionsOnly ? "promo" : "all"
+    ].join("|");
+  }
+
+  function resetCatalogState() {
+    catalogQueryKey = catalogKey();
+    catalogItems = [];
+    catalogTotal = 0;
+    catalogHasMore = false;
+    catalogLoading = false;
+    renderCatalogView();
+  }
+
+  function resetAndLoadCatalog() {
+    resetCatalogState();
+    loadCatalogPage();
+  }
+
+  async function loadCatalogPage() {
+    if (catalogLoading) return;
+
+    const module = catalogLiveModule();
+    const stateEl = $("#retailerCatalogState");
+
+    if (!module?.browse) {
+      if (stateEl) stateEl.textContent = "Der Händlerkatalog konnte nicht geladen werden.";
+      return;
+    }
+
+    const requestKey = catalogKey();
+
+    if (requestKey !== catalogQueryKey) {
+      resetCatalogState();
+    }
+
+    const serial = ++catalogRequestSerial;
+    catalogLoading = true;
+    renderCatalogView();
+
+    try {
+      const page = await module.browse({
+        query: catalogCurrentQuery(),
+        offset: catalogItems.length,
+        limit: CATALOG_PAGE_SIZE,
+        promotionsOnly: catalogPromotionsOnly
+      });
+
+      if (serial !== catalogRequestSerial || requestKey !== catalogKey()) return;
+
+      const seen = new Set(
+        catalogItems.map(item =>
+          String(item.retailerProductId || item.remoteObjectId || "")
+        )
+      );
+
+      page.items.forEach(item => {
+        const key = String(item.retailerProductId || item.remoteObjectId || "");
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        catalogItems.push(item);
+      });
+
+      catalogTotal = Number(page.total) || 0;
+      catalogHasMore = Boolean(page.hasMore);
+    } catch (error) {
+      if (serial !== catalogRequestSerial) return;
+      if (stateEl) {
+        stateEl.textContent = `Katalog konnte nicht geladen werden: ${error.message}`;
+      }
+      catalogHasMore = false;
+    } finally {
+      if (serial === catalogRequestSerial) {
+        catalogLoading = false;
+        renderCatalogView();
+      }
+    }
+  }
+
+  function catalogItemId(item) {
+    return String(item?.retailerProductId || item?.remoteObjectId || "");
+  }
+
+  function catalogLinkedProductsMap(store) {
+    const map = new Map();
+
+    state.products.forEach(product => {
+      const link = product.liveLinks?.[store];
+      if (!link) return;
+
+      [link.retailerProductId, link.remoteObjectId]
+        .filter(Boolean)
+        .forEach(id => map.set(String(id), product));
+    });
+
+    return map;
+  }
+
+  function catalogDisplayPrice(item) {
+    if (item?.salePrice != null) return Number(item.salePrice);
+    if (item?.currentPrice != null) return Number(item.currentPrice);
+    if (item?.displayPrice != null) return Number(item.displayPrice);
+    return null;
+  }
+
+  function catalogAmountText(item) {
+    if (currentCatalogRetailer === "tg" && item?.amountText) {
+      return String(item.amountText);
+    }
+    return formatLiveAmount(item);
+  }
+
+  function renderCatalogView() {
+    if (currentArticleMode !== "catalog") return;
+
+    renderCatalogTabs();
+
+    const countEl = $("#retailerCatalogCount");
+    const stateEl = $("#retailerCatalogState");
+    const listEl = $("#retailerCatalogList");
+    const moreBtn = $("#retailerCatalogMoreBtn");
+
+    if (!countEl || !stateEl || !listEl || !moreBtn) return;
+
+    const store = retailer(currentCatalogRetailer);
+    const query = catalogCurrentQuery();
+    const linkedMap = catalogLinkedProductsMap(currentCatalogRetailer);
+
+    if (catalogLoading && !catalogItems.length) {
+      countEl.textContent = `${store.name}: Produkte werden geladen …`;
+      stateEl.textContent = query
+        ? `Suche nach „${query}“ …`
+        : "Gesamten Produktbestand laden …";
+      listEl.innerHTML = "";
+    } else {
+      countEl.textContent = catalogTotal
+        ? `${catalogTotal.toLocaleString("de-AT")} Produkte · ${catalogItems.length.toLocaleString("de-AT")} angezeigt`
+        : (catalogItems.length ? `${catalogItems.length} Produkte` : "Keine Produkte");
+
+      if (catalogItems.length) {
+        stateEl.textContent = catalogPromotionsOnly
+          ? "Nur aktuell erkannte Aktionsartikel"
+          : (query ? "Treffer im vollständigen Händlerbestand" : "Alphabetisch · jeweils 50 Produkte nachladen");
+      } else if (!catalogLoading) {
+        stateEl.textContent = query
+          ? `Keine Produkte für „${query}“ gefunden.`
+          : "Keine Produkte verfügbar.";
+      }
+
+      listEl.innerHTML = catalogItems.map((item, index) => {
+        const linked = linkedMap.get(catalogItemId(item)) || null;
+        const price = catalogDisplayPrice(item);
+        const sale = item.salePrice != null;
+        const promotion = item.promotion?.label;
+        const displayOnly = currentCatalogRetailer === "tg" && item.optimizerEligible === false;
+
+        return `
+          <article class="product-card catalog-product-card"
+                   style="--catalog-accent:${store.color}">
+            <div class="product-main catalog-product-main">
+              <div class="product-name">
+                ${escapeHtml(item.name)}
+                ${item.bio ? `<span class="live-result-bio">BIO</span>` : ""}
+              </div>
+              <div class="product-meta catalog-product-meta">
+                <span>${escapeHtml(catalogAmountText(item))}</span>
+                ${item.unitPrice
+                  ? `<span>·</span><span>${money(item.unitPrice)}/${escapeHtml(item.unitPriceUnit || "")}</span>`
+                  : ""}
+              </div>
+              <div class="offer-extra catalog-badges">
+                ${promotion
+                  ? `<span class="offer-badge condition">${escapeHtml(promotion)}</span>`
+                  : ""}
+                ${displayOnly
+                  ? `<span class="offer-badge tg-display-only">nur Anzeige</span>`
+                  : ""}
+                ${linked
+                  ? `<span class="catalog-linked-label">✓ ${escapeHtml(linked.name)}</span>`
+                  : ""}
+              </div>
+            </div>
+
+            <div class="product-price-wrap catalog-price-wrap">
+              <div class="product-price ${sale ? "sale" : ""}">${money(price)}</div>
+              ${sale && item.regularPrice != null
+                ? `<div class="old-price">${money(item.regularPrice)}</div>`
+                : ""}
+              <button class="catalog-link-btn ${linked ? "is-linked" : ""}"
+                      data-catalog-link-index="${index}">
+                ${linked ? "Verknüpfung" : "Verknüpfen"}
+              </button>
+            </div>
+          </article>`;
+      }).join("");
+    }
+
+    moreBtn.classList.toggle(
+      "hidden",
+      !catalogHasMore || catalogLoading || !catalogItems.length
+    );
+    moreBtn.disabled = catalogLoading;
+    moreBtn.textContent = catalogLoading
+      ? "Lädt …"
+      : `Weitere ${Math.min(CATALOG_PAGE_SIZE, Math.max(0, catalogTotal - catalogItems.length))} laden`;
+  }
+
+  function openCatalogLinkSheet(index) {
+    const item = catalogItems[Number(index)];
+    if (!item) return;
+
+    selectedCatalogItem = {
+      store: currentCatalogRetailer,
+      item
+    };
+
+    const store = retailer(currentCatalogRetailer);
+    const price = catalogDisplayPrice(item);
+
+    $("#catalogLinkEyebrow").textContent = `${store.name.toUpperCase()} PRODUKT`;
+    $("#catalogLinkTitle").textContent = item.name;
+
+    $("#catalogLinkSummary").innerHTML = `
+      <div class="catalog-link-product" style="--catalog-accent:${store.color}">
+        <div>
+          <strong>${escapeHtml(item.name)}</strong>
+          <div class="product-meta">
+            <span>${escapeHtml(catalogAmountText(item))}</span>
+            ${item.unitPrice
+              ? `<span>·</span><span>${money(item.unitPrice)}/${escapeHtml(item.unitPriceUnit || "")}</span>`
+              : ""}
+          </div>
+        </div>
+        <div class="catalog-link-price">${money(price)}</div>
+      </div>`;
+
+    $("#catalogPersonalSearch").value = "";
+    renderCatalogPersonalTargets();
+    openSheet("catalogLinkSheet");
+  }
+
+  function renderCatalogPersonalTargets() {
+    const resultEl = $("#catalogPersonalResults");
+    const stateEl = $("#catalogPersonalState");
+
+    if (!resultEl || !stateEl || !selectedCatalogItem) return;
+
+    const q = ($("#catalogPersonalSearch")?.value || "").trim().toLowerCase();
+    const store = selectedCatalogItem.store;
+    const liveItem = selectedCatalogItem.item;
+    const liveId = catalogItemId(liveItem);
+
+    const rows = state.products
+      .filter(product =>
+        !q ||
+        `${product.name} ${product.brand || ""} ${product.category}`
+          .toLowerCase()
+          .includes(q)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name, "de", {
+        sensitivity: "base",
+        numeric: true
+      }))
+      .slice(0, 40);
+
+    stateEl.textContent = rows.length
+      ? `${rows.length}${state.products.length > 40 && !q ? " von " + state.products.length : ""} persönliche Artikel`
+      : "Kein passender persönlicher Artikel gefunden.";
+
+    resultEl.innerHTML = rows.map(product => {
+      const link = product.liveLinks?.[store];
+      const linkedId = String(
+        link?.retailerProductId || link?.remoteObjectId || ""
+      );
+      const current = Boolean(liveId && linkedId === liveId);
+      const replaces = Boolean(link && !current);
+
+      return `
+        <article class="catalog-target-card ${current ? "is-current" : ""}">
+          <div>
+            <strong>${escapeHtml(product.name)}</strong>
+            <div class="muted small">
+              ${escapeHtml(product.brand || "ohne Marke")} ·
+              ${escapeHtml(fmtAmount(product))} ·
+              ${escapeHtml(product.category)}
+            </div>
+          </div>
+          <button class="catalog-target-btn ${current ? "is-current" : ""}"
+                  data-catalog-target-product="${product.id}"
+                  ${current ? "disabled" : ""}>
+            ${current ? "Aktuell" : (replaces ? "Ersetzen" : "Verknüpfen")}
+          </button>
+        </article>`;
+    }).join("");
+  }
+
+  function sameCatalogLiveItem(linkOrOffer, liveItem) {
+    if (!linkOrOffer || !liveItem) return false;
+
+    const liveIds = new Set(
+      [liveItem.retailerProductId, liveItem.remoteObjectId]
+        .filter(Boolean)
+        .map(String)
+    );
+
+    return [linkOrOffer.retailerProductId, linkOrOffer.remoteObjectId]
+      .filter(Boolean)
+      .map(String)
+      .some(id => liveIds.has(id));
+  }
+
+  function detachCatalogItemFromOtherProducts(store, liveItem, targetProductId) {
+    state.products.forEach(product => {
+      if (product.id === targetProductId) return;
+
+      const link = product.liveLinks?.[store];
+      if (!sameCatalogLiveItem(link, liveItem)) return;
+
+      delete product.liveLinks[store];
+
+      product.offers = (product.offers || []).filter(offer =>
+        !(
+          offer.store === store &&
+          sameCatalogLiveItem(offer, liveItem)
+        )
+      );
+    });
+  }
+
+  function linkSelectedCatalogItem(productId) {
+    if (!selectedCatalogItem) return;
+
+    const { store, item } = selectedCatalogItem;
+    detachCatalogItemFromOtherProducts(store, item, productId);
+
+    if (store === "mpreis") linkMpreisResult(productId, item);
+    else if (store === "spar") linkSparResult(productId, item);
+    else if (store === "tg") linkTgResult(productId, item);
+    else return;
+
+    selectedCatalogItem = null;
+  }
+
+  function createPersonalFromCatalog() {
+    if (!selectedCatalogItem) return;
+
+    const { store, item } = selectedCatalogItem;
+
+    const amountValue = Array.isArray(item.amount)
+      ? Number(item.amount[0]) || 1
+      : Number(item.amount);
+
+    const product = {
+      id: `p_${cryptoId()}`,
+      name: String(item.name || "Neuer Artikel").trim(),
+      brand: "",
+      category: "Sonstiges",
+      amount: Number.isFinite(amountValue) && amountValue > 0 ? amountValue : 1,
+      unit: item.unit || "Stk",
+      favorite: false,
+      offers: [],
+      liveLinks: {}
+    };
+
+    state.products.push(product);
+    detachCatalogItemFromOtherProducts(store, item, product.id);
+
+    if (store === "mpreis") linkMpreisResult(product.id, item);
+    else if (store === "spar") linkSparResult(product.id, item);
+    else if (store === "tg") linkTgResult(product.id, item);
+
+    selectedCatalogItem = null;
+    showToast("Persönlicher Artikel übernommen und verknüpft");
   }
 
   function renderArticleCard(product) {
@@ -2321,6 +2787,14 @@
     currentView = view;
     $$(".view").forEach(v => v.classList.toggle("is-active", v.dataset.view === view));
     $$(".nav-item").forEach(n => n.classList.toggle("is-active", n.dataset.nav === view));
+
+    if (view === "articles") {
+      renderArticles();
+      if (currentArticleMode === "catalog" && !catalogItems.length && !catalogLoading) {
+        loadCatalogPage();
+      }
+    }
+
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
@@ -2367,6 +2841,25 @@
 
     const del = e.target.closest("[data-shopping-delete]");
     if (del) return deleteShopping(del.dataset.shoppingDelete);
+
+    const articleMode = e.target.closest("[data-article-mode]");
+    if (articleMode) return setArticleMode(articleMode.dataset.articleMode);
+
+    const catalogStore = e.target.closest("[data-catalog-store]");
+    if (catalogStore) return setCatalogRetailer(catalogStore.dataset.catalogStore);
+
+    const catalogFilter = e.target.closest("#catalogPromotionFilter");
+    if (catalogFilter) {
+      catalogPromotionsOnly = !catalogPromotionsOnly;
+      renderCatalogTabs();
+      return resetAndLoadCatalog();
+    }
+
+    const catalogLink = e.target.closest("[data-catalog-link-index]");
+    if (catalogLink) return openCatalogLinkSheet(catalogLink.dataset.catalogLinkIndex);
+
+    const catalogTarget = e.target.closest("[data-catalog-target-product]");
+    if (catalogTarget) return linkSelectedCatalogItem(catalogTarget.dataset.catalogTargetProduct);
 
     const cat = e.target.closest("[data-category]");
     if (cat) { currentCategory = cat.dataset.category; return renderArticles(); }
@@ -2459,6 +2952,19 @@
   $("#sheetBackdrop").addEventListener("click", closeSheets);
 
   $("#articleSearch").addEventListener("input", renderArticles);
+
+  $("#retailerCatalogSearch").addEventListener("input", () => {
+    clearTimeout(catalogSearchTimer);
+    catalogSearchTimer = setTimeout(() => {
+      catalogRequestSerial += 1;
+      resetAndLoadCatalog();
+    }, 260);
+  });
+
+  $("#catalogPersonalSearch").addEventListener("input", renderCatalogPersonalTargets);
+
+  $("#retailerCatalogMoreBtn").addEventListener("click", loadCatalogPage);
+  $("#catalogCreatePersonalBtn").addEventListener("click", createPersonalFromCatalog);
 
   $("#mpreisSearchInput").addEventListener("input", (e) => {
     clearTimeout(mpreisSearchTimer);
