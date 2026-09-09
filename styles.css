@@ -797,3 +797,10 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
   text-overflow: clip;
   line-height: 1.22;
 }
+
+
+/* Version 10.3 – T&G vollständiger Osttirol-Flugblattimport */
+.offer-badge.tg-display-only {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 9%, var(--surface-2));
+}

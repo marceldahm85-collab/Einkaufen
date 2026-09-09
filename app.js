@@ -1575,10 +1575,13 @@
         ? ` · Aktionen bis ${formatDate(tgPublicStatus.validUntil)}`
         : "";
 
+      const flyerCount = tgPublicStatus.flyerProductCount || 0;
+      const linkable = tgPublicStatus.linkableCount || 0;
+
       lastEl.textContent = `Datenstand: ${updated.toLocaleString("de-AT", {
         day: "2-digit", month: "2-digit", year: "numeric",
         hour: "2-digit", minute: "2-digit"
-      })} · ${tgPublicStatus.productCount || 0} bepreiste Aktionen${period}`;
+      })} · ${flyerCount || tgPublicStatus.productCount || 0} Flugblatt-Angebote · ${linkable} sicher verknüpfbar${period}`;
     } else {
       lastEl.textContent = "Noch keine importierten T&G-Aktionsdaten vorhanden";
     }
@@ -1644,7 +1647,9 @@
       listEl.innerHTML = items.map(item => {
         const promotion = item.promotion || {};
         const condition = promotion.label || "Spezialaktion";
-        const hasPrice = item.salePrice != null;
+        const displayPrice = item.salePrice ?? item.displayPrice ?? null;
+        const hasPrice = displayPrice != null;
+        const displayOnly = item.optimizerEligible === false && item.displayPrice != null;
 
         return `
           <article class="product-card tg-promo-card">
@@ -1653,13 +1658,16 @@
               ${item.description ? `<div class="product-meta"><span>${escapeHtml(item.description)}</span></div>` : ""}
               <div class="offer-extra">
                 <span class="offer-badge condition">${escapeHtml(condition)}</span>
+                ${displayOnly
+                  ? `<span class="offer-badge tg-display-only">nur Anzeige</span>`
+                  : ""}
               </div>
             </div>
 
             <div class="product-price-wrap">
               ${hasPrice
-                ? `<div class="product-price sale">${money(item.salePrice)}</div>
-                   ${item.regularPrice != null && Number(item.regularPrice) !== Number(item.salePrice)
+                ? `<div class="product-price sale">${money(displayPrice)}</div>
+                   ${item.regularPrice != null && Number(item.regularPrice) !== Number(displayPrice)
                      ? `<div class="old-price">${money(item.regularPrice)}</div>`
                      : ""}
                    <div class="product-meta" style="justify-content:flex-end">

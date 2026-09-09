@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 10.1
+# PreisPilot Osttirol – Version 10.3
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -555,3 +555,79 @@ Der Diagnose-Schritt:
 Noch werden aus dem Flugblatt keine zusätzlichen Preise in `data/tg.json`
 übernommen. Erst nach Sichtung der echten PDF-Textstruktur wird der Parser
 für das vollständige Osttirol-Flugblatt gebaut.
+
+
+## Version 10.2 – FlowPaper-PDF-Auflösung korrigiert
+
+Die erste T&G-Flugblattdiagnose hat die echte FlowPaper-Konfiguration gefunden:
+
+`T-G_..._Osttirol_[*,2,true].pdf`
+
+Das ist kein echter PDF-Dateiname, sondern FlowPapers Split-/Dual-Mode-Syntax.
+
+Die Diagnose normalisiert solche Angaben nun automatisch zu:
+
+`T-G_..._Osttirol.pdf`
+
+Zusätzlich werden Original-PDF-Pfade aus `IMGFiles` und `JSONFile` abgeleitet.
+Bekannte Demo-URLs aus FlowPaper-Bibliotheken wie `mydomain.com/abc.pdf` werden
+verworfen.
+
+Damit soll der nächste GitHub-Lauf erstmals die echte T&G-Osttirol-PDF laden
+und den vorhandenen Text seitenweise analysieren.
+
+
+## Version 10.3 – T&G Osttirol-Flugblatt wird importiert
+
+Die Diagnose hat gezeigt, dass das offizielle regionale T&G-Flugblatt vollständig
+als PDF erreichbar ist und auf acht Seiten maschinenlesbaren Produkttext enthält.
+
+Der Workflow führt nun nach dem stabilen Spezialaktionsimport zusätzlich aus:
+
+`scripts/update_tg_flyer.py`
+
+### Was aus dem Flugblatt übernommen wird
+
+Der Parser erkennt Produktblöcke anhand der im PDF gedruckten Grundpreise.
+Aus Menge und Grundpreis wird der sichtbare Angebotspreis rekonstruiert und
+anschließend gegen die tatsächlich gedruckten Preiswerte derselben Seite
+abgeglichen. Dadurch werden auch Rundungsfälle wie 15,99 statt rechnerisch
+16,00 berücksichtigt.
+
+Erkannt werden unter anderem:
+- kg-, g-, l- und ml-Gebinde
+- Multipacks wie `20 x 0,5 l`
+- Mengenbereiche wie `160–411 ml`
+- Preise je 100 g
+- Preise je 0,5 l
+- Rollen- und Meterpreise
+
+### Mengen- und Gratisaktionen
+
+Besonders sichere Muster wie:
+
+`0,69`
+`1 DS. 1,39`
+`BEI 24 DS. JE`
+
+werden zusätzlich ausgewertet. Aus Preisverhältnis und benötigter Menge kann
+z. B. `12+12 gratis`, `4+2 gratis`, `3+3 gratis`, `2+1 gratis` oder `1+1 gratis`
+eindeutig rekonstruiert werden.
+
+Nur solche eindeutig zugeordneten Bedingungen werden für persönliche
+Produktverknüpfungen und den Optimierer freigegeben.
+
+### Konservative Behandlung aller anderen Flugblattpreise
+
+Das PDF enthält viele Mengenhinweise wie `AB 2 PKG.`, deren räumliche Zuordnung
+im reinen PDF-Text nicht immer zweifelsfrei erhalten bleibt.
+
+Diese Produkte werden trotzdem mit erkanntem Flugblattpreis in der
+T&G-Aktionsansicht angezeigt, erhalten aber das Kennzeichen `nur Anzeige`.
+Sie fließen nicht in den Optimierer ein, bis die Bedingung sicher zugeordnet
+werden kann.
+
+Damit ist ein falscher Preisvergleich ausgeschlossen, während trotzdem der
+Großteil des Osttirol-Flugblatts direkt in der App sichtbar wird.
+
+Der bisherige Spezialaktionsimport bleibt als stabile zweite Quelle erhalten.
