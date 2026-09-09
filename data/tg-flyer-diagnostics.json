@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-09-09T10:05:33Z",
+  "region": "Osttirol",
+  "viewerUrl": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/index.html",
+  "viewerMarkers": {
+    "flowpaper": true,
+    "PDFFile": true,
+    "download": false,
+    "flipbook": false
+  },
+  "assetCount": 7,
+  "assets": [
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/css/flowpaper.css",
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/jquery.min.js",
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/jquery.extensions.min.js",
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/three.min.js",
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/flowpaper.js",
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/flowpaper_handlers.js",
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206"
+  ],
+  "javascript": [
+    {
+      "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/jquery.min.js",
+      "size": 89493,
+      "pdfCandidates": [],
+      "flowpaperMention": false
+    },
+    {
+      "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/jquery.extensions.min.js",
+      "size": 536508,
+      "pdfCandidates": [],
+      "flowpaperMention": true
+    },
+    {
+      "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/three.min.js",
+      "size": 660428,
+      "pdfCandidates": [],
+      "flowpaperMention": false
+    },
+    {
+      "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/flowpaper.js",
+      "size": 98846,
+      "pdfCandidates": [],
+      "flowpaperMention": true
+    },
+    {
+      "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/js/flowpaper_handlers.js",
+      "size": 7409,
+      "pdfCandidates": [
+        "https://mydomain.com/abc.pdf"
+      ],
+      "flowpaperMention": true
+    }
+  ],
+  "pdfCandidates": [
+    "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206",
+    "https://mydomain.com/abc.pdf"
+  ],
+  "pdfAttempts": [
+    {
+      "url": "https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206",
+      "error": "Abruf fehlgeschlagen: https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206: HTTP Error 404: Not Found"
+    },
+    {
+      "url": "https://mydomain.com/abc.pdf",
+      "error": "Abruf fehlgeschlagen: https://mydomain.com/abc.pdf: <urlopen error [Errno -5] No address associated with hostname>"
+    }
+  ],
+  "pdfUrl": null,
+  "viewerHtmlPreview": "\n<!doctype html>\n<html>\n<head>\n    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />\n    <meta name=\"viewport\" content=\"initial-scale=1,user-scalable=0,maximum-scale=1,width=device-width\" />\n    <meta content=\"IE=Edge\" http-equiv=\"X-UA-Compatible\" />\n    <meta name=\"format-detection\" content=\"telephone=no\"/>\n    <meta property=\"og:title\" content=\"T&amp;G_KW35_36_2026.indd\" />\n    <meta name=\"twitter:title\" content=\"T&amp;G_KW35_36_2026.indd\" />\n    <meta name=\"twitter:image:src\" content=\"docs/T-G_KW35_36_2026_Osttirol.pdf_1.jpg\" />\n    <meta name=\"twitter:card\" content=\"player\">\n    <meta name=\"twitter:player\" content=\"\">\n    <meta name=\"twitter:player:width\" content=\"400\">\n    <meta name=\"twitter:player:height\" content=\"300\">\n\n    <meta property=\"og:url\" content=\"\" />\n    <meta property=\"og:image\" content=\"docs/T-G_KW35_36_2026_Osttirol.pdf_1.jpg\" />    \n    <meta property=\"og:image:width\" content=\"110\" /> \n    <meta property=\"og:image:height\" content=\"158\" /> \n    \n\n    <style type=\"text/css\" media=\"screen\">\n        html, body\t{ height:100%; }\n        body { margin:0; padding:0; overflow:auto; }\n        #flashContent { display:none; }\n\n        \n    </style>\n    <link rel=\"stylesheet\" type=\"text/css\" href=\"css/flowpaper.css\" />\n    \n    <script type=\"text/javascript\" src=\"js/jquery.min.js\"></script>\n    <script type=\"text/javascript\" src=\"js/jquery.extensions.min.js\"></script>\n    <!--[if gte IE 10 | !IE ]><!-->\n    <script type=\"text/javascript\" src=\"js/three.min.js\"></script>\n    <!--<![endif]-->\n    <script type=\"text/javascript\" src=\"js/flowpaper.js\"></script>\n    <script type=\"text/javascript\" src=\"js/flowpaper_handlers.js\"></script>\n    <title>T&G_KW35_36_2026.indd</title>\n</head>\n<body>\n<div id=\"documentViewer\" class=\"flowpaper_viewer\" style=\"position:absolute;;width:100%;height:100%;background-color:#222222;;\"></div>\n<script type=\"text/javascript\">\n    // viewer start\n    $('#documentViewer').FlowPaperViewer(\n            { config : {\n                \"PDFFile\"                 : \"docs/T-G_KW35_36_2026_Osttirol_[*,2,true].pdf?reload=1787207674206\",\n                \"IMGFiles\"                : \"docs/T-G_KW35_36_2026_Osttirol.pdf_{page}.jpg?reload=1787207674206\",\n                \"HighResIMGFiles\"         : \"\",\n                \"JSONFile\"                : \"docs/T-G_KW35_36_2026_Osttirol.pdf_{page}.bin?reload=1787207674206\",\n                \"JSONDataType\"            : \"lz\",\n                \"ThumbIMGFiles\"           : \"docs/T-G_KW35_36_2026_Osttirol.pdf_{page}_thumb.jpg?reload=1787207674206\",\n                \"SWFFile\"                 : \"\",\n                \"FontsToLoad\"             : null,\n\n                \"Scale\"                   : 0.1,\n                \"ZoomTransition\"          : \"easeOut\",\n                \"ZoomTime\"                : 0.4,\n                \"ZoomInterval\"            : 0.001,\n                \"FitPageOnLoad\"           : true,\n                \"FitWidthOnLoad\"          : false,\n                \"AutoAdjustPrintSize\"     : true,\n                \"PrintPaperAsBitmap\"      : false,\n                \"AutoDetectLinks\"         : true,\n                \"ImprovedAccessibility\"   : false,\n                \"FullScreenAsMaxWindow\"   : false,\n                \"EnableCornerDragging\"    : true,\n                \"ProgressiveLoading\"      : false,\n                \"MinZoomSize\"             : 0.1,\n                \"MaxZoomSize\"             : 5,\n                \"SearchMatchAll\"          : true,\n                \"InitViewMode\"            : \"Zine\",\n                \"RTLMode\"                 : false,\n                \"RenderingOrder\"          : \"html5,html\",\n                \"StartAtPage\"             : 1,\n                \"EnableWebGL\"             : false,\n                \"PreviewMode\"             : \"\",\n                \"PublicationTitle\"        : \"T&G_KW35_36_2026.indd\",\n                \"AnimatedLoader\"          : false,\n                \"LinkTarget\"              : \"New window\",\n                \"RestrictToDomains\"       : [\"AllowedDomains:*\"],\n                \"MixedMode\"               : true,\n\n                \"UIConfig\"                : \"T-G_KW35_36_2026_Osttirol.xml?reload=1787207674206\",\n                \"BrandingLogo\"            : \"\",\n                \"BrandingUrl\"             : \"http://www.tundg.at\",\n\n                \"WMode\"                   : \"transparent\",\n\n                \"key\"                     : \"$549fadd1cc682e5fcaa\",\n                \"TrackingNumber\"          : \"\",\n                \"localeDirectory\"         : \"locale/\",\n                \"localeChain\"             : \"en_US\"\n            }}\n    );\n    // viewer end\n\n    var url = window.location.href.toString();\n    if(location.length==0){\n        url = document.URL.toString();\n    }\n    if(url.indexOf(\"file:\")>=0){\n        jQuery('#documentViewer').html(\"<div style='position:relative;background-color:#ffffff;width:420px;font-family:Verdana;font-size:10pt;left:22%;top:20%;padding: 10px 10px 10px 10px;border-style:solid;border-width:5px;'><img src='data:image/gif;base64,R0lGODlhEAAPAMQPAPS+GvXAIfrjnP/89vnZePrhlvS9F//+/PrfjfS/HfrgkPS+GP/9+YJiACAYAP////O3AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAA8ALAAAAAAQAA8AAAVQ4COOD0GQKElA0JmSg7EsxvCOCMsi9xPrkNpNwXI0WIoXA1A8QgCMVEFn1BVQS6rzGR1NtcCriJEAVnWJrgDI1gkehwD7rAsc1u28QJ5vB0IAOw%3D%3D'>&nbsp;<b>You are trying to use FlowPaper from a local directory.</b><br/><br/> Use the 'View in browser' button in the Desktop Publisher publish & preview dialog window to preview your publication or copy the contents of your publication directory to a web server and access this html file through a http:// url.</div>\");\n    }\n</script>\n</body>\n</html>",
+  "pdf": null
+}
