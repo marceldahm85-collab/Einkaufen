@@ -35,6 +35,12 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Preis- und Mengenlogik prüfen
+        run: |
+          node --check app.js
+          node scripts/test_optimizer_quantity.js
+          python scripts/test_update_tg_flyer.py
+
       - name: MPREIS-Daten aktualisieren
         run: python scripts/update_mpreis.py
 
@@ -126,9 +132,13 @@ jobs:
           data = json.loads(path.read_text(encoding="utf-8"))
           count = int(data.get("flyerProductCount") or 0)
           linkable = int(data.get("flyerLinkableCount") or 0)
+          text_linkable = int(data.get("flyerTextLinkableCount") or 0)
+          spatial_linkable = int(data.get("flyerSpatialLinkableCount") or 0)
 
           print(f"T&G-Flugblattprodukte: {count}")
-          print(f"Davon sicher verknüpfbar: {linkable}")
+          print(f"Sicher über Textstruktur: {text_linkable}")
+          print(f"Zusätzlich über PDF-Positionen: {spatial_linkable}")
+          print(f"Insgesamt sicher verknüpfbar: {linkable}")
 
           if count < 20:
               raise SystemExit(
