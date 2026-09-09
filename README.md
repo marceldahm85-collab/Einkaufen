@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 9.2
+# PreisPilot Osttirol – Version 9.4
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -393,3 +393,61 @@ Unter `Mehr → SPAR` gibt es nun:
 
 Die Liste zeigt ohne Suchbegriff alle aktuell verifizierten SPAR-Aktionsprodukte.
 Persönlich verknüpfte SPAR-Produkte übernehmen die Aktionsinformationen ebenfalls.
+
+
+## Version 9.3 – SPAR-Aktions-Badges korrigiert
+
+Der SPAR-FactFinder liefert für österreichische Produkte zuverlässig
+Produktnummer, Aktionsstatus, Preis und Normalpreis. Die semantischen Badge-Texte
+sind jedoch nicht bei allen Datensätzen befüllt.
+
+Daher arbeitet die Aktionsstufe nun zweistufig:
+
+1. FactFinder identifiziert Aktion und Produkt eindeutig.
+2. Nur wenn daraus lediglich ein rechnerischer `-xx %`-Badge entstehen würde,
+   wird zusätzlich die offizielle SPAR-Produktseite des bereits identifizierten
+   Artikels gelesen.
+
+Dadurch können offizielle Bezeichnungen wie:
+- `1+1 gratis`
+- `2+1 gratis`
+- `Monatssparer`
+- `Preisgesenkt`
+- `IMMER BILLIG`
+- `SPAR-Joker`
+- Mengenaktionen
+
+erhalten bleiben, statt automatisch in einen Prozent-Rabatt umgerechnet zu werden.
+
+Der Workflow schreibt außerdem eine Zusammenfassung der gefundenen Aktionsarten
+ins Log und nach `promotionBreakdown` in `data/spar.json`.
+
+
+## Version 9.4 – SPAR-Aktionsdiagnose
+
+Diese Version verändert die sichtbare SPAR-Aktionslogik bewusst noch nicht.
+
+Vor `SPAR-Aktionen ergänzen` läuft nun:
+`scripts/diagnose_spar_promotions.py`
+
+Die Diagnose untersucht den aktuellen SPAR-FactFinder-Datensatz und protokolliert:
+
+- alle relevanten Feldnamen für Promotion/Badge/Preis
+- unterschiedliche Werte und Häufigkeiten
+- `is-on-promotion`
+- `badge-short-name`
+- `badge-names`
+- `badge-icon`
+- `price`
+- `regular-price`
+- `best-price`
+- Preisbeziehungen
+- relevante FactFinder-Facetten
+- häufigste Kombinationen der Promotion-Felder
+- einige Produktbeispiele pro Struktur
+
+Zusätzlich wird `data/spar-promotion-diagnostics.json` erzeugt.
+
+Ziel ist, echte kurzfristige Aktionen strukturell von Dauertiefpreisen wie
+`IMMER BILLIG` und langfristigen Preisänderungen wie `Preisgesenkt` zu trennen,
+bevor die Importlogik erneut geändert wird.
