@@ -167,12 +167,22 @@
             <button class="secondary-btn" id="syncMpreisBtn">Neu laden</button>
           </div>
 
-          <button class="secondary-btn mpreis-promo-btn" id="showMpreisPromotionsBtn" type="button">
-            🔥 Aktionsartikel anzeigen
-          </button>
+          <div class="retailer-action-row">
+            <button class="secondary-btn mpreis-promo-btn" id="showMpreisPromotionsBtn" type="button">
+              🔥 Aktionen
+            </button>
+            <button class="secondary-btn retailer-flyer-btn mpreis-flyer-btn" id="openMpreisFlyerBtn" type="button">
+              📄 Flugblatt
+            </button>
+          </div>
+
+          <div class="flyer-source-line">
+            <span>Flugblatt: MPREIS Tirol</span>
+            <span>für Osttirol</span>
+          </div>
 
           <p class="muted small live-note">
-            Die öffentliche MPREIS-Datei wird automatisch durch GitHub Actions aus dem österreichischen Preisdatensatz von Heisse Preise aktualisiert. Deine Einkaufsliste, Einstellungen und Produktverknüpfungen bleiben ausschließlich lokal im Browser.
+            Die öffentliche MPREIS-Datei wird automatisch durch GitHub Actions aktualisiert. Das Flugblatt öffnet die offizielle MPREIS-Flugblattseite mit Region Tirol; MPREIS bietet dort derzeit keine eigene Osttirol-Auswahl an. Deine persönlichen Daten bleiben ausschließlich lokal im Browser.
           </p>
         </div>
 
@@ -193,12 +203,22 @@
             <button class="secondary-btn" id="syncSparBtn">Neu laden</button>
           </div>
 
-          <button class="secondary-btn spar-promo-btn" id="showSparPromotionsBtn" type="button">
-            🔥 SPAR-Aktionsartikel anzeigen
-          </button>
+          <div class="retailer-action-row">
+            <button class="secondary-btn spar-promo-btn" id="showSparPromotionsBtn" type="button">
+              🔥 Aktionen
+            </button>
+            <button class="secondary-btn retailer-flyer-btn spar-flyer-btn" id="openSparFlyerBtn" type="button">
+              📄 Flugblatt
+            </button>
+          </div>
+
+          <div class="flyer-source-line">
+            <span>Flugblatt: INTERSPAR</span>
+            <span>Osttirol</span>
+          </div>
 
           <p class="muted small live-note">
-            SPAR-Grundpreise und Preisverläufe werden automatisch aktualisiert. Offizielle Aktionspreise werden zusätzlich aus der SPAR-Produktsuche übernommen und eindeutig über die Produktnummer zugeordnet.
+            SPAR-Grundpreise und Preisverläufe werden automatisch aktualisiert. Für das Flugblatt wird gezielt die offizielle INTERSPAR-Osttirol-Seite verwendet.
           </p>
         </div>
 
@@ -219,16 +239,22 @@
             <button class="secondary-btn" id="syncTgBtn">Neu laden</button>
           </div>
 
-          <button class="secondary-btn tg-promo-btn" id="showTgPromotionsBtn" type="button">
-            🔥 T&G-Aktionen anzeigen
-          </button>
+          <div class="retailer-action-row">
+            <button class="secondary-btn tg-promo-btn" id="showTgPromotionsBtn" type="button">
+              🔥 Aktionen
+            </button>
+            <button class="secondary-btn retailer-flyer-btn tg-flyer-btn" id="openTgFlyerBtn" type="button" disabled>
+              📄 Flugblatt
+            </button>
+          </div>
 
-          <button class="secondary-btn tg-flyer-btn" id="openTgFlyerBtn" type="button" disabled>
-            📄 Osttirol-Flugblatt
-          </button>
+          <div class="flyer-source-line">
+            <span>Flugblatt: T&G</span>
+            <span>Osttirol</span>
+          </div>
 
           <p class="muted small live-note">
-            T&G stellt derzeit keinen vollständigen öffentlichen Produktkatalog bereit. Importiert werden die aktuellen offiziellen Spezialaktionen. Das Osttirol-Flugblatt ist zusätzlich direkt verlinkt.
+            T&G wird aus den offiziellen Spezialaktionen und dem regionalen Osttirol-Flugblatt ergänzt. Der Flugblatt-Link wird automatisch mit dem aktuellen Import aktualisiert.
           </p>
         </div>
 

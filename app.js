@@ -93,6 +93,11 @@
   };
 
   let state = loadState();
+  const OFFICIAL_FLYER_URLS = {
+    mpreis: "https://www.mpreis.at/aktionen/flugblatt?region=tirol",
+    spar: "https://www.interspar.at/aktionen/osttirol"
+  };
+
   let currentView = "shopping";
   let currentCategory = "Alle";
   let currentMarket = "all";
@@ -2537,6 +2542,17 @@
     return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
   }
 
+  function openOfficialFlyer(store) {
+    const url = OFFICIAL_FLYER_URLS[store];
+
+    if (!url) {
+      showToast("Flugblatt-Link ist derzeit nicht verfügbar");
+      return;
+    }
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   function openTgFlyer() {
     const url = tgPublicStatus?.flyer?.url || $("#openTgFlyerBtn")?.dataset.flyerUrl;
     if (!url) {
@@ -2900,6 +2916,12 @@
 
     const showTgPromotions = e.target.closest("#showTgPromotionsBtn");
     if (showTgPromotions) return openTgPromotions();
+
+    const mpreisFlyer = e.target.closest("#openMpreisFlyerBtn");
+    if (mpreisFlyer) return openOfficialFlyer("mpreis");
+
+    const sparFlyer = e.target.closest("#openSparFlyerBtn");
+    if (sparFlyer) return openOfficialFlyer("spar");
 
     const tgFlyer = e.target.closest("#openTgFlyerBtn");
     if (tgFlyer) return openTgFlyer();

@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 11.0
+# PreisPilot Osttirol – Version 11.1
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -732,3 +732,37 @@ weiterhin ausschließlich im localStorage des Browsers.
 Die Live-Module MPREIS, SPAR und T&G besitzen nun eine gemeinsame paginierte
 `browse()`-Schnittstelle. Der alphabetische Index wird erst beim ersten Öffnen
 des jeweiligen Katalogs im Browser aufgebaut und anschließend wiederverwendet.
+
+
+## Version 11.1 – Flugblätter MPREIS, INTERSPAR und T&G
+
+Die Händlerkarten unter `Mehr` besitzen nun ein einheitliches Zwei-Button-Layout:
+
+- `🔥 Aktionen`
+- `📄 Flugblatt`
+
+### MPREIS
+
+Verwendet wird die offizielle MPREIS-Flugblattseite mit Region `Tirol`:
+
+`https://www.mpreis.at/aktionen/flugblatt?region=tirol`
+
+MPREIS bietet auf seiner öffentlichen Flugblattseite aktuell eine Auswahl nach
+Bundesland. Für Osttirol wird daher Tirol verwendet.
+
+### SPAR / INTERSPAR
+
+Auf ausdrücklichen Wunsch wird nicht das allgemeine SPAR-Flugblatt verwendet,
+sondern die offizielle INTERSPAR-Seite für Osttirol:
+
+`https://www.interspar.at/aktionen/osttirol`
+
+Die Seite führt jeweils die aktuellen INTERSPAR-Osttirol-Flugblätter.
+
+### T&G
+
+T&G verwendet weiterhin den vom GitHub-Importer automatisch erkannten
+regionalen Osttirol-Flugblatt-Viewer aus `data/tg.json`.
+
+Damit müssen für die drei Händler keine kalenderwochenabhängigen URLs in der
+App gepflegt werden.

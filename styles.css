@@ -1040,3 +1040,64 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
     padding-inline: 6px;
   }
 }
+
+
+/* Version 11.1 – einheitliche Flugblatt-Buttons */
+.retailer-action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.retailer-action-row .secondary-btn {
+  width: 100%;
+  margin-top: 0;
+  min-height: 39px;
+}
+
+.retailer-flyer-btn {
+  background: color-mix(in srgb, var(--accent-blue) 7%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent-blue) 18%, var(--line));
+}
+
+.mpreis-flyer-btn {
+  background: color-mix(in srgb, #d50057 7%, var(--surface-2));
+  border-color: color-mix(in srgb, #d50057 18%, var(--line));
+}
+
+.spar-flyer-btn {
+  background: color-mix(in srgb, #00843d 7%, var(--surface-2));
+  border-color: color-mix(in srgb, #00843d 18%, var(--line));
+}
+
+.tg-flyer-btn {
+  margin-top: 0;
+  background: color-mix(in srgb, #ef7d00 7%, var(--surface-2));
+  border-color: color-mix(in srgb, #ef7d00 18%, var(--line));
+}
+
+.flyer-source-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 7px 2px 0;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 720;
+}
+
+.flyer-source-line span:last-child {
+  text-align: right;
+}
+
+@media (max-width: 350px) {
+  .retailer-action-row {
+    gap: 6px;
+  }
+
+  .retailer-action-row .secondary-btn {
+    padding-inline: 7px;
+    font-size: 10px;
+  }
+}
