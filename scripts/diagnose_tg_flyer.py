@@ -82,12 +82,69 @@ def extract_urls(source, base_url):
     return result
 
 
+def is_demo_pdf_url(url):
+    host = urllib.parse.urlparse(url).netloc.casefold()
+    return host in {
+        "mydomain.com",
+        "www.mydomain.com",
+        "example.com",
+        "www.example.com",
+    }
+
+
+def normalize_flowpaper_pdf_url(url):
+    """
+    FlowPaper split mode may expose:
+      docs/Name_[*,2,true].pdf?reload=...
+    while the original downloadable PDF is:
+      docs/Name.pdf?reload=...
+
+    The same original filename can also be inferred from:
+      docs/Name.pdf_{page}.jpg
+      docs/Name.pdf_{page}.bin
+    """
+    value = str(url or "").replace("\\/", "/").strip()
+    if not value:
+        return None
+
+    parts = urllib.parse.urlsplit(value)
+    path = parts.path
+
+    # Split-mode template -> original PDF.
+    path = re.sub(
+        r"_\[\s*\*\s*,\s*\d+\s*(?:,\s*(?:true|false)\s*)?\]\.pdf$",
+        ".pdf",
+        path,
+        flags=re.I,
+    )
+
+    # FlowPaper page image / JSON text template -> original PDF.
+    path = re.sub(
+        r"\.pdf_\{page\}\.(?:jpg|jpeg|png|bin|json)$",
+        ".pdf",
+        path,
+        flags=re.I,
+    )
+
+    normalized = urllib.parse.urlunsplit((
+        parts.scheme,
+        parts.netloc,
+        path,
+        parts.query,
+        parts.fragment,
+    ))
+
+    return normalized
+
+
 def extract_pdf_candidates(source, base_url):
     candidates = []
 
     patterns = [
         r"PDFFile\s*:\s*[\"']([^\"']+\.pdf(?:\?[^\"']*)?)[\"']",
         r"PDFFile\s*=\s*[\"']([^\"']+\.pdf(?:\?[^\"']*)?)[\"']",
+        r"IMGFiles\s*:\s*[\"']([^\"']+\.pdf_\{page\}\.(?:jpg|jpeg|png)(?:\?[^\"']*)?)[\"']",
+        r"JSONFile\s*:\s*[\"']([^\"']+\.pdf_\{page\}\.(?:bin|json)(?:\?[^\"']*)?)[\"']",
         r"[\"']([^\"']+\.pdf(?:\?[^\"']*)?)[\"']",
         r"href\s*=\s*[\"']([^\"']+\.pdf(?:\?[^\"']*)?)[\"']",
     ]
@@ -100,11 +157,15 @@ def extract_pdf_candidates(source, base_url):
     seen = set()
 
     for url in candidates:
-        url = url.replace("\\/", "/")
-        if url in seen:
+        normalized = normalize_flowpaper_pdf_url(url)
+        if not normalized:
             continue
-        seen.add(url)
-        result.append(url)
+        if is_demo_pdf_url(normalized):
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
 
     return result
 
@@ -268,10 +329,10 @@ def main():
 
     print(f"Gefundene Assets: {len(inspection['assets'])}")
     print(f"Geprüfte JS-Dateien: {len(inspection['js'])}")
-    print(f"PDF-Kandidaten: {len(inspection['pdfCandidates'])}")
+    print(f"PDF-Kandidaten nach FlowPaper-Normalisierung: {len(inspection['pdfCandidates'])}")
 
     for url in inspection["pdfCandidates"][:20]:
-        print(f"  PDF-Kandidat: {url}")
+        print(f"  PDF-Kandidat normalisiert: {url}")
 
     pdf_url, pdf_attempts = choose_working_pdf(inspection["pdfCandidates"])
 
