@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import html
 import json
 import math
 import re
@@ -8,6 +9,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,6 +21,8 @@ SEARCH_URL = "https://search-spar.spar-ics.com/fact-finder/rest/v4/search/produc
 PAGE_SIZE = 5000
 MAX_PAGES = 20
 MIN_PROMOTIONS_FOR_SUCCESS = 5
+DETAIL_WORKERS = 8
+DETAIL_TIMEOUT = 35
 
 
 def now_iso():
@@ -142,6 +146,93 @@ def fetch_all_hits():
     return result
 
 
+def normalize_product_url(url):
+    value = str(url or "").strip()
+    if not value:
+        return None
+
+    if value.startswith("//"):
+        return "https:" + value
+
+    if value.startswith("/"):
+        return "https://www.spar.at" + value
+
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+
+    return "https://www.spar.at/" + value.lstrip("/")
+
+
+def fetch_text(url, attempts=3):
+    headers = {
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "de-AT,de;q=0.9",
+        "User-Agent": "Mozilla/5.0 PreisPilot-Osttirol-GitHubAction/1.0",
+        "Referer": "https://www.spar.at/produktwelt/",
+    }
+
+    last_error = None
+
+    for attempt in range(attempts):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=DETAIL_TIMEOUT) as response:
+                raw = response.read()
+                charset = response.headers.get_content_charset() or "utf-8"
+                return raw.decode(charset, errors="replace")
+        except Exception as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                time.sleep(1.5 * (attempt + 1))
+
+    raise RuntimeError(f"SPAR-Produktseite nicht abrufbar: {last_error}")
+
+
+def html_to_text(source):
+    text = re.sub(r"(?is)<script\b.*?</script>", " ", source or "")
+    text = re.sub(r"(?is)<style\b.*?</style>", " ", text)
+    text = re.sub(r"(?s)<[^>]+>", " ", text)
+    text = html.unescape(text)
+    return " ".join(text.split())
+
+
+def extract_official_promotion_hint(source):
+    """Return only a concise promotion phrase from an official SPAR product page."""
+    text = html_to_text(source)
+
+    # Bundle offers are the most important case because a simple price
+    # calculation would otherwise incorrectly display them as "-50 %".
+    bundle = re.search(
+        r"\b(\d+)\s*\+\s*(\d+)\s*GRATIS\b(?:\s*[-–—]\s*(?:ab|bei)\s*(\d+)\s*Stk\.?)?",
+        text,
+        flags=re.I,
+    )
+    if bundle:
+        paid = int(bundle.group(1))
+        free = int(bundle.group(2))
+        required = int(bundle.group(3)) if bundle.group(3) else paid + free
+        return f"{paid}+{free} gratis · ab {required} Stück"
+
+    for pattern, label in (
+        (r"\bMONATSSPARER\b", "Monatssparer"),
+        (r"\bPREIS\s*GESENKT\b|\bPREISGESENKT\b", "Preisgesenkt"),
+        (r"\bIMMER\s+BILLIG\b", "IMMER BILLIG"),
+        (r"\bSPAR[-\s]*JOKER\b", "SPAR-Joker"),
+    ):
+        if re.search(pattern, text, flags=re.I):
+            return label
+
+    quantity = re.search(r"\b(?:ab|bei)\s+(\d+)\s*Stk\.?\b", text, flags=re.I)
+    if quantity:
+        return f"ab {int(quantity.group(1))} Stück"
+
+    percent = re.search(r"(?<!\d)-\s*(\d{1,2})\s*%", text)
+    if percent:
+        return f"-{int(percent.group(1))} %"
+
+    return None
+
+
 def promo_text(values):
     parts = []
 
@@ -164,37 +255,35 @@ def promo_text(values):
     return " · ".join(dict.fromkeys(part.strip() for part in parts if part.strip()))
 
 
-def parse_promotion(values, sale_price, regular_price):
-    text = promo_text(values)
+def parse_promotion(values, sale_price, regular_price, detail_hint=None):
+    structured = promo_text(values)
+    text = " · ".join(part for part in (structured, detail_hint) if part)
     folded = text.casefold()
 
     promotion = {
         "type": "price_drop",
         "verified": True,
-        "source": "spar.at / FactFinder",
+        "source": "spar.at",
         "loyaltyRequired": False,
     }
 
-    bundle = re.search(r"\b(\d+)\s*\+\s*(\d+)\s*(?:gratis|free)\b", folded)
-    qty = re.search(r"\bab\s+(\d+)\b", folded)
+    bundle = re.search(
+        r"\b(\d+)\s*\+\s*(\d+)\s*(?:gratis|free)\b(?:.*?\bab\s+(\d+)\s*stück\b)?",
+        folded,
+    )
+    qty = re.search(r"\b(?:ab|bei)\s+(\d+)\s*(?:stk\.?|stück)\b", folded)
     percent = re.search(r"-(\d{1,2})\s*%", folded)
 
     if bundle:
         paid = int(bundle.group(1))
         free = int(bundle.group(2))
+        required = int(bundle.group(3)) if bundle.group(3) else paid + free
         promotion.update({
             "type": "bundle",
             "paidQuantity": paid,
             "freeQuantity": free,
-            "requiredQuantity": paid + free,
-            "label": f"{paid}+{free} gratis",
-        })
-    elif qty:
-        required = int(qty.group(1))
-        promotion.update({
-            "type": "quantity",
             "requiredQuantity": required,
-            "label": f"ab {required} Stück",
+            "label": f"{paid}+{free} gratis",
         })
     elif "monatssparer" in folded:
         promotion.update({
@@ -211,12 +300,19 @@ def parse_promotion(values, sale_price, regular_price):
             "type": "low_price",
             "label": "IMMER BILLIG",
         })
-    elif "joker" in folded or "app" in folded:
+    elif "joker" in folded or "nur mit app" in folded:
         promotion.update({
             "type": "loyalty",
             "loyaltyRequired": True,
             "loyaltyProgram": "SPAR App",
-            "label": "SPAR-App",
+            "label": "SPAR-Joker" if "joker" in folded else "SPAR-App",
+        })
+    elif qty:
+        required = int(qty.group(1))
+        promotion.update({
+            "type": "quantity",
+            "requiredQuantity": required,
+            "label": f"ab {required} Stück",
         })
     elif percent:
         promotion.update({
@@ -227,19 +323,110 @@ def parse_promotion(values, sale_price, regular_price):
     else:
         if regular_price and regular_price > 0 and sale_price < regular_price:
             pct = round((1 - sale_price / regular_price) * 100)
-            promotion["discountPercent"] = pct
-            promotion["label"] = f"-{pct} %"
+            promotion.update({
+                "type": "percentage",
+                "discountPercent": pct,
+                "label": f"-{pct} %",
+            })
         else:
-            promotion["label"] = text or "Im Angebot"
+            promotion["label"] = structured or detail_hint or "Im Angebot"
 
     if "joker" in folded or "nur mit app" in folded:
         promotion["loyaltyRequired"] = True
         promotion["loyaltyProgram"] = "SPAR App"
 
-    if text:
-        promotion["officialLabel"] = text
+    if structured:
+        promotion["structuredLabel"] = structured
+
+    if detail_hint:
+        promotion["officialLabel"] = detail_hint
+        promotion["detailVerified"] = True
 
     return promotion
+
+
+def needs_detail_enrichment(action):
+    promotion = action.get("promotion") or {}
+
+    # If FactFinder already gives a semantic action label, there is no need
+    # to fetch the product detail page. Percentage-only labels are enriched.
+    return (
+        promotion.get("type") == "percentage"
+        or promotion.get("label") in {"Im Angebot", "Aktion"}
+    )
+
+
+def enrich_action_from_detail(action):
+    url = normalize_product_url(action.get("productUrl"))
+    if not url:
+        return action, False, "keine Produkt-URL"
+
+    try:
+        source = fetch_text(url)
+        hint = extract_official_promotion_hint(source)
+
+        if not hint:
+            return action, False, None
+
+        action["promotion"] = parse_promotion(
+            action.get("_values") or {},
+            action["salePrice"],
+            action["regularPrice"],
+            detail_hint=hint,
+        )
+        action["productUrl"] = url
+        return action, True, None
+    except Exception as exc:
+        return action, False, str(exc)
+
+
+def enrich_actions_with_official_labels(actions):
+    candidates = [
+        action for action in actions.values()
+        if needs_detail_enrichment(action) and action.get("productUrl")
+    ]
+
+    if not candidates:
+        return 0, 0
+
+    enriched = 0
+    errors = 0
+
+    with ThreadPoolExecutor(max_workers=DETAIL_WORKERS) as pool:
+        futures = {
+            pool.submit(enrich_action_from_detail, action): action["productId"]
+            for action in candidates
+        }
+
+        for future in as_completed(futures):
+            product_id = futures[future]
+
+            try:
+                action, changed, error = future.result()
+            except Exception as exc:
+                errors += 1
+                print(
+                    f"WARNUNG: SPAR-Aktionsdetail {product_id}: {exc}",
+                    file=sys.stderr,
+                )
+                continue
+
+            if changed:
+                enriched += 1
+            elif error:
+                errors += 1
+
+    return enriched, errors
+
+
+def promotion_breakdown(actions):
+    result = {}
+
+    for action in actions.values():
+        label = str((action.get("promotion") or {}).get("label") or "Unbekannt")
+        result[label] = result.get(label, 0) + 1
+
+    return dict(sorted(result.items(), key=lambda item: (-item[1], item[0].casefold())))
 
 
 def extract_action(hit):
@@ -288,7 +475,8 @@ def extract_action(hit):
         "salePrice": round(sale_price, 2),
         "regularPrice": round(regular_price, 2),
         "promotion": promotion,
-        "productUrl": str(values.get("url") or "").strip() or None,
+        "productUrl": normalize_product_url(values.get("url")),
+        "_values": values,
     }
 
 
@@ -410,6 +598,18 @@ def main():
             if action:
                 actions[action["productId"]] = action
 
+        enriched_count, detail_errors = enrich_actions_with_official_labels(actions)
+        breakdown = promotion_breakdown(actions)
+
+        print(
+            f"SPAR Aktions-Badges: {enriched_count} aus offiziellen Produktseiten ergänzt; "
+            f"{detail_errors} Detailabrufe ohne Ergebnis/mit Fehler."
+        )
+        print(
+            "SPAR Aktionsarten: "
+            + " | ".join(f"{label}: {count}" for label, count in breakdown.items())
+        )
+
         matched = {
             pid: action
             for pid, action in actions.items()
@@ -423,6 +623,9 @@ def main():
             )
 
         verified = 0
+
+        for action in actions.values():
+            action.pop("_values", None)
 
         for product in products:
             product_id = str(product.get("retailerProductId") or product.get("remoteObjectId") or "")
@@ -459,7 +662,9 @@ def main():
 
         payload["promotionCount"] = verified
         payload["promotionUpdatedAt"] = now_iso()
-        payload["promotionSource"] = "spar.at / FactFinder"
+        payload["promotionSource"] = "spar.at / FactFinder + Produktwelt"
+        payload["promotionBreakdown"] = breakdown
+        payload["promotionDetailEnrichedCount"] = enriched_count
         payload["promotionStale"] = False
         payload.pop("promotionLastError", None)
 
