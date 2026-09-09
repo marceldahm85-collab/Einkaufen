@@ -702,3 +702,32 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+
+/* Version 9.2 – SPAR Aktionsansicht */
+.spar-promo-btn {
+  width: 100%;
+  margin-top: 11px;
+  border-color: color-mix(in srgb, #00843d 24%, var(--line));
+  background: color-mix(in srgb, #00843d 8%, var(--surface-2));
+  color: var(--text);
+}
+
+.spar-promo-card {
+  align-items: start;
+}
+
+.spar-promo-main {
+  cursor: default;
+}
+
+#sparPromotionsSheet .live-result-list {
+  padding-bottom: 10px;
+}
+
+#sparPromotionsSheet .product-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.22;
+}

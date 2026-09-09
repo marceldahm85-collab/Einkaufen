@@ -1140,6 +1140,7 @@
     const linkedEl = $("#sparLinkedCount");
     const lastEl = $("#sparLastSync");
     const statusEl = $("#sparLiveStatus");
+    const promoBtn = $("#showSparPromotionsBtn");
     if (!linkedEl || !lastEl || !statusEl) return;
 
     linkedEl.textContent = `${linked} Artikel verknüpft`;
@@ -1164,6 +1165,13 @@
     } else {
       lastEl.textContent = "Noch keine importierten SPAR-Daten vorhanden";
     }
+
+    if (promoBtn) {
+      const count = sparPublicStatus?.promotionCount || 0;
+      promoBtn.textContent = count
+        ? `🔥 ${count} SPAR-Aktionsartikel anzeigen`
+        : "🔥 SPAR-Aktionsartikel anzeigen";
+    }
   }
 
   async function refreshSparPublicStatus(force = false) {
@@ -1178,6 +1186,66 @@
 
     saveState();
     renderSparLiveStatus();
+  }
+
+  async function openSparPromotions() {
+    const stateEl = $("#sparPromotionsState");
+    const listEl = $("#sparPromotionsList");
+
+    if (!stateEl || !listEl) return;
+
+    openSheet("sparPromotionsSheet");
+    stateEl.textContent = "Aktionsartikel werden geladen …";
+    listEl.innerHTML = "";
+
+    if (!window.SparLive?.promotions) {
+      stateEl.textContent = "Die SPAR-Aktionsansicht konnte nicht geladen werden.";
+      return;
+    }
+
+    try {
+      const items = await window.SparLive.promotions();
+
+      stateEl.textContent = items.length
+        ? `${items.length} verifizierte SPAR-Aktionsartikel`
+        : "Aktuell wurden keine verifizierten SPAR-Aktionen gefunden.";
+
+      listEl.innerHTML = items.map(item => {
+        const promotion = item.promotion || {};
+        const salePrice = item.salePrice ?? item.currentPrice;
+        const regularPrice = item.regularPrice;
+        const condition = promotion.label || promotion.officialLabel || "Im Angebot";
+        const appOnly = promotion.loyaltyRequired === true;
+
+        return `
+          <article class="product-card spar-promo-card">
+            <div class="product-main spar-promo-main">
+              <div class="product-name">
+                ${escapeHtml(item.name)}
+                ${item.bio ? `<span class="live-result-bio">BIO</span>` : ""}
+              </div>
+              <div class="product-meta">
+                <span>${escapeHtml(formatLiveAmount(item))}</span>
+                ${item.unitPrice ? `<span>·</span><span>${money(item.unitPrice)}/${escapeHtml(item.unitPriceUnit || "")}</span>` : ""}
+              </div>
+              <div class="offer-extra">
+                <span class="offer-badge condition">${escapeHtml(condition)}</span>
+                ${appOnly ? `<span class="offer-badge app-only">NUR MIT APP</span>` : ""}
+              </div>
+            </div>
+
+            <div class="product-price-wrap">
+              <div class="product-price sale">${money(salePrice)}</div>
+              ${regularPrice != null && Number(regularPrice) !== Number(salePrice)
+                ? `<div class="old-price">${money(regularPrice)}</div>`
+                : ""}
+            </div>
+          </article>`;
+      }).join("");
+    } catch (error) {
+      stateEl.textContent = `SPAR-Aktionsartikel konnten nicht geladen werden: ${error.message}`;
+      listEl.innerHTML = "";
+    }
   }
 
   function openSparLink(productId) {
@@ -1252,10 +1320,12 @@
             </div>
           </div>
           <div class="product-price-wrap">
-            <div class="product-price">${money(item.currentPrice)}</div>
+            <div class="product-price ${item.salePrice != null ? "sale" : ""}">${money(item.salePrice ?? item.currentPrice)}</div>
+            ${item.salePrice != null && item.regularPrice != null ? `<div class="old-price">${money(item.regularPrice)}</div>` : ""}
             <div class="product-meta" style="justify-content:flex-end">
               ${item.unitPrice ? `${money(item.unitPrice)}/${item.unitPriceUnit}` : ""}
             </div>
+            ${item.promotion?.label ? `<div class="offer-extra" style="justify-content:flex-end"><span class="offer-badge condition">${escapeHtml(item.promotion.label)}</span></div>` : ""}
           </div>
         </article>`).join("");
 
@@ -1333,16 +1403,16 @@
     Object.assign(offer, {
       retailerProductId: liveItem.retailerProductId,
       remoteObjectId: liveItem.remoteObjectId,
-      regularPrice: liveItem.currentPrice,
-      salePrice: null,
+      regularPrice: liveItem.regularPrice ?? liveItem.currentPrice,
+      salePrice: liveItem.salePrice ?? null,
       unitPrice: liveItem.unitPrice,
       unitPriceUnit: liveItem.unitPriceUnit,
-      validUntil: null,
+      validUntil: liveItem.validUntil ?? null,
       updatedAt: date,
-      source: liveItem.source || "heisse-preise.io (SPAR)",
+      source: liveItem.promotionVerified ? "spar.at" : (liveItem.source || "heisse-preise.io (SPAR)"),
       retrievedAt: now,
-      promotion: null,
-      promotionVerified: false,
+      promotion: liveItem.promotion ?? null,
+      promotionVerified: Boolean(liveItem.promotionVerified),
       history
     });
   }
@@ -1779,6 +1849,9 @@
 
     const liveLink = e.target.closest("[data-link-mpreis]");
     if (liveLink) return openMpreisLink(liveLink.dataset.linkMpreis);
+
+    const showSparPromotions = e.target.closest("#showSparPromotionsBtn");
+    if (showSparPromotions) return openSparPromotions();
 
     const sparLink = e.target.closest("[data-link-spar]");
     if (sparLink) return openSparLink(sparLink.dataset.linkSpar);

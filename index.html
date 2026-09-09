@@ -157,8 +157,12 @@
             <button class="secondary-btn" id="syncSparBtn">Neu laden</button>
           </div>
 
+          <button class="secondary-btn spar-promo-btn" id="showSparPromotionsBtn" type="button">
+            🔥 SPAR-Aktionsartikel anzeigen
+          </button>
+
           <p class="muted small live-note">
-            SPAR-Grundpreise und Preisverläufe werden automatisch aus dem öffentlichen österreichischen Preisdatensatz aktualisiert. Aktionsbedingungen werden in diesem Schritt noch nicht getrennt ausgewiesen.
+            SPAR-Grundpreise und Preisverläufe werden automatisch aktualisiert. Offizielle Aktionspreise werden zusätzlich aus der SPAR-Produktsuche übernommen und eindeutig über die Produktnummer zugeordnet.
           </p>
         </div>
 
@@ -397,6 +401,22 @@
     <div class="live-link-info" id="sparCurrentLink"></div>
     <div id="sparSearchState" class="muted small live-search-state"></div>
     <div id="sparSearchResults" class="stack live-result-list"></div>
+  </section>
+
+  <section class="bottom-sheet" id="sparPromotionsSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">SPAR AKTIONEN</div>
+        <h2>Aktionsartikel</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+
+    <div id="sparPromotionsState" class="muted small live-search-state">
+      Aktionsartikel werden geladen …
+    </div>
+    <div id="sparPromotionsList" class="stack live-result-list"></div>
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

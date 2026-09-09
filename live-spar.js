@@ -79,12 +79,30 @@
     return enrich(item, payload);
   }
 
+  async function promotions() {
+    const payload = await load(false);
+
+    return payload.products
+      .filter(item => item.promotionVerified === true)
+      .slice()
+      .sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""), "de", {
+          sensitivity: "base",
+          numeric: true
+        })
+      )
+      .map(item => enrich(item, payload));
+  }
+
   async function status(force = false) {
     const payload = await load(force);
     return {
       ok: true,
       updatedAt: payload.updatedAt || null,
       productCount: payload.productCount ?? payload.products.length,
+      promotionCount: payload.promotionCount || 0,
+      promotionUpdatedAt: payload.promotionUpdatedAt || null,
+      promotionStale: Boolean(payload.promotionStale),
       scope: payload.scope || null
     };
   }
@@ -113,5 +131,5 @@
       .trim();
   }
 
-  window.SparLive = { search, getObject, status, reload };
+  window.SparLive = { search, getObject, promotions, status, reload };
 })();

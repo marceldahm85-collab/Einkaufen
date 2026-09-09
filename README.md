@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 9.0
+# PreisPilot Osttirol – Version 9.2
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -333,3 +333,63 @@ Die Verknüpfungen bleiben weiterhin ausschließlich im localStorage des Browser
 SPAR-Aktionsbedingungen werden in Version 9.0 noch nicht separat ausgewiesen.
 Der Grundpreisimport ist bewusst zuerst unabhängig und stabil umgesetzt.
 Die offizielle SPAR-Aktionslogik ist der nächste separate Integrationsschritt.
+
+
+## Version 9.1 – Aktionsdaten ausfallsicher
+
+Beim Grundpreisimport werden zuletzt verifizierte MPREIS-Aktionsfelder nun
+produktweise mitgeführt. Erst ein erfolgreiches neues Einlesen der offiziellen
+MPREIS-Aktionsseite ersetzt sie.
+
+Scheitert nur die Aktionsstufe vorübergehend:
+- Grundpreise werden weiterhin aktualisiert
+- die zuletzt verifizierten Aktionen bleiben vorhanden
+- `promotionStale` wird auf `true` gesetzt
+- `promotionLastError` dokumentiert den technischen Fehler
+- die Aktion wird beim nächsten erfolgreichen Lauf frisch ersetzt
+
+Dadurch kann ein einzelner temporärer MPREIS-Abruffehler die Aktionsansicht
+nicht mehr komplett leeren.
+
+
+## Version 9.2 – SPAR-Aktionen
+
+SPAR-Aktionen werden als zweite Stufe nach dem stabilen SPAR-Grundpreisimport
+ergänzt.
+
+Quelle der Aktionsstufe:
+`https://search-spar.spar-ics.com/fact-finder/rest/v4/search/products_lmos_at`
+
+Verwendete offizielle strukturierte Felder sind unter anderem:
+- `product-number`
+- `is-on-promotion`
+- `price`
+- `regular-price`
+- `badge-short-name`
+- `badge-names`
+- `url`
+
+Die Zuordnung erfolgt ausschließlich über die SPAR-Produktnummer.
+
+Unterstützte Darstellungen:
+- Aktionspreis / Normalpreis
+- 1+1, 2+1 usw.
+- Monatssparer
+- Preisgesenkt
+- IMMER BILLIG
+- Prozentaktionen
+- SPAR-App/Joker-Hinweise, sofern im Datensatz vorhanden
+
+### Ausfallsicherheit
+
+Der Grundpreisimport trägt zuletzt verifizierte SPAR-Aktionen weiter.
+Scheitert die Aktionsstufe vorübergehend, bleiben die letzten verifizierten
+Aktionen erhalten und werden als `promotionStale` markiert.
+
+### App
+
+Unter `Mehr → SPAR` gibt es nun:
+`🔥 N SPAR-Aktionsartikel anzeigen`
+
+Die Liste zeigt ohne Suchbegriff alle aktuell verifizierten SPAR-Aktionsprodukte.
+Persönlich verknüpfte SPAR-Produkte übernehmen die Aktionsinformationen ebenfalls.
