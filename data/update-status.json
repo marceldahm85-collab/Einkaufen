@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-08T21:08:09Z",
+  "updatedAt": "2026-09-09T04:31:01Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -10,9 +10,9 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 469,
-        "pagesChecked": 16,
-        "updatedAt": "2026-09-08T21:09:48Z",
+        "verifiedCount": 1171,
+        "pagesChecked": 40,
+        "updatedAt": "2026-09-09T04:38:40Z",
         "error": null,
         "source": "mpreis.at"
       }
