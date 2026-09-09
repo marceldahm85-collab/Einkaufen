@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "importerVersion": 1,
+  "store": "spar",
+  "scope": "SPAR-Daten aus Heisse Preise",
+  "provider": "heisse-preise.io",
+  "providerUrl": "https://heisse-preise.io/data/latest-canonical.json",
+  "updatedAt": null,
+  "productCount": 0,
+  "skippedCount": 0,
+  "products": []
+}
