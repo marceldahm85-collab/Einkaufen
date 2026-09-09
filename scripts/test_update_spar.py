@@ -43,3 +43,35 @@ assert fallback["retailerProductId"].startswith("hp-")
 assert fallback["unitPrice"] == 5.98
 
 print("OK")
+
+
+previous = {
+    "retailerProductId": "spar-123",
+    "promotionVerified": True,
+    "regularPrice": 2.49,
+    "salePrice": 1.24,
+    "promotionObservedAt": "2026-09-09T06:00:00Z",
+    "promotion": {
+        "type": "bundle",
+        "paidQuantity": 1,
+        "freeQuantity": 1,
+        "requiredQuantity": 2,
+        "label": "1+1 gratis",
+    },
+    "unitPrice": 1.24,
+    "unitPriceUnit": "l",
+}
+fresh = {
+    "retailerProductId": "spar-123",
+    "remoteObjectId": "spar-123",
+    "currentPrice": 2.49,
+    "unitPrice": 2.49,
+    "unitPriceUnit": "l",
+}
+mod.carry_forward_promotion(fresh, previous)
+assert fresh["promotionVerified"] is True
+assert fresh["salePrice"] == 1.24
+assert fresh["promotion"]["requiredQuantity"] == 2
+assert fresh["unitPrice"] == 1.24
+
+print("Promotion carry-forward OK")

@@ -191,6 +191,61 @@ def normalize_item(item: dict):
     }
 
 
+PROMOTION_FIELDS = (
+    "regularPrice",
+    "salePrice",
+    "promotion",
+    "promotionVerified",
+    "promotionObservedAt",
+    "validUntil",
+)
+
+
+def load_existing_payload():
+    if not OUT.exists():
+        return None
+
+    try:
+        payload = json.loads(OUT.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else None
+    except Exception:
+        return None
+
+
+def build_existing_product_map(payload):
+    result = {}
+
+    if not isinstance(payload, dict):
+        return result
+
+    for item in payload.get("products") or []:
+        if not isinstance(item, dict):
+            continue
+
+        for key in (item.get("retailerProductId"), item.get("remoteObjectId")):
+            if key:
+                result[str(key)] = item
+
+    return result
+
+
+def carry_forward_promotion(product, previous):
+    if not isinstance(previous, dict) or previous.get("promotionVerified") is not True:
+        return product
+
+    for field in PROMOTION_FIELDS:
+        if field in previous:
+            product[field] = previous[field]
+
+    if previous.get("salePrice") is not None:
+        if previous.get("unitPrice") is not None:
+            product["unitPrice"] = previous["unitPrice"]
+        if previous.get("unitPriceUnit") is not None:
+            product["unitPriceUnit"] = previous["unitPriceUnit"]
+
+    return product
+
+
 def load_existing_count() -> int:
     if not OUT.exists():
         return 0
@@ -236,6 +291,8 @@ def write_status(status: str, updated_at: str, product_count: int, error=None, s
 def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     updated_at = now_iso()
+    existing_payload = load_existing_payload()
+    existing_products = build_existing_product_map(existing_payload)
     existing_count = load_existing_count()
 
     try:
@@ -260,6 +317,13 @@ def main() -> int:
                 skipped += 1
                 continue
 
+            previous = None
+            for key in (normalized.get("retailerProductId"), normalized.get("remoteObjectId")):
+                if key and str(key) in existing_products:
+                    previous = existing_products[str(key)]
+                    break
+
+            carry_forward_promotion(normalized, previous)
             products.append(normalized)
 
         products.sort(key=lambda p: (
@@ -285,6 +349,17 @@ def main() -> int:
             "skippedCount": skipped,
             "products": products,
         }
+
+        if isinstance(existing_payload, dict):
+            for key in (
+                "promotionCount",
+                "promotionUpdatedAt",
+                "promotionSource",
+                "promotionStale",
+                "promotionLastError",
+            ):
+                if key in existing_payload:
+                    payload[key] = existing_payload[key]
 
         temp = OUT.with_suffix(".json.tmp")
         temp.write_text(
