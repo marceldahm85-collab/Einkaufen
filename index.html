@@ -166,6 +166,36 @@
           </p>
         </div>
 
+        <div class="settings-card tg-live-card">
+          <div class="section-head compact">
+            <div>
+              <div class="eyebrow">T&G OSTTIROL</div>
+              <h2>T&G</h2>
+            </div>
+            <span class="status-badge" id="tgLiveStatus">Bereit</span>
+          </div>
+
+          <div class="live-sync-summary">
+            <div>
+              <strong id="tgLinkedCount">0 Artikel verknüpft</strong>
+              <div class="muted small" id="tgLastSync">Aktionsdaten werden geladen …</div>
+            </div>
+            <button class="secondary-btn" id="syncTgBtn">Neu laden</button>
+          </div>
+
+          <button class="secondary-btn tg-promo-btn" id="showTgPromotionsBtn" type="button">
+            🔥 T&G-Aktionen anzeigen
+          </button>
+
+          <button class="secondary-btn tg-flyer-btn" id="openTgFlyerBtn" type="button" disabled>
+            📄 Osttirol-Flugblatt
+          </button>
+
+          <p class="muted small live-note">
+            T&G stellt derzeit keinen vollständigen öffentlichen Produktkatalog bereit. Importiert werden die aktuellen offiziellen Spezialaktionen. Das Osttirol-Flugblatt ist zusätzlich direkt verlinkt.
+          </p>
+        </div>
+
         <div class="settings-card danger-zone">
           <div>
             <strong>Demo-Daten zurücksetzen</strong>
@@ -419,10 +449,51 @@
     <div id="sparPromotionsList" class="stack live-result-list"></div>
   </section>
 
+  <section class="bottom-sheet" id="tgLinkSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">T&G AKTIONEN</div>
+        <h2 id="tgLinkTitle">Aktionsartikel verknüpfen</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+
+    <p class="muted small live-note">
+      Hier werden nur aktuell bepreiste T&G-Spezialaktionen durchsucht – nicht das vollständige T&G-Sortiment.
+    </p>
+
+    <div class="search-wrap sheet-search">
+      <input id="tgSearchInput" class="search-input" type="search"
+             placeholder="T&G-Aktion suchen …" autocomplete="off">
+    </div>
+
+    <div class="live-link-info" id="tgCurrentLink"></div>
+    <div id="tgSearchState" class="muted small live-search-state"></div>
+    <div id="tgSearchResults" class="stack live-result-list"></div>
+  </section>
+
+  <section class="bottom-sheet" id="tgPromotionsSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">T&G OSTTIROL</div>
+        <h2>Aktuelle Spezialaktionen</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+
+    <div id="tgPromotionsState" class="muted small live-search-state">
+      T&G-Aktionen werden geladen …
+    </div>
+    <div id="tgPromotionsList" class="stack live-result-list"></div>
+  </section>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="live-mpreis.js"></script>
   <script src="live-spar.js"></script>
+  <script src="live-tg.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

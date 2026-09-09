@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 9.5
+# PreisPilot Osttirol – Version 10.0
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -480,3 +480,53 @@ Daraus folgt:
 Der temporäre Diagnose-Schritt wird im normalen Workflow wieder entfernt.
 `scripts/diagnose_spar_promotions.py` kann für spätere Analysen im Repository
 verbleiben, läuft aber nicht mehr automatisch.
+
+
+## Version 10.0 – T&G Osttirol
+
+T&G ist nun als dritter automatisch aktualisierter Händler integriert.
+
+### Datenumfang
+
+T&G stellt aktuell keinen vollständigen öffentlich durchsuchbaren Sortimentskatalog
+bereit. Deshalb importiert PreisPilot bewusst nur Informationen, die auf der
+offiziellen T&G-Aktionsseite eindeutig verfügbar sind:
+
+- aktuelle Spezialaktionen
+- Normalpreis
+- Aktionspreis
+- Grundpreistext
+- Gültigkeitszeitraum
+- prozentuale Sortimentsaktionen ohne festen Produktpreis
+- Link zum aktuellen Osttirol-Flugblatt
+
+Quelle:
+`https://www.tundg.at/aktionen/`
+
+### App
+
+Unter `Mehr → T&G` gibt es:
+
+- Datenstand
+- Anzahl aktueller Spezialaktionen
+- Gültigkeit
+- persönliche T&G-Aktionsverknüpfungen
+- Aktionsansicht ohne Suchbegriff
+- direkten Link zum Osttirol-Flugblatt
+
+In `Artikel verwalten` gibt es zusätzlich einen T&G-Button.
+
+Die T&G-Suche in dieser Verknüpfung durchsucht ausdrücklich nur aktuell
+bepreiste Spezialaktionen und ist kein vollständiger T&G-Katalog.
+
+### Nach Aktionsende
+
+Eine persönliche T&G-Verknüpfung bleibt lokal bestehen. Verschwindet die Aktion
+aus dem aktuellen Import, wird der alte Aktionspreis über `validUntil`
+automatisch nicht mehr als aktiver Angebotspreis verwendet. Der lokale
+Preisverlauf bleibt erhalten.
+
+### Datenschutz
+
+Persönliche Produktverknüpfungen, Einkaufsliste und Einstellungen bleiben
+weiterhin ausschließlich im localStorage des Browsers.

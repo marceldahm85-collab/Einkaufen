@@ -24,7 +24,8 @@
     settings: { theme: "system", region: "osttirol", shoppingSort: "added", shoppingStrategy: "cheapest" },
     live: {
       mpreis: { enabled: true, lastSync: null, lastError: null },
-      spar: { enabled: true, lastSync: null, lastError: null }
+      spar: { enabled: true, lastSync: null, lastError: null },
+      tg: { enabled: true, lastSync: null, lastError: null }
     },
     shopping: [
       { id: "s1", productId: "p_milk", quantity: 2, checked: false, preferredStore: "auto", addedAt: 1 },
@@ -97,10 +98,13 @@
   let currentMarket = "all";
   let currentMpreisLinkProductId = null;
   let currentSparLinkProductId = null;
+  let currentTgLinkProductId = null;
   let mpreisSearchTimer = null;
   let sparSearchTimer = null;
+  let tgSearchTimer = null;
   let mpreisPublicStatus = null;
   let sparPublicStatus = null;
+  let tgPublicStatus = null;
 
   const $ = (sel, root=document) => root.querySelector(sel);
   const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
@@ -129,6 +133,10 @@
         spar: {
           ...initialState.live.spar,
           ...(input.live?.spar || {})
+        },
+        tg: {
+          ...initialState.live.tg,
+          ...(input.live?.tg || {})
         }
       },
       shopping: Array.isArray(input.shopping) ? input.shopping : [],
@@ -1536,6 +1544,423 @@
     return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
   }
 
+  function renderTgLiveStatus() {
+    const live = state.live?.tg || {};
+    const linked = state.products.filter(p => p.liveLinks?.tg).length;
+
+    const linkedEl = $("#tgLinkedCount");
+    const lastEl = $("#tgLastSync");
+    const statusEl = $("#tgLiveStatus");
+    const promoBtn = $("#showTgPromotionsBtn");
+    const flyerBtn = $("#openTgFlyerBtn");
+
+    if (!linkedEl || !lastEl || !statusEl) return;
+
+    linkedEl.textContent = `${linked} Artikel verknüpft`;
+    statusEl.className = "status-badge";
+
+    if (live.lastError) {
+      statusEl.textContent = "Fehler";
+      statusEl.classList.add("live-error");
+    } else if (tgPublicStatus?.updatedAt) {
+      statusEl.textContent = "Aktuell";
+      statusEl.classList.add("live-ok");
+    } else {
+      statusEl.textContent = "Bereit";
+    }
+
+    if (tgPublicStatus?.updatedAt) {
+      const updated = new Date(tgPublicStatus.updatedAt);
+      const period = tgPublicStatus.validUntil
+        ? ` · Aktionen bis ${formatDate(tgPublicStatus.validUntil)}`
+        : "";
+
+      lastEl.textContent = `Datenstand: ${updated.toLocaleString("de-AT", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+      })} · ${tgPublicStatus.productCount || 0} bepreiste Aktionen${period}`;
+    } else {
+      lastEl.textContent = "Noch keine importierten T&G-Aktionsdaten vorhanden";
+    }
+
+    if (promoBtn) {
+      const count = tgPublicStatus?.promotionCount || 0;
+      promoBtn.textContent = count
+        ? `🔥 ${count} T&G-Aktionen anzeigen`
+        : "🔥 T&G-Aktionen anzeigen";
+    }
+
+    if (flyerBtn) {
+      const url = tgPublicStatus?.flyer?.url;
+      flyerBtn.disabled = !url;
+      flyerBtn.dataset.flyerUrl = url || "";
+    }
+  }
+
+  async function refreshTgPublicStatus(force = false) {
+    try {
+      if (!window.TgLive?.status) throw new Error("T&G-Datenmodul fehlt");
+      tgPublicStatus = await window.TgLive.status(force);
+      state.live.tg.lastError = null;
+    } catch (error) {
+      tgPublicStatus = null;
+      state.live.tg.lastError = error.message;
+    }
+
+    saveState();
+    renderTgLiveStatus();
+  }
+
+  function tgAmountText(item) {
+    return item.amountText || formatLiveAmount(item);
+  }
+
+  async function openTgPromotions() {
+    const stateEl = $("#tgPromotionsState");
+    const listEl = $("#tgPromotionsList");
+
+    if (!stateEl || !listEl) return;
+
+    openSheet("tgPromotionsSheet");
+    stateEl.textContent = "T&G-Aktionen werden geladen …";
+    listEl.innerHTML = "";
+
+    if (!window.TgLive?.promotions) {
+      stateEl.textContent = "Die T&G-Aktionsansicht konnte nicht geladen werden.";
+      return;
+    }
+
+    try {
+      const items = await window.TgLive.promotions();
+
+      const until = tgPublicStatus?.validUntil
+        ? ` · gültig bis ${formatDate(tgPublicStatus.validUntil)}`
+        : "";
+
+      stateEl.textContent = items.length
+        ? `${items.length} offizielle T&G-Spezialaktionen${until}`
+        : "Aktuell wurden keine T&G-Spezialaktionen gefunden.";
+
+      listEl.innerHTML = items.map(item => {
+        const promotion = item.promotion || {};
+        const condition = promotion.label || "Spezialaktion";
+        const hasPrice = item.salePrice != null;
+
+        return `
+          <article class="product-card tg-promo-card">
+            <div class="product-main tg-promo-main">
+              <div class="product-name">${escapeHtml(item.name)}</div>
+              ${item.description ? `<div class="product-meta"><span>${escapeHtml(item.description)}</span></div>` : ""}
+              <div class="offer-extra">
+                <span class="offer-badge condition">${escapeHtml(condition)}</span>
+              </div>
+            </div>
+
+            <div class="product-price-wrap">
+              ${hasPrice
+                ? `<div class="product-price sale">${money(item.salePrice)}</div>
+                   ${item.regularPrice != null && Number(item.regularPrice) !== Number(item.salePrice)
+                     ? `<div class="old-price">${money(item.regularPrice)}</div>`
+                     : ""}
+                   <div class="product-meta" style="justify-content:flex-end">
+                     ${item.unitPriceText
+                       ? escapeHtml(item.unitPriceText)
+                       : (item.unitPrice ? `${money(item.unitPrice)}/${escapeHtml(item.unitPriceUnit || "")}` : "")}
+                   </div>`
+                : `<div class="tg-no-price">ohne Fixpreis</div>`}
+            </div>
+          </article>`;
+      }).join("");
+    } catch (error) {
+      stateEl.textContent = `T&G-Aktionen konnten nicht geladen werden: ${error.message}`;
+      listEl.innerHTML = "";
+    }
+  }
+
+  function openTgLink(productId) {
+    const product = productById(productId);
+    if (!product) return;
+
+    currentTgLinkProductId = productId;
+    $("#tgLinkTitle").textContent = product.name;
+    $("#tgSearchInput").value = product.name;
+    renderTgCurrentLink(product);
+    $("#tgSearchResults").innerHTML = "";
+    $("#tgSearchState").textContent = "";
+    openSheet("tgLinkSheet");
+    searchTgProducts(product.name);
+  }
+
+  function renderTgCurrentLink(product) {
+    const target = $("#tgCurrentLink");
+    if (!target) return;
+
+    const link = product?.liveLinks?.tg;
+    if (!link) {
+      target.innerHTML = "";
+      return;
+    }
+
+    target.innerHTML = `
+      <div class="live-link-card tg-link-card">
+        <strong>Verknüpft mit: ${escapeHtml(link.name || "T&G-Aktion")}</strong>
+        Diese Verknüpfung gilt für den aktuell erkannten T&G-Aktionsartikel.
+        <button class="live-unlink-btn" data-unlink-tg="${product.id}">Verknüpfung lösen</button>
+      </div>`;
+  }
+
+  async function searchTgProducts(query) {
+    const stateEl = $("#tgSearchState");
+    const resultEl = $("#tgSearchResults");
+    if (!stateEl || !resultEl) return;
+
+    const q = String(query || "").trim();
+    if (q.length < 2) {
+      stateEl.textContent = "Mindestens 2 Zeichen eingeben.";
+      resultEl.innerHTML = "";
+      return;
+    }
+
+    if (!window.TgLive) {
+      stateEl.textContent = "T&G-Datenmodul konnte nicht geladen werden.";
+      return;
+    }
+
+    stateEl.textContent = "Suche in aktuellen T&G-Spezialaktionen …";
+    resultEl.innerHTML = "";
+
+    try {
+      const results = await window.TgLive.search(q, 20);
+
+      stateEl.textContent = results.length
+        ? `${results.length} aktuelle Treffer – passenden Aktionsartikel antippen`
+        : "Keine passende aktuell bepreiste T&G-Aktion gefunden.";
+
+      resultEl.innerHTML = results.map((item, index) => `
+        <article class="product-card live-result tg-live-result" data-tg-result-index="${index}">
+          <div class="product-main">
+            <div class="product-name">${escapeHtml(item.name)}</div>
+            <div class="product-meta">
+              <span>${escapeHtml(tgAmountText(item))}</span>
+            </div>
+          </div>
+          <div class="product-price-wrap">
+            <div class="product-price sale">${money(item.salePrice)}</div>
+            ${item.regularPrice != null ? `<div class="old-price">${money(item.regularPrice)}</div>` : ""}
+            <div class="product-meta" style="justify-content:flex-end">
+              ${item.unitPriceText
+                ? escapeHtml(item.unitPriceText)
+                : (item.unitPrice ? `${money(item.unitPrice)}/${escapeHtml(item.unitPriceUnit || "")}` : "")}
+            </div>
+          </div>
+        </article>`).join("");
+
+      resultEl._tgResults = results;
+    } catch (error) {
+      stateEl.textContent = `T&G-Suche nicht möglich: ${error.message}`;
+      resultEl.innerHTML = "";
+    }
+  }
+
+  function linkTgResult(productId, liveItem) {
+    const product = productById(productId);
+    if (!product || !liveItem) return;
+
+    product.liveLinks = product.liveLinks || {};
+    product.liveLinks.tg = {
+      remoteObjectId: liveItem.remoteObjectId,
+      retailerProductId: liveItem.retailerProductId,
+      name: liveItem.name,
+      linkedAt: new Date().toISOString()
+    };
+
+    applyTgLivePrice(product, liveItem);
+    state.live.tg.lastSync = new Date().toISOString();
+    state.live.tg.lastError = null;
+
+    saveState();
+    renderAll();
+    showToast("T&G-Aktionsartikel verknüpft");
+    closeSheets();
+  }
+
+  function unlinkTg(productId) {
+    const product = productById(productId);
+    if (!product?.liveLinks?.tg) return;
+
+    delete product.liveLinks.tg;
+    saveState();
+    renderAll();
+    showToast("T&G-Verknüpfung entfernt");
+    closeSheets();
+  }
+
+  function applyTgLivePrice(product, liveItem) {
+    const now = liveItem.retrievedAt || new Date().toISOString();
+    const date = now.slice(0, 10);
+    let offer = (product.offers || []).find(o => o.store === "tg");
+
+    if (!offer) {
+      offer = { store: "tg", history: [] };
+      product.offers = product.offers || [];
+      product.offers.push(offer);
+    }
+
+    const historyMap = new Map();
+
+    (Array.isArray(offer.history) ? offer.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) {
+        historyMap.set(h.date, { date: h.date, price: Number(h.price) });
+      }
+    });
+
+    (Array.isArray(liveItem.history) ? liveItem.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) {
+        historyMap.set(h.date, { date: h.date, price: Number(h.price) });
+      }
+    });
+
+    if (liveItem.salePrice != null) {
+      historyMap.set(date, { date, price: Number(liveItem.salePrice) });
+    }
+
+    const history = [...historyMap.values()]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 250);
+
+    Object.assign(offer, {
+      retailerProductId: liveItem.retailerProductId,
+      remoteObjectId: liveItem.remoteObjectId,
+      regularPrice: liveItem.regularPrice ?? null,
+      salePrice: liveItem.salePrice ?? null,
+      unitPrice: liveItem.unitPrice,
+      unitPriceUnit: liveItem.unitPriceUnit,
+      validUntil: liveItem.validUntil ?? null,
+      updatedAt: date,
+      source: "tundg.at Spezialaktionen",
+      retrievedAt: now,
+      promotion: liveItem.promotion ?? null,
+      promotionVerified: Boolean(liveItem.promotionVerified),
+      history
+    });
+  }
+
+  async function syncLinkedTg({ silent = false } = {}) {
+    const linkedProducts = state.products.filter(p => p.liveLinks?.tg);
+
+    if (!linkedProducts.length) {
+      if (!silent) showToast("Noch keine T&G-Aktionsartikel verknüpft");
+      return;
+    }
+
+    if (!window.TgLive) {
+      state.live.tg.lastError = "Live-Modul fehlt";
+      saveState();
+      renderTgLiveStatus();
+      if (!silent) showToast("T&G-Datenmodul fehlt");
+      return;
+    }
+
+    const button = $("#syncTgBtn");
+    const status = $("#tgLiveStatus");
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Lädt …";
+    }
+    if (status) {
+      status.textContent = "Lädt";
+      status.className = "status-badge live-working";
+    }
+
+    let updated = 0;
+    let expired = 0;
+
+    for (const product of linkedProducts) {
+      const link = product.liveLinks.tg;
+
+      try {
+        const item = await window.TgLive.getObject(link.remoteObjectId);
+        applyTgLivePrice(product, item);
+        product.liveLinks.tg = {
+          ...product.liveLinks.tg,
+          remoteObjectId: item.remoteObjectId,
+          retailerProductId: item.retailerProductId,
+          name: item.name
+        };
+        updated += 1;
+      } catch {
+        expired += 1;
+      }
+    }
+
+    state.live.tg.lastSync = new Date().toISOString();
+    state.live.tg.lastError = null;
+
+    saveState();
+    renderAll();
+
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Neu laden";
+    }
+
+    if (!silent) {
+      showToast(
+        expired
+          ? `${updated} T&G-Aktionen aktualisiert · ${expired} nicht mehr aktiv`
+          : `${updated} T&G-Aktionen aktualisiert`
+      );
+    }
+  }
+
+  async function reloadAndSyncTg() {
+    const button = $("#syncTgBtn");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Lädt …";
+    }
+
+    try {
+      if (!window.TgLive?.reload) throw new Error("T&G-Datenmodul fehlt");
+      tgPublicStatus = await window.TgLive.reload();
+      state.live.tg.lastError = null;
+      saveState();
+      renderTgLiveStatus();
+      await syncLinkedTg({ silent: false });
+    } catch (error) {
+      state.live.tg.lastError = error.message;
+      saveState();
+      renderTgLiveStatus();
+      showToast("T&G-Aktionsdaten konnten nicht neu geladen werden");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Neu laden";
+      }
+    }
+  }
+
+  function shouldAutoSyncTg() {
+    const linked = state.products.some(p => p.liveLinks?.tg);
+    if (!linked || !navigator.onLine) return false;
+
+    const last = state.live?.tg?.lastSync;
+    if (!last) return true;
+
+    return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
+  }
+
+  function openTgFlyer() {
+    const url = tgPublicStatus?.flyer?.url || $("#openTgFlyerBtn")?.dataset.flyerUrl;
+    if (!url) {
+      showToast("Osttirol-Flugblatt-Link ist derzeit nicht verfügbar");
+      return;
+    }
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   function renderMore() {
     $("#databaseList").innerHTML = state.products.map(p => `
       <div class="database-item">
@@ -1550,12 +1975,16 @@
           <button class="database-live-btn spar-live-btn ${p.liveLinks?.spar ? "is-linked" : ""}" data-link-spar="${p.id}">
             ${p.liveLinks?.spar ? "SPAR ✓" : "SPAR"}
           </button>
+          <button class="database-live-btn tg-live-btn ${p.liveLinks?.tg ? "is-linked" : ""}" data-link-tg="${p.id}">
+            ${p.liveLinks?.tg ? "T&G ✓" : "T&G"}
+          </button>
           <button class="database-delete" data-delete-product="${p.id}">Löschen</button>
         </div>
       </div>`).join("");
 
     renderMpreisLiveStatus();
     renderSparLiveStatus();
+    renderTgLiveStatus();
 
     $$("#themeSegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.themeValue === state.settings.theme));
     $$("#shoppingStrategySegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.strategyValue === state.settings.shoppingStrategy));
@@ -1856,6 +2285,15 @@
     const sparLink = e.target.closest("[data-link-spar]");
     if (sparLink) return openSparLink(sparLink.dataset.linkSpar);
 
+    const showTgPromotions = e.target.closest("#showTgPromotionsBtn");
+    if (showTgPromotions) return openTgPromotions();
+
+    const tgFlyer = e.target.closest("#openTgFlyerBtn");
+    if (tgFlyer) return openTgFlyer();
+
+    const tgLink = e.target.closest("[data-link-tg]");
+    if (tgLink) return openTgLink(tgLink.dataset.linkTg);
+
     const liveResult = e.target.closest("[data-mpreis-result-index]");
     if (liveResult) {
       const results = $("#mpreisSearchResults")._mpreisResults || [];
@@ -1880,6 +2318,18 @@
     const unlinkSparLive = e.target.closest("[data-unlink-spar]");
     if (unlinkSparLive) return unlinkSpar(unlinkSparLive.dataset.unlinkSpar);
 
+    const tgResult = e.target.closest("[data-tg-result-index]");
+    if (tgResult) {
+      const results = $("#tgSearchResults")._tgResults || [];
+      const item = results[Number(tgResult.dataset.tgResultIndex)];
+      if (item && currentTgLinkProductId) {
+        return linkTgResult(currentTgLinkProductId, item);
+      }
+    }
+
+    const unlinkTgLive = e.target.closest("[data-unlink-tg]");
+    if (unlinkTgLive) return unlinkTg(unlinkTgLive.dataset.unlinkTg);
+
     const delProduct = e.target.closest("[data-delete-product]");
     if (delProduct) {
       if (confirm("Diesen Artikel wirklich aus der Datenbank löschen?")) deleteProduct(delProduct.dataset.deleteProduct);
@@ -1902,8 +2352,15 @@
     sparSearchTimer = setTimeout(() => searchSparProducts(query), 320);
   });
 
+  $("#tgSearchInput").addEventListener("input", (e) => {
+    clearTimeout(tgSearchTimer);
+    const query = e.target.value;
+    tgSearchTimer = setTimeout(() => searchTgProducts(query), 320);
+  });
+
   $("#syncMpreisBtn").addEventListener("click", reloadAndSyncMpreis);
   $("#syncSparBtn").addEventListener("click", reloadAndSyncSpar);
+  $("#syncTgBtn").addEventListener("click", reloadAndSyncTg);
   $("#shoppingSort").addEventListener("change", (e) => {
     state.settings.shoppingSort = e.target.value;
     saveState(); renderShopping();
@@ -1983,6 +2440,12 @@
   refreshSparPublicStatus().then(() => {
     if (shouldAutoSyncSpar()) {
       setTimeout(() => syncLinkedSpar({ silent: true }).catch(() => {}), 550);
+    }
+  });
+
+  refreshTgPublicStatus().then(() => {
+    if (shouldAutoSyncTg()) {
+      setTimeout(() => syncLinkedTg({ silent: true }).catch(() => {}), 700);
     }
   });
 })();

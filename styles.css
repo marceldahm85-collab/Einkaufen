@@ -731,3 +731,69 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
   text-overflow: clip;
   line-height: 1.22;
 }
+
+
+/* Version 10.0 – T&G Spezialaktionen */
+.tg-live-card::before {
+  background: linear-gradient(#ef7d00, #f5a63a);
+}
+
+.database-live-btn.tg-live-btn {
+  color: #c96000;
+  background: color-mix(in srgb, #ef7d00 11%, var(--surface-2));
+}
+
+.database-live-btn.tg-live-btn.is-linked {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 11%, var(--surface-2));
+}
+
+.tg-promo-btn,
+.tg-flyer-btn {
+  width: 100%;
+  margin-top: 11px;
+}
+
+.tg-promo-btn {
+  border-color: color-mix(in srgb, #ef7d00 25%, var(--line));
+  background: color-mix(in srgb, #ef7d00 9%, var(--surface-2));
+}
+
+.tg-flyer-btn {
+  margin-top: 8px;
+}
+
+.tg-link-card {
+  background: color-mix(in srgb, #ef7d00 9%, var(--surface-2));
+  border-color: color-mix(in srgb, #ef7d00 18%, var(--line));
+}
+
+.tg-live-result .product-price,
+.tg-promo-card .product-price {
+  color: #d96f00;
+}
+
+.tg-promo-card {
+  align-items: start;
+}
+
+.tg-promo-main {
+  cursor: default;
+}
+
+.tg-no-price {
+  font-size: .78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+#tgPromotionsSheet .live-result-list {
+  padding-bottom: 10px;
+}
+
+#tgPromotionsSheet .product-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.22;
+}
