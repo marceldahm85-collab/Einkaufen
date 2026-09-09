@@ -215,6 +215,92 @@
     return o.salePrice != null ? Number(o.salePrice) : Number(o.regularPrice);
   }
 
+  function offerPricingForQuantity(offer, quantity = 1) {
+    if (!offer) return null;
+
+    const o = normalizedOffer(offer);
+    const qty = Math.max(1, Number(quantity || 1));
+    const regular = o.regularPrice != null && Number.isFinite(Number(o.regularPrice))
+      ? Number(o.regularPrice)
+      : null;
+    const sale = o.salePrice != null && Number.isFinite(Number(o.salePrice))
+      ? Number(o.salePrice)
+      : null;
+
+    if (sale == null) {
+      if (regular == null) return null;
+      return {
+        unitPrice: regular,
+        lineTotal: regular * qty,
+        activeSale: false,
+        conditionMet: true
+      };
+    }
+
+    const promotion = o.promotion || {};
+    const required = Math.max(1, Number(promotion.requiredQuantity || 1));
+    const conditional = ["quantity", "bundle"].includes(promotion.type) && required > 1;
+
+    if (conditional && qty < required) {
+      if (regular == null) return null;
+      return {
+        unitPrice: regular,
+        lineTotal: regular * qty,
+        activeSale: false,
+        conditionMet: false
+      };
+    }
+
+    if (promotion.type === "bundle" && required > 1) {
+      const fullGroups = Math.floor(qty / required);
+      const remainder = qty % required;
+
+      // The retailer feed stores the printed effective "je" price as salePrice.
+      // Complete promotion groups can therefore be valued directly from it.
+      let lineTotal = fullGroups * required * sale;
+
+      if (remainder) {
+        if (regular == null) return null;
+        lineTotal += remainder * regular;
+      }
+
+      return {
+        unitPrice: lineTotal / qty,
+        lineTotal,
+        activeSale: true,
+        conditionMet: true
+      };
+    }
+
+    return {
+      unitPrice: sale,
+      lineTotal: sale * qty,
+      activeSale: true,
+      conditionMet: true
+    };
+  }
+
+  function pricedOfferForStore(product, storeId, quantity = 1) {
+    const offer = offerForStore(product, storeId);
+    if (!offer) return null;
+
+    const pricing = offerPricingForQuantity(offer, quantity);
+    return pricing ? { offer, pricing } : null;
+  }
+
+  function cheapestPricedOffer(product, quantity = 1) {
+    const candidates = validOffers(product)
+      .map(normalizedOffer)
+      .map(offer => ({ offer, pricing: offerPricingForQuantity(offer, quantity) }))
+      .filter(candidate => candidate.pricing)
+      .sort((a, b) =>
+        (a.pricing.lineTotal - b.pricing.lineTotal) ||
+        (a.pricing.unitPrice - b.pricing.unitPrice)
+      );
+
+    return candidates[0] || null;
+  }
+
   function validOffers(product) {
     const today = todayISO();
     return (product.offers || []).filter(o => {
@@ -361,7 +447,7 @@
   function shoppingStoreId(item) {
     if (item.custom) return item.store || "auto";
     if (item.preferredStore && item.preferredStore !== "auto") return item.preferredStore;
-    return cheapestOffer(item.product)?.store || "auto";
+    return cheapestPricedOffer(item.product, item.quantity)?.offer.store || "auto";
   }
 
   function shoppingStoreName(item) {
@@ -371,15 +457,24 @@
 
   function shoppingUnitPrice(item) {
     if (item.custom) return Number(item.price || 0);
-    if (item.preferredStore && item.preferredStore !== "auto") {
-      const offer = validOffers(item.product).map(normalizedOffer).find(o => o.store === item.preferredStore);
-      if (offer) return offerPrice(offer);
-    }
-    return cheapestOffer(item.product) ? offerPrice(cheapestOffer(item.product)) : 0;
+
+    const quantity = Number(item.quantity || 1);
+    const candidate = item.preferredStore && item.preferredStore !== "auto"
+      ? pricedOfferForStore(item.product, item.preferredStore, quantity)
+      : cheapestPricedOffer(item.product, quantity);
+
+    return candidate?.pricing.unitPrice || 0;
   }
 
   function shoppingItemTotal(item) {
-    return shoppingUnitPrice(item) * Number(item.quantity || 1);
+    if (item.custom) return Number(item.price || 0) * Number(item.quantity || 1);
+
+    const quantity = Number(item.quantity || 1);
+    const candidate = item.preferredStore && item.preferredStore !== "auto"
+      ? pricedOfferForStore(item.product, item.preferredStore, quantity)
+      : cheapestPricedOffer(item.product, quantity);
+
+    return candidate?.pricing.lineTotal || 0;
   }
 
   function renderShoppingCard(item) {
@@ -390,6 +485,10 @@
       ? `${storeId === "auto" ? "Kein Markt" : store.name} · freier Artikel`
       : `${item.product.brand || "ohne Marke"} · ${fmtAmount(item.product)}`;
     const price = shoppingUnitPrice(item);
+    const selectedOffer = !item.custom && storeId !== "auto"
+      ? offerForStore(item.product, storeId)
+      : null;
+    const condition = selectedOffer ? offerConditionLabel(selectedOffer) : "";
     const idAttr = item.custom ? `c:${item.id}` : `p:${item.id}`;
     return `
       <article class="product-card shopping-card ${item.checked ? "is-checked" : ""}">
@@ -397,6 +496,7 @@
         <div class="product-main" ${item.custom ? "" : `data-open-product="${item.product.id}"`}>
           <div class="product-name">${escapeHtml(name)}</div>
           <div class="product-meta"><span>${escapeHtml(meta)}</span></div>
+          ${condition ? `<div class="product-meta"><span>${escapeHtml(condition)}</span></div>` : ""}
           ${storeId !== "auto" ? `<div class="market-label"><span class="market-dot" style="background:${store.color}"></span>${store.name}</div>` : ""}
         </div>
         <div class="product-price-wrap">
@@ -508,17 +608,19 @@
       const assignments = [];
 
       productItems.forEach(item => {
-        const offer = item.preferredStore && item.preferredStore !== "auto"
-          ? offerForStore(item.product, item.preferredStore)
-          : cheapestOffer(item.product);
+        const quantity = Number(item.quantity || 1);
+        const candidate = item.preferredStore && item.preferredStore !== "auto"
+          ? pricedOfferForStore(item.product, item.preferredStore, quantity)
+          : cheapestPricedOffer(item.product, quantity);
 
-        if (!offer) return;
+        if (!candidate) return;
 
         assignments.push({
           item,
-          store: offer.store,
-          offer,
-          lineTotal: offerPrice(offer) * Number(item.quantity || 1)
+          store: candidate.offer.store,
+          offer: candidate.offer,
+          pricing: candidate.pricing,
+          lineTotal: candidate.pricing.lineTotal
         });
       });
 
@@ -580,19 +682,24 @@
         ? (stores.includes(item.preferredStore) ? [item.preferredStore] : [])
         : stores;
 
+      const quantity = Number(item.quantity || 1);
       const choices = allowedStores
-        .map(store => offerForStore(item.product, store))
+        .map(store => pricedOfferForStore(item.product, store, quantity))
         .filter(Boolean)
-        .sort((a,b) => offerPrice(a) - offerPrice(b));
+        .sort((a,b) =>
+          (a.pricing.lineTotal - b.pricing.lineTotal) ||
+          (a.pricing.unitPrice - b.pricing.unitPrice)
+        );
 
-      const offer = choices[0];
-      if (!offer) return;
+      const candidate = choices[0];
+      if (!candidate) return;
 
       assignments.push({
         item,
-        store: offer.store,
-        offer,
-        lineTotal: offerPrice(offer) * Number(item.quantity || 1)
+        store: candidate.offer.store,
+        offer: candidate.offer,
+        pricing: candidate.pricing,
+        lineTotal: candidate.pricing.lineTotal
       });
     });
 
@@ -1577,11 +1684,16 @@
 
       const flyerCount = tgPublicStatus.flyerProductCount || 0;
       const linkable = tgPublicStatus.linkableCount || 0;
+      const textLinked = tgPublicStatus.flyerTextLinkableCount || 0;
+      const spatialLinked = tgPublicStatus.flyerSpatialLinkableCount || 0;
+      const spatialInfo = spatialLinked
+        ? ` · Flyer-Zuordnung ${textLinked}+${spatialLinked}`
+        : "";
 
       lastEl.textContent = `Datenstand: ${updated.toLocaleString("de-AT", {
         day: "2-digit", month: "2-digit", year: "numeric",
         hour: "2-digit", minute: "2-digit"
-      })} · ${flyerCount || tgPublicStatus.productCount || 0} Flugblatt-Angebote · ${linkable} sicher verknüpfbar${period}`;
+      })} · ${flyerCount || tgPublicStatus.productCount || 0} Flugblatt-Angebote · ${linkable} sicher verknüpfbar${spatialInfo}${period}`;
     } else {
       lastEl.textContent = "Noch keine importierten T&G-Aktionsdaten vorhanden";
     }

@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 10.3
+# PreisPilot Osttirol – Version 10.4
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -631,3 +631,54 @@ Damit ist ein falscher Preisvergleich ausgeschlossen, während trotzdem der
 Großteil des Osttirol-Flugblatts direkt in der App sichtbar wird.
 
 Der bisherige Spezialaktionsimport bleibt als stabile zweite Quelle erhalten.
+
+
+## Version 10.4 – räumliche T&G-Zuordnung + korrekte Mengenpreise
+
+Der T&G-Flugblattimport verwendet zusätzlich zu der bereits bewährten
+Textreihenfolge nun die echten PDF-Textkoordinaten.
+
+### Räumliche Zuordnung
+
+`pypdf` liefert für Textfragmente die Position auf der jeweiligen PDF-Seite.
+PreisPilot sucht damit Produktanker über Produktname und Grundpreis und ordnet
+Mengenhinweise wie:
+
+- `AB 2 PKG.`
+- `AB 6 FL.`
+- `AB 12 DS.`
+- `AB 24 DS.`
+- `AB 2 KISTEN`
+
+nur dann einem Artikel zu, wenn die Position eindeutig genug ist.
+
+Bei räumlich mehrdeutigen Treffern wird bewusst keine Zuordnung vorgenommen.
+Die bisherige textbasierte Erkennung bleibt die stärkere Quelle und wird nicht
+überschrieben.
+
+Der Workflow protokolliert getrennt:
+
+- sicher über Textstruktur zugeordnet
+- zusätzlich über PDF-Positionen zugeordnet
+- insgesamt sicher verknüpfbar
+
+### Mengenbedingungen im Optimierer
+
+Der Optimierer berücksichtigt jetzt `requiredQuantity` tatsächlich.
+
+Beispiele:
+
+- `ab 2 Stück`: bei Menge 1 wird der Aktionspreis nicht verwendet; ist der
+  Normalpreis unbekannt, gilt das Angebot für diese Einkaufsmenge als nicht
+  bepreist.
+- `1+1 gratis`: vollständige Aktionsgruppen werden zum gedruckten Effektivpreis
+  berechnet. Eine Restmenge wird nur dann bewertet, wenn ein Normalpreis bekannt
+  ist.
+- Ein Mengenangebot ohne bekannten Normalpreis wird unterhalb der Mindestmenge
+  nicht geschätzt.
+
+Damit können Mengenaktionen nicht mehr fälschlich als normaler Einzelpreis in
+`Günstigster Einkauf`, `Maximal 2 Märkte` oder `Nur ein Markt` einfließen.
+
+Die T&G-Aktionsansicht bleibt unverändert vollständig: nicht sicher zuordenbare
+Flyerpreise werden weiterhin als `nur Anzeige` dargestellt.

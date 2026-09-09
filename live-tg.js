@@ -116,6 +116,8 @@
       linkableCount: payload.linkableCount || 0,
       flyerProductCount: payload.flyerProductCount || 0,
       flyerLinkableCount: payload.flyerLinkableCount || 0,
+      flyerTextLinkableCount: payload.flyerTextLinkableCount || 0,
+      flyerSpatialLinkableCount: payload.flyerSpatialLinkableCount || 0,
       validFrom: payload.validFrom || null,
       validUntil: payload.validUntil || null,
       flyer: payload.flyer || null,
