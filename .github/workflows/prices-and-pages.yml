@@ -84,9 +84,6 @@ jobs:
               )
           PY
 
-      - name: SPAR-Aktionsfelder analysieren
-        run: python scripts/diagnose_spar_promotions.py
-
       - name: SPAR-Aktionen ergänzen
         run: python scripts/update_spar_actions.py
 
