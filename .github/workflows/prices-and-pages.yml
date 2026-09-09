@@ -112,8 +112,30 @@ jobs:
       - name: PDF-Textwerkzeug installieren
         run: python -m pip install --disable-pip-version-check pypdf
 
-      - name: T&G-Osttirol-Flugblatt analysieren
-        run: python scripts/diagnose_tg_flyer.py
+      - name: T&G-Osttirol-Flugblatt importieren
+        run: python scripts/update_tg_flyer.py
+
+      - name: T&G-Flugblattdaten prüfen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/tg.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          count = int(data.get("flyerProductCount") or 0)
+          linkable = int(data.get("flyerLinkableCount") or 0)
+
+          print(f"T&G-Flugblattprodukte: {count}")
+          print(f"Davon sicher verknüpfbar: {linkable}")
+
+          if count < 20:
+              raise SystemExit(
+                  "Unplausibel wenige T&G-Flugblattprodukte. "
+                  "Deployment wird abgebrochen."
+              )
+          PY
 
       - name: Öffentliche Preisdaten speichern
         shell: bash
