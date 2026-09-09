@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 9.4
+# PreisPilot Osttirol – Version 9.5
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -451,3 +451,32 @@ Zusätzlich wird `data/spar-promotion-diagnostics.json` erzeugt.
 Ziel ist, echte kurzfristige Aktionen strukturell von Dauertiefpreisen wie
 `IMMER BILLIG` und langfristigen Preisänderungen wie `Preisgesenkt` zu trennen,
 bevor die Importlogik erneut geändert wird.
+
+
+## Version 9.5 – SPAR-Aktionslogik auf Basis der Live-Diagnose
+
+Die Diagnose des realen SPAR-FactFinder-Datensatzes hat gezeigt:
+
+- `is-on-promotion=true` ist der zuverlässige Indikator für aktuelle Angebote.
+- `price < regular-price` deckt nahezu dieselbe Aktionsmenge ab.
+- `promotion-text` bzw. `promotion-most-likely-text` sind semantisch wertvoll,
+  kommen derzeit aber nur bei sehr wenigen Produkten vor.
+- `badge-names`, `badge-short-name` und `badge-icon` enthalten überwiegend
+  Produktmerkmale oder längerfristige Preisprogramme und dürfen nicht als
+  kurzfristige Aktionsart interpretiert werden.
+
+Daraus folgt:
+
+1. Nur `is-on-promotion=true` kommt in die Aktionsansicht.
+2. Eine konkrete Aktionsbedingung wird nur angezeigt, wenn SPAR sie strukturiert
+   in `promotion-text` / `promotion-most-likely-text` liefert.
+3. Fehlt diese Information, lautet die sichere Bezeichnung schlicht `Aktion`.
+4. Der rechnerische Rabatt bleibt als `discountPercent` gespeichert, wird aber
+   nicht mehr als vermeintliche Aktionsart (`-xx %`) missverstanden.
+5. 50 % Preisnachlass wird nicht automatisch als `1+1 gratis` bezeichnet.
+6. `IMMER BILLIG`, Bio, Pfand, Lokalität oder 5%-Wein-Badges werden nicht zur
+   Klassifikation einer laufenden Aktion verwendet.
+
+Der temporäre Diagnose-Schritt wird im normalen Workflow wieder entfernt.
+`scripts/diagnose_spar_promotions.py` kann für spätere Analysen im Repository
+verbleiben, läuft aber nicht mehr automatisch.

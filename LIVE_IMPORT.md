@@ -34,3 +34,18 @@ durch einen zusätzlichen MPREIS-Aktionsadapter ergänzt.
 
 ## Nächste Händler
 SPAR, BILLA, HOFER, Lidl und T&G können danach dieselbe Adapter-Schnittstelle verwenden.
+
+
+## MPREIS-Aktionsstufe (Version 8.3)
+
+Nach dem Grundpreisimport wird `scripts/update_mpreis_actions.py` ausgeführt.
+
+Quelle:
+`https://www.mpreis.at/aktionen/aktuell/alle-produkte-in-aktion`
+
+Die Zuordnung erfolgt bevorzugt über die MPREIS-Produkt-ID aus `/shop/p/...`.
+Nur wenn keine ID verwendbar ist, wird ein exakt eindeutiger Produktname als
+Fallback akzeptiert.
+
+Die Aktionsstufe darf den Grundpreisimport nicht beschädigen. Bei unsicherer
+Extraktion bleibt die Aktion daher ungesetzt.
