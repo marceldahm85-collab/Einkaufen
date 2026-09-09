@@ -481,6 +481,8 @@ def main():
         payload["promotionCount"] = verified
         payload["promotionUpdatedAt"] = now_iso()
         payload["promotionSource"] = "mpreis.at"
+        payload["promotionStale"] = False
+        payload.pop("promotionLastError", None)
 
         temp = DATA_PATH.with_suffix(".json.tmp")
         temp.write_text(
@@ -494,15 +496,34 @@ def main():
         return 0
 
     except Exception as exc:
-        # Promotions are supplementary. Never destroy the stable base-price file.
+        # Promotions are supplementary. The base importer deliberately carries
+        # the last verified action fields forward. If this refresh fails, keep
+        # those actions instead of silently deleting them.
+        preserved = sum(
+            1 for product in products
+            if isinstance(product, dict) and product.get("promotionVerified") is True
+        )
+
+        payload["promotionCount"] = preserved
+        payload["promotionStale"] = True
+        payload["promotionLastError"] = str(exc)
+
+        temp = DATA_PATH.with_suffix(".json.tmp")
+        temp.write_text(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        temp.replace(DATA_PATH)
+
         set_promo_status(
             "stale",
-            count=0,
+            count=preserved,
             error=str(exc),
             pages=pages_checked,
         )
         print(
-            f"WARNUNG: MPREIS-Aktionen konnten nicht sicher ergänzt werden: {exc}",
+            f"WARNUNG: MPREIS-Aktionen konnten nicht aktualisiert werden. "
+            f"{preserved} zuletzt verifizierte Aktionen bleiben erhalten. Fehler: {exc}",
             file=sys.stderr,
         )
         return 0
