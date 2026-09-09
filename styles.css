@@ -672,3 +672,33 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
   text-overflow: clip;
   line-height: 1.22;
 }
+
+
+/* Version 9.0 – SPAR Live-Preise */
+.spar-live-card::before {
+  background: linear-gradient(#00843d, #25a45d);
+}
+
+.database-live-btn.spar-live-btn {
+  color: #00843d;
+  background: color-mix(in srgb, #00843d 11%, var(--surface-2));
+}
+
+.database-live-btn.spar-live-btn.is-linked {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 11%, var(--surface-2));
+}
+
+.spar-link-card {
+  background: color-mix(in srgb, #00843d 9%, var(--surface-2));
+  border-color: color-mix(in srgb, #00843d 16%, var(--line));
+}
+
+.spar-live-result .product-price {
+  color: #00843d;
+}
+
+.database-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

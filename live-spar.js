@@ -1,0 +1,117 @@
+(() => {
+  "use strict";
+
+  const DATA_URL = "data/spar.json";
+  let payloadCache = null;
+  let loadPromise = null;
+  let lookup = null;
+
+  async function load(force = false) {
+    if (!force && payloadCache) return payloadCache;
+    if (!force && loadPromise) return loadPromise;
+
+    const url = force ? `${DATA_URL}?v=${Date.now()}` : DATA_URL;
+
+    loadPromise = fetch(url, { cache: force ? "reload" : "default" })
+      .then(async response => {
+        if (!response.ok) throw new Error(`SPAR-Daten nicht verfügbar (${response.status})`);
+
+        const payload = await response.json();
+        if (!payload || !Array.isArray(payload.products)) {
+          throw new Error("Ungültiges SPAR-Datenformat.");
+        }
+
+        payloadCache = payload;
+        lookup = new Map();
+
+        payload.products.forEach(item => {
+          if (item.remoteObjectId) lookup.set(String(item.remoteObjectId), item);
+          if (item.retailerProductId) lookup.set(String(item.retailerProductId), item);
+        });
+
+        return payload;
+      })
+      .finally(() => { loadPromise = null; });
+
+    return loadPromise;
+  }
+
+  async function search(query, limit = 20) {
+    const q = normalize(query);
+    if (!q) return [];
+
+    const payload = await load(false);
+    const tokens = q.split(/\s+/).filter(Boolean);
+
+    return payload.products
+      .map(item => {
+        const name = normalize(item.name);
+        const description = normalize(item.description);
+        const hay = `${name} ${description}`;
+        let score = 999;
+
+        if (name === q) score = 0;
+        else if (name.startsWith(q)) score = 1;
+        else if (name.includes(q)) score = 2;
+        else if (tokens.every(t => hay.includes(t))) score = 3;
+        else {
+          const matches = tokens.filter(t => hay.includes(t)).length;
+          if (matches) score = 10 - Math.min(matches, 6);
+        }
+
+        return { item, score, nameLength: name.length };
+      })
+      .filter(x => x.score < 999)
+      .sort((a,b) =>
+        (a.score - b.score) ||
+        (a.nameLength - b.nameLength) ||
+        String(a.item.name).localeCompare(String(b.item.name), "de")
+      )
+      .slice(0, Math.min(40, Math.max(1, Number(limit) || 20)))
+      .map(x => enrich(x.item, payload));
+  }
+
+  async function getObject(id) {
+    if (!id) throw new Error("SPAR-Produkt-ID fehlt.");
+    const payload = await load(false);
+    const item = lookup?.get(String(id));
+    if (!item) throw new Error("SPAR-Produkt im aktuellen Datenstand nicht gefunden.");
+    return enrich(item, payload);
+  }
+
+  async function status(force = false) {
+    const payload = await load(force);
+    return {
+      ok: true,
+      updatedAt: payload.updatedAt || null,
+      productCount: payload.productCount ?? payload.products.length,
+      scope: payload.scope || null
+    };
+  }
+
+  async function reload() {
+    payloadCache = null;
+    lookup = null;
+    loadPromise = null;
+    return status(true);
+  }
+
+  function enrich(item, payload) {
+    return {
+      ...item,
+      source: item.source || "heisse-preise.io (SPAR)",
+      retrievedAt: payload.updatedAt || new Date().toISOString()
+    };
+  }
+
+  function normalize(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  }
+
+  window.SparLive = { search, getObject, status, reload };
+})();

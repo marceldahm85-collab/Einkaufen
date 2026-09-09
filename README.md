@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 8
+# PreisPilot Osttirol – Version 9.0
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -184,3 +184,152 @@ Persönliche Daten bleiben ausschließlich im Browser-localStorage und werden ni
 in das Repository geschrieben. Siehe `GITHUB_DATENSCHUTZ.md`.
 
 Einrichtung: `GITHUB_SETUP.md`.
+
+
+## Version 8.2 – robuster MPREIS-Datenimport
+
+Der direkte MPREIS-Algolia-Nachbau wurde vorerst entfernt.
+
+Als Quelle wird nun der öffentliche österreichische Rohdatenexport von
+`heisse-preise.io/data/latest-canonical.json` verwendet. Der Export enthält unter
+anderem MPREIS-Datensätze mit aktuellem Preis, Menge, Einheit, Bio-Status und
+Preisverlauf.
+
+### Verlässlichkeitsregeln
+
+- ein erster Workflow kann nur grün werden, wenn mindestens 100 MPREIS-Produkte
+  in `data/mpreis.json` vorhanden sind
+- eine leere Datei kann deshalb nicht mehr unbemerkt als erfolgreich deployed werden
+- sobald einmal ein gültiger Datenbestand vorhanden ist, bleibt dieser bei einem
+  temporären Quellenfehler bestehen
+- `data/**`-Commits des Preis-Bots lösen keinen neuen Workflow aus
+- `.nojekyll` wird im Workflow selbst erzeugt
+
+### Datenschutz
+
+Keine Änderung: persönliche Einkaufsdaten bleiben ausschließlich im localStorage
+des jeweiligen Browsers und werden nicht nach GitHub übertragen.
+
+
+## Version 8.3 – MPREIS-Aktionen
+
+Der stabile MPREIS-Grundpreisimport aus Heisse Preise bleibt unverändert.
+
+Danach läuft eine zweite, bewusst getrennte Importstufe:
+
+`scripts/update_mpreis_actions.py`
+
+Sie liest die offizielle MPREIS-Seite „Alle Produkte in Aktion“ und übernimmt
+eine Aktion nur dann, wenn sie eindeutig einem Produkt zugeordnet werden kann.
+
+Unterstützt werden aktuell:
+- Statt-Preis / Aktionspreis
+- prozentuelle Preissenkung
+- `ab N Stück`
+- `bei N Stück`
+- `1+1`, `2+1`, `2+2`, `4+2`, `12+12` usw.
+- `NUR MIT APP`
+
+Das öffentliche Produktobjekt erhält bei einer sicheren Zuordnung unter anderem:
+
+```json
+{
+  "regularPrice": 2.99,
+  "salePrice": 1.99,
+  "promotionVerified": true,
+  "promotion": {
+    "type": "bundle",
+    "requiredQuantity": 3,
+    "paidQuantity": 2,
+    "freeQuantity": 1,
+    "label": "2+1 gratis",
+    "loyaltyRequired": true,
+    "loyaltyProgram": "MPREIS App",
+    "verified": true
+  }
+}
+```
+
+### Ausfallsicherheit
+
+Der Aktionsimport ist eine Zusatzstufe. Wenn die MPREIS-Aktionsseite ihre Struktur
+ändert oder vorübergehend nicht erreichbar ist, bleibt `data/mpreis.json` mit den
+normalen Preisen vollständig nutzbar. Unsichere Aktionen werden nicht geraten.
+
+### App
+
+- MPREIS-Suchergebnisse zeigen Aktionspreis, Statt-Preis und Bedingung.
+- Verknüpfte lokale Produkte übernehmen die verifizierte Aktionsinformation.
+- Produktdetails und Marktansicht verwenden die bereits vorhandenen Aktions-Badges.
+- Der MPREIS-Status zeigt zusätzlich die Anzahl der verifizierten Aktionen.
+- lokale MPREIS-Übernahme wird spätestens nach 6 Stunden aktualisiert.
+
+
+## Version 8.4 – MPREIS Aktionsansicht
+
+Unter `Mehr → MPREIS` gibt es nun einen direkten Einstieg:
+
+`🔥 N Aktionsartikel anzeigen`
+
+Die Ansicht benötigt keinen Suchbegriff. Sie liest ausschließlich Produkte mit
+`promotionVerified === true` aus `data/mpreis.json` und zeigt alle aktuell
+verifizierten MPREIS-Aktionen kompakt an.
+
+Angezeigt werden:
+- Produktname
+- Menge
+- Aktionspreis
+- Statt-/Normalpreis
+- Grundpreis
+- Aktionsbedingung
+- Kennzeichnung `NUR MIT APP`, sofern erforderlich
+
+Geplanter späterer Ausbau:
+Alle importierten Händlerprodukte sollen vollständig browsbar und durchsuchbar
+werden, um die persönliche Produktdatenbank schneller zu pflegen und zu verknüpfen.
+
+
+## Version 9.0 – SPAR als zweiter Live-Händler
+
+SPAR ist nun zusätzlich zu MPREIS als automatisch aktualisierter Händler integriert.
+
+### Öffentliche Daten
+
+GitHub Actions erzeugt:
+
+- `data/mpreis.json`
+- `data/spar.json`
+
+Beide Grundpreisdateien werden aus dem österreichischen Rohdatenexport von
+Heisse Preise erstellt.
+
+### SPAR in der App
+
+Unter `Mehr → SPAR` werden angezeigt:
+
+- Datenstand
+- Anzahl der importierten SPAR-Produkte
+- Anzahl der persönlich verknüpften Artikel
+- manuelles Neuladen
+
+In der persönlichen Artikeldatenbank gibt es pro Artikel nun zwei getrennte
+Verknüpfungen:
+
+- MPREIS
+- SPAR
+
+Eine SPAR-Verknüpfung übernimmt:
+
+- aktuellen Preis
+- Menge / Einheit
+- Grundpreis
+- Preisverlauf
+- Abrufdatum und Quelle
+
+Die Verknüpfungen bleiben weiterhin ausschließlich im localStorage des Browsers.
+
+### Wichtig
+
+SPAR-Aktionsbedingungen werden in Version 9.0 noch nicht separat ausgewiesen.
+Der Grundpreisimport ist bewusst zuerst unabhängig und stabil umgesetzt.
+Die offizielle SPAR-Aktionslogik ist der nächste separate Integrationsschritt.

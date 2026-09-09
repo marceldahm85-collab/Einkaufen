@@ -23,7 +23,8 @@
     schemaVersion: 3,
     settings: { theme: "system", region: "osttirol", shoppingSort: "added", shoppingStrategy: "cheapest" },
     live: {
-      mpreis: { enabled: true, lastSync: null, lastError: null }
+      mpreis: { enabled: true, lastSync: null, lastError: null },
+      spar: { enabled: true, lastSync: null, lastError: null }
     },
     shopping: [
       { id: "s1", productId: "p_milk", quantity: 2, checked: false, preferredStore: "auto", addedAt: 1 },
@@ -95,8 +96,11 @@
   let currentCategory = "Alle";
   let currentMarket = "all";
   let currentMpreisLinkProductId = null;
+  let currentSparLinkProductId = null;
   let mpreisSearchTimer = null;
+  let sparSearchTimer = null;
   let mpreisPublicStatus = null;
+  let sparPublicStatus = null;
 
   const $ = (sel, root=document) => root.querySelector(sel);
   const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
@@ -121,6 +125,10 @@
         mpreis: {
           ...initialState.live.mpreis,
           ...(input.live?.mpreis || {})
+        },
+        spar: {
+          ...initialState.live.spar,
+          ...(input.live?.spar || {})
         }
       },
       shopping: Array.isArray(input.shopping) ? input.shopping : [],
@@ -1125,6 +1133,339 @@
     return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
   }
 
+  function renderSparLiveStatus() {
+    const live = state.live?.spar || {};
+    const linked = state.products.filter(p => p.liveLinks?.spar).length;
+
+    const linkedEl = $("#sparLinkedCount");
+    const lastEl = $("#sparLastSync");
+    const statusEl = $("#sparLiveStatus");
+    if (!linkedEl || !lastEl || !statusEl) return;
+
+    linkedEl.textContent = `${linked} Artikel verknüpft`;
+    statusEl.className = "status-badge";
+
+    if (live.lastError) {
+      statusEl.textContent = "Fehler";
+      statusEl.classList.add("live-error");
+    } else if (sparPublicStatus?.updatedAt) {
+      statusEl.textContent = "Aktuell";
+      statusEl.classList.add("live-ok");
+    } else {
+      statusEl.textContent = "Bereit";
+    }
+
+    if (sparPublicStatus?.updatedAt) {
+      const date = new Date(sparPublicStatus.updatedAt);
+      lastEl.textContent = `GitHub-Datenstand: ${date.toLocaleString("de-AT", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+      })} · ${sparPublicStatus.productCount || 0} Produkte`;
+    } else {
+      lastEl.textContent = "Noch keine importierten SPAR-Daten vorhanden";
+    }
+  }
+
+  async function refreshSparPublicStatus(force = false) {
+    try {
+      if (!window.SparLive?.status) throw new Error("SPAR-Datenmodul fehlt");
+      sparPublicStatus = await window.SparLive.status(force);
+      state.live.spar.lastError = null;
+    } catch (error) {
+      sparPublicStatus = null;
+      state.live.spar.lastError = error.message;
+    }
+
+    saveState();
+    renderSparLiveStatus();
+  }
+
+  function openSparLink(productId) {
+    const product = productById(productId);
+    if (!product) return;
+
+    currentSparLinkProductId = productId;
+    $("#sparLinkTitle").textContent = product.name;
+    $("#sparSearchInput").value = product.name;
+    renderSparCurrentLink(product);
+    $("#sparSearchResults").innerHTML = "";
+    $("#sparSearchState").textContent = "";
+    openSheet("sparLinkSheet");
+    searchSparProducts(product.name);
+  }
+
+  function renderSparCurrentLink(product) {
+    const target = $("#sparCurrentLink");
+    if (!target) return;
+
+    const link = product?.liveLinks?.spar;
+    if (!link) {
+      target.innerHTML = "";
+      return;
+    }
+
+    target.innerHTML = `
+      <div class="live-link-card spar-link-card">
+        <strong>Verknüpft mit: ${escapeHtml(link.name || "SPAR-Produkt")}</strong>
+        Produkt-ID: ${escapeHtml(link.retailerProductId || link.remoteObjectId || "—")}
+        <button class="live-unlink-btn" data-unlink-spar="${product.id}">Verknüpfung lösen</button>
+      </div>`;
+  }
+
+  async function searchSparProducts(query) {
+    const stateEl = $("#sparSearchState");
+    const resultEl = $("#sparSearchResults");
+    if (!stateEl || !resultEl) return;
+
+    const q = String(query || "").trim();
+    if (q.length < 2) {
+      stateEl.textContent = "Mindestens 2 Zeichen eingeben.";
+      resultEl.innerHTML = "";
+      return;
+    }
+
+    if (!window.SparLive) {
+      stateEl.textContent = "SPAR-Datenmodul konnte nicht geladen werden.";
+      return;
+    }
+
+    stateEl.textContent = "Suche bei SPAR …";
+    resultEl.innerHTML = "";
+
+    try {
+      const results = await window.SparLive.search(q, 20);
+      stateEl.textContent = results.length
+        ? `${results.length} Treffer – passenden Artikel antippen`
+        : "Keine passenden SPAR-Produkte gefunden.";
+
+      resultEl.innerHTML = results.map((item, index) => `
+        <article class="product-card live-result spar-live-result" data-spar-result-index="${index}">
+          <div class="product-main">
+            <div class="product-name">
+              ${escapeHtml(item.name)}
+              ${item.bio ? `<span class="live-result-bio">BIO</span>` : ""}
+            </div>
+            <div class="product-meta">
+              <span>${escapeHtml(formatLiveAmount(item))}</span>
+              <span>·</span>
+              <span>ID ${escapeHtml(item.retailerProductId || item.remoteObjectId)}</span>
+            </div>
+          </div>
+          <div class="product-price-wrap">
+            <div class="product-price">${money(item.currentPrice)}</div>
+            <div class="product-meta" style="justify-content:flex-end">
+              ${item.unitPrice ? `${money(item.unitPrice)}/${item.unitPriceUnit}` : ""}
+            </div>
+          </div>
+        </article>`).join("");
+
+      resultEl._sparResults = results;
+    } catch (error) {
+      stateEl.textContent = `SPAR-Suche nicht möglich: ${error.message}`;
+      resultEl.innerHTML = "";
+    }
+  }
+
+  function linkSparResult(productId, liveItem) {
+    const product = productById(productId);
+    if (!product || !liveItem) return;
+
+    product.liveLinks = product.liveLinks || {};
+    product.liveLinks.spar = {
+      remoteObjectId: liveItem.remoteObjectId,
+      retailerProductId: liveItem.retailerProductId,
+      name: liveItem.name,
+      linkedAt: new Date().toISOString()
+    };
+
+    applySparLivePrice(product, liveItem);
+    state.live.spar.lastSync = new Date().toISOString();
+    state.live.spar.lastError = null;
+
+    saveState();
+    renderAll();
+    showToast("SPAR-Produkt verknüpft");
+    closeSheets();
+  }
+
+  function unlinkSpar(productId) {
+    const product = productById(productId);
+    if (!product?.liveLinks?.spar) return;
+
+    delete product.liveLinks.spar;
+    saveState();
+    renderAll();
+    showToast("SPAR-Verknüpfung entfernt");
+    closeSheets();
+  }
+
+  function applySparLivePrice(product, liveItem) {
+    const now = liveItem.retrievedAt || new Date().toISOString();
+    const date = now.slice(0, 10);
+    let offer = (product.offers || []).find(o => o.store === "spar");
+
+    if (!offer) {
+      offer = { store: "spar", history: [] };
+      product.offers = product.offers || [];
+      product.offers.push(offer);
+    }
+
+    const historyMap = new Map();
+
+    (Array.isArray(offer.history) ? offer.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) {
+        historyMap.set(h.date, { date: h.date, price: Number(h.price) });
+      }
+    });
+
+    (Array.isArray(liveItem.history) ? liveItem.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) {
+        historyMap.set(h.date, { date: h.date, price: Number(h.price) });
+      }
+    });
+
+    historyMap.set(date, { date, price: liveItem.currentPrice });
+
+    const history = [...historyMap.values()]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 250);
+
+    Object.assign(offer, {
+      retailerProductId: liveItem.retailerProductId,
+      remoteObjectId: liveItem.remoteObjectId,
+      regularPrice: liveItem.currentPrice,
+      salePrice: null,
+      unitPrice: liveItem.unitPrice,
+      unitPriceUnit: liveItem.unitPriceUnit,
+      validUntil: null,
+      updatedAt: date,
+      source: liveItem.source || "heisse-preise.io (SPAR)",
+      retrievedAt: now,
+      promotion: null,
+      promotionVerified: false,
+      history
+    });
+  }
+
+  async function syncLinkedSpar({ silent = false } = {}) {
+    const linkedProducts = state.products.filter(p => p.liveLinks?.spar);
+
+    if (!linkedProducts.length) {
+      if (!silent) showToast("Noch keine SPAR-Produkte verknüpft");
+      return;
+    }
+
+    if (!window.SparLive) {
+      state.live.spar.lastError = "Live-Modul fehlt";
+      saveState();
+      renderSparLiveStatus();
+      if (!silent) showToast("SPAR-Datenmodul fehlt");
+      return;
+    }
+
+    const button = $("#syncSparBtn");
+    const status = $("#sparLiveStatus");
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Lädt …";
+    }
+    if (status) {
+      status.textContent = "Lädt";
+      status.className = "status-badge live-working";
+    }
+
+    let updated = 0;
+    const errors = [];
+
+    for (let i = 0; i < linkedProducts.length; i += 4) {
+      const batch = linkedProducts.slice(i, i + 4);
+
+      const results = await Promise.allSettled(batch.map(async product => {
+        const link = product.liveLinks.spar;
+        let item;
+
+        try {
+          item = await window.SparLive.getObject(link.remoteObjectId);
+        } catch {
+          const candidates = await window.SparLive.search(link.name || product.name, 10);
+          item = candidates.find(c =>
+            c.remoteObjectId === link.remoteObjectId ||
+            c.retailerProductId === link.retailerProductId
+          );
+          if (!item) throw new Error(`${product.name}: SPAR-Produkt nicht mehr gefunden`);
+        }
+
+        applySparLivePrice(product, item);
+        product.liveLinks.spar = {
+          ...product.liveLinks.spar,
+          remoteObjectId: item.remoteObjectId,
+          retailerProductId: item.retailerProductId,
+          name: item.name
+        };
+      }));
+
+      results.forEach(result => {
+        if (result.status === "fulfilled") updated += 1;
+        else errors.push(String(result.reason?.message || result.reason || "Unbekannter Fehler"));
+      });
+    }
+
+    state.live.spar.lastSync = new Date().toISOString();
+    state.live.spar.lastError = errors.length ? errors.join(" | ") : null;
+    saveState();
+    renderAll();
+
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Neu laden";
+    }
+
+    if (!silent) {
+      showToast(errors.length
+        ? `${updated} aktualisiert · ${errors.length} Fehler`
+        : `${updated} SPAR-Preise aktualisiert`
+      );
+    }
+  }
+
+  async function reloadAndSyncSpar() {
+    const button = $("#syncSparBtn");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Lädt …";
+    }
+
+    try {
+      if (!window.SparLive?.reload) throw new Error("SPAR-Datenmodul fehlt");
+      sparPublicStatus = await window.SparLive.reload();
+      state.live.spar.lastError = null;
+      saveState();
+      renderSparLiveStatus();
+      await syncLinkedSpar({ silent: false });
+    } catch (error) {
+      state.live.spar.lastError = error.message;
+      saveState();
+      renderSparLiveStatus();
+      showToast("SPAR-Daten konnten nicht neu geladen werden");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Neu laden";
+      }
+    }
+  }
+
+  function shouldAutoSyncSpar() {
+    const linked = state.products.some(p => p.liveLinks?.spar);
+    if (!linked || !navigator.onLine) return false;
+
+    const last = state.live?.spar?.lastSync;
+    if (!last) return true;
+
+    return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
+  }
+
   function renderMore() {
     $("#databaseList").innerHTML = state.products.map(p => `
       <div class="database-item">
@@ -1136,11 +1477,15 @@
           <button class="database-live-btn ${p.liveLinks?.mpreis ? "is-linked" : ""}" data-link-mpreis="${p.id}">
             ${p.liveLinks?.mpreis ? "MPREIS ✓" : "MPREIS"}
           </button>
+          <button class="database-live-btn spar-live-btn ${p.liveLinks?.spar ? "is-linked" : ""}" data-link-spar="${p.id}">
+            ${p.liveLinks?.spar ? "SPAR ✓" : "SPAR"}
+          </button>
           <button class="database-delete" data-delete-product="${p.id}">Löschen</button>
         </div>
       </div>`).join("");
 
     renderMpreisLiveStatus();
+    renderSparLiveStatus();
 
     $$("#themeSegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.themeValue === state.settings.theme));
     $$("#shoppingStrategySegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.strategyValue === state.settings.shoppingStrategy));
@@ -1435,6 +1780,9 @@
     const liveLink = e.target.closest("[data-link-mpreis]");
     if (liveLink) return openMpreisLink(liveLink.dataset.linkMpreis);
 
+    const sparLink = e.target.closest("[data-link-spar]");
+    if (sparLink) return openSparLink(sparLink.dataset.linkSpar);
+
     const liveResult = e.target.closest("[data-mpreis-result-index]");
     if (liveResult) {
       const results = $("#mpreisSearchResults")._mpreisResults || [];
@@ -1446,6 +1794,18 @@
 
     const unlinkLive = e.target.closest("[data-unlink-mpreis]");
     if (unlinkLive) return unlinkMpreis(unlinkLive.dataset.unlinkMpreis);
+
+    const sparResult = e.target.closest("[data-spar-result-index]");
+    if (sparResult) {
+      const results = $("#sparSearchResults")._sparResults || [];
+      const item = results[Number(sparResult.dataset.sparResultIndex)];
+      if (item && currentSparLinkProductId) {
+        return linkSparResult(currentSparLinkProductId, item);
+      }
+    }
+
+    const unlinkSparLive = e.target.closest("[data-unlink-spar]");
+    if (unlinkSparLive) return unlinkSpar(unlinkSparLive.dataset.unlinkSpar);
 
     const delProduct = e.target.closest("[data-delete-product]");
     if (delProduct) {
@@ -1463,7 +1823,14 @@
     mpreisSearchTimer = setTimeout(() => searchMpreisProducts(query), 320);
   });
 
+  $("#sparSearchInput").addEventListener("input", (e) => {
+    clearTimeout(sparSearchTimer);
+    const query = e.target.value;
+    sparSearchTimer = setTimeout(() => searchSparProducts(query), 320);
+  });
+
   $("#syncMpreisBtn").addEventListener("click", reloadAndSyncMpreis);
+  $("#syncSparBtn").addEventListener("click", reloadAndSyncSpar);
   $("#shoppingSort").addEventListener("change", (e) => {
     state.settings.shoppingSort = e.target.value;
     saveState(); renderShopping();
@@ -1537,6 +1904,12 @@
   refreshMpreisPublicStatus().then(() => {
     if (shouldAutoSyncMpreis()) {
       setTimeout(() => syncLinkedMpreis({ silent: true }).catch(() => {}), 400);
+    }
+  });
+
+  refreshSparPublicStatus().then(() => {
+    if (shouldAutoSyncSpar()) {
+      setTimeout(() => syncLinkedSpar({ silent: true }).catch(() => {}), 550);
     }
   });
 })();

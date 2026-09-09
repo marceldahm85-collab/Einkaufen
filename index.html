@@ -140,6 +140,28 @@
           </p>
         </div>
 
+        <div class="settings-card spar-live-card">
+          <div class="section-head compact">
+            <div>
+              <div class="eyebrow">GITHUB-PREISDATEN</div>
+              <h2>SPAR</h2>
+            </div>
+            <span class="status-badge" id="sparLiveStatus">Bereit</span>
+          </div>
+
+          <div class="live-sync-summary">
+            <div>
+              <strong id="sparLinkedCount">0 Artikel verknüpft</strong>
+              <div class="muted small" id="sparLastSync">Datenstand wird geladen …</div>
+            </div>
+            <button class="secondary-btn" id="syncSparBtn">Neu laden</button>
+          </div>
+
+          <p class="muted small live-note">
+            SPAR-Grundpreise und Preisverläufe werden automatisch aus dem öffentlichen österreichischen Preisdatensatz aktualisiert. Aktionsbedingungen werden in diesem Schritt noch nicht getrennt ausgewiesen.
+          </p>
+        </div>
+
         <div class="settings-card danger-zone">
           <div>
             <strong>Demo-Daten zurücksetzen</strong>
@@ -357,9 +379,30 @@
     <div id="mpreisPromotionsList" class="stack live-result-list"></div>
   </section>
 
+  <section class="bottom-sheet" id="sparLinkSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">SPAR LIVE</div>
+        <h2 id="sparLinkTitle">Produkt verknüpfen</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+
+    <div class="search-wrap sheet-search">
+      <input id="sparSearchInput" class="search-input" type="search"
+             placeholder="SPAR-Produkt suchen …" autocomplete="off">
+    </div>
+
+    <div class="live-link-info" id="sparCurrentLink"></div>
+    <div id="sparSearchState" class="muted small live-search-state"></div>
+    <div id="sparSearchResults" class="stack live-result-list"></div>
+  </section>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="live-mpreis.js"></script>
+  <script src="live-spar.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
