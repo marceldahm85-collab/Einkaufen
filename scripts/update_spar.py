@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "data" / "mpreis.json"
+OUT = ROOT / "data" / "spar.json"
 STATUS = ROOT / "data" / "update-status.json"
 
 SOURCE_URL = "https://heisse-preise.io/data/latest-canonical.json"
@@ -130,8 +130,6 @@ def normalize_history(raw_history, current_price):
         seen.add(key)
         result.append({"date": date, "price": round(price, 2)})
 
-    # Heisse Preise documents newest-first. We normalize to oldest -> newest
-    # inside the published file; the app can sort it as needed.
     result.sort(key=lambda x: x["date"])
 
     if not result and current_price is not None:
@@ -144,7 +142,7 @@ def normalize_history(raw_history, current_price):
 
 
 def normalize_item(item: dict):
-    if str(item.get("store") or "").lower() != "mpreis":
+    if str(item.get("store") or "").lower() != "spar":
         return None
 
     name = str(item.get("name") or "").strip()
@@ -171,13 +169,12 @@ def normalize_item(item: dict):
         product_id = stable_fallback_id(item)
 
     description = str(item.get("description") or "").strip()
-
     history = normalize_history(item.get("priceHistory"), price)
 
     amount = int(quantity) if float(quantity).is_integer() else round(quantity, 3)
 
     return {
-        "store": "mpreis",
+        "store": "spar",
         "remoteObjectId": product_id,
         "retailerProductId": product_id,
         "name": name,
@@ -189,7 +186,7 @@ def normalize_item(item: dict):
         "unitPriceUnit": base_unit(unit),
         "weighted": bool(item.get("isWeighted", False)),
         "bio": bool(item.get("bio", False)),
-        "source": "heisse-preise.io (MPREIS)",
+        "source": "heisse-preise.io (SPAR)",
         "history": history,
     }
 
@@ -222,7 +219,7 @@ def write_status(status: str, updated_at: str, product_count: int, error=None, s
     payload["schemaVersion"] = 1
     payload["updatedAt"] = updated_at
     payload.setdefault("stores", {})
-    payload["stores"]["mpreis"] = {
+    payload["stores"]["spar"] = {
         "status": status,
         "productCount": product_count,
         "stale": bool(stale),
@@ -254,7 +251,7 @@ def main() -> int:
             if not isinstance(item, dict):
                 continue
 
-            if str(item.get("store") or "").lower() != "mpreis":
+            if str(item.get("store") or "").lower() != "spar":
                 continue
 
             normalized = normalize_item(item)
@@ -272,15 +269,15 @@ def main() -> int:
 
         if len(products) < MIN_EXPECTED_PRODUCTS:
             raise RuntimeError(
-                f"Unplausibel wenige MPREIS-Produkte ({len(products)}). "
+                f"Unplausibel wenige SPAR-Produkte ({len(products)}). "
                 "Vorhandene Daten werden nicht überschrieben."
             )
 
         payload = {
             "schemaVersion": 1,
-            "importerVersion": 2,
-            "store": "mpreis",
-            "scope": "MPREIS-Daten aus Heisse Preise",
+            "importerVersion": 1,
+            "store": "spar",
+            "scope": "SPAR-Daten aus Heisse Preise",
             "provider": "heisse-preise.io",
             "providerUrl": SOURCE_URL,
             "updatedAt": updated_at,
@@ -299,14 +296,12 @@ def main() -> int:
         write_status("ok", updated_at, len(products))
 
         print(
-            f"MPREIS: {len(products)} Produkte importiert; "
-            f"{skipped} MPREIS-Einträge übersprungen."
+            f"SPAR: {len(products)} Produkte importiert; "
+            f"{skipped} SPAR-Einträge übersprungen."
         )
         return 0
 
     except Exception as exc:
-        # Sobald ein gültiger Datenbestand existiert, bleibt er bei einem
-        # temporären Quellenfehler erhalten. Das ist für die App robuster.
         if existing_count >= MIN_EXPECTED_PRODUCTS:
             write_status(
                 "stale",
@@ -316,14 +311,12 @@ def main() -> int:
                 stale=True,
             )
             print(
-                f"WARNUNG: MPREIS konnte nicht aktualisiert werden. "
+                f"WARNUNG: SPAR konnte nicht aktualisiert werden. "
                 f"Vorhandene {existing_count} Produkte bleiben aktiv. Fehler: {exc}",
                 file=sys.stderr,
             )
             return 0
 
-        # Beim allerersten Import darf der Workflow NICHT grün werden,
-        # solange die öffentliche MPREIS-Datei noch leer ist.
         write_status(
             "error",
             updated_at,
