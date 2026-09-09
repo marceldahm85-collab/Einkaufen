@@ -109,6 +109,12 @@ jobs:
               )
           PY
 
+      - name: PDF-Textwerkzeug installieren
+        run: python -m pip install --disable-pip-version-check pypdf
+
+      - name: T&G-Osttirol-Flugblatt analysieren
+        run: python scripts/diagnose_tg_flyer.py
+
       - name: Öffentliche Preisdaten speichern
         shell: bash
         run: |
