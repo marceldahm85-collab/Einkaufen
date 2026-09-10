@@ -72,11 +72,46 @@
     return enrich(item, payload);
   }
 
+  function localTodayISO() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function promotionIsCurrent(item, today = localTodayISO()) {
+    if (!item || item.promotionVerified !== true) return false;
+    const validFrom = item.validFrom ? String(item.validFrom).slice(0, 10) : null;
+    const validUntil = item.validUntil ? String(item.validUntil).slice(0, 10) : null;
+    if (validFrom && today < validFrom) return false;
+    if (validUntil && today > validUntil) return false;
+    return true;
+  }
+
+  function currentItem(item) {
+    if (!item) return item;
+    if (item.salePrice == null || promotionIsCurrent(item)) return item;
+
+    return {
+      ...item,
+      inactivePromotion: item.promotion || null,
+      salePrice: null,
+      currentPrice: item.regularPrice ?? null,
+      displayPrice: item.regularPrice ?? null,
+      promotion: null,
+      promotionVerified: false,
+      promotionInactiveReason: item.validUntil && localTodayISO() > String(item.validUntil).slice(0, 10)
+        ? "expired"
+        : "future"
+    };
+  }
+
   async function promotions() {
     const payload = await load(false);
 
     return payload.products
-      .filter(item => item.promotionVerified === true)
+      .filter(item => promotionIsCurrent(item))
       .slice()
       .sort((a, b) => {
         const aPriced = a.salePrice != null ? 0 : 1;
@@ -152,7 +187,7 @@
     let rows = ensureBrowseIndex(payload);
 
     if (promotionsOnly) {
-      rows = rows.filter(entry => entry.item.promotionVerified === true);
+      rows = rows.filter(entry => promotionIsCurrent(entry.item));
     }
 
     if (query) {
@@ -189,20 +224,32 @@
 
   async function status(force = false) {
     const payload = await load(force);
+    const currentPromotions = payload.products.filter(item => promotionIsCurrent(item));
+    const currentLinkable = currentPromotions.filter(item =>
+      item.optimizerEligible !== false && item.salePrice != null
+    ).length;
+
+    const today = localTodayISO();
+    const flyerMeta = payload.flyer || null;
+    const flyerCurrent = !flyerMeta || (
+      (!flyerMeta.validFrom || today >= String(flyerMeta.validFrom).slice(0, 10)) &&
+      (!flyerMeta.validUntil || today <= String(flyerMeta.validUntil).slice(0, 10))
+    );
 
     return {
       ok: true,
       updatedAt: payload.updatedAt || null,
       productCount: payload.productCount || 0,
-      promotionCount: payload.promotionCount || payload.products.length,
-      linkableCount: payload.linkableCount || 0,
-      flyerProductCount: payload.flyerProductCount || 0,
-      flyerLinkableCount: payload.flyerLinkableCount || 0,
-      flyerTextLinkableCount: payload.flyerTextLinkableCount || 0,
-      flyerSpatialLinkableCount: payload.flyerSpatialLinkableCount || 0,
-      validFrom: payload.validFrom || null,
-      validUntil: payload.validUntil || null,
-      flyer: payload.flyer || null,
+      promotionCount: currentPromotions.length,
+      linkableCount: currentLinkable,
+      flyerProductCount: flyerCurrent ? (payload.flyerProductCount || 0) : 0,
+      flyerLinkableCount: flyerCurrent ? (payload.flyerLinkableCount || 0) : 0,
+      flyerTextLinkableCount: flyerCurrent ? (payload.flyerTextLinkableCount || 0) : 0,
+      flyerSpatialLinkableCount: flyerCurrent ? (payload.flyerSpatialLinkableCount || 0) : 0,
+      validFrom: flyerCurrent ? (payload.validFrom || null) : null,
+      validUntil: flyerCurrent ? (payload.validUntil || null) : null,
+      flyer: flyerMeta,
+      flyerCurrent,
       scope: payload.scope || null,
       region: payload.region || "Osttirol"
     };
@@ -217,9 +264,10 @@
   }
 
   function enrich(item, payload) {
+    const live = currentItem(item);
     return {
-      ...item,
-      source: item.source || "tundg.at Spezialaktionen",
+      ...live,
+      source: live.source || "tundg.at Spezialaktionen",
       retrievedAt: payload.updatedAt || new Date().toISOString()
     };
   }

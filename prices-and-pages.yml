@@ -39,11 +39,16 @@ jobs:
         run: |
           node --check app.js
           node --check live-search.js
+          node --check live-mpreis.js
+          node --check live-spar.js
+          node --check live-tg.js
           node scripts/test_optimizer_quantity.js
           node scripts/test_package_comparison.js
+          node scripts/test_optimizer_promotions.js
           node scripts/test_search_aliases.js
           node scripts/test_catalog_browse.js
           node scripts/test_product_edit_preservation.js
+          python scripts/test_update_tg.py
           python scripts/test_update_tg_flyer.py
 
       - name: MPREIS-Daten aktualisieren
@@ -151,6 +156,9 @@ jobs:
                   "Deployment wird abgebrochen."
               )
           PY
+
+      - name: Aktionsdaten-Integrität prüfen
+        run: python scripts/check_action_integrity.py
 
       - name: Öffentliche Preisdaten speichern
         shell: bash

@@ -67,11 +67,47 @@
     return enrich(item, payload);
   }
 
+  function localTodayISO() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function promotionIsCurrent(item, today = localTodayISO()) {
+    if (payloadCache?.promotionStale === true) return false;
+    if (!item || item.promotionVerified !== true) return false;
+    const validFrom = item.validFrom ? String(item.validFrom).slice(0, 10) : null;
+    const validUntil = item.validUntil ? String(item.validUntil).slice(0, 10) : null;
+    if (validFrom && today < validFrom) return false;
+    if (validUntil && today > validUntil) return false;
+    return true;
+  }
+
+  function currentItem(item) {
+    if (!item) return item;
+    if (item.salePrice == null || promotionIsCurrent(item)) return item;
+
+    return {
+      ...item,
+      inactivePromotion: item.promotion || null,
+      salePrice: null,
+      currentPrice: item.regularPrice ?? null,
+      displayPrice: item.regularPrice ?? null,
+      promotion: null,
+      promotionVerified: false,
+      promotionInactiveReason: item.validUntil && localTodayISO() > String(item.validUntil).slice(0, 10)
+        ? "expired"
+        : "future"
+    };
+  }
+
   async function promotions() {
     const payload = await load(false);
 
     return payload.products
-      .filter(item => item.promotionVerified === true)
+      .filter(item => promotionIsCurrent(item))
       .slice()
       .sort((a, b) =>
         String(a.name || "").localeCompare(String(b.name || ""), "de", {
@@ -142,7 +178,7 @@
     let rows = ensureBrowseIndex(payload);
 
     if (promotionsOnly) {
-      rows = rows.filter(entry => entry.item.promotionVerified === true);
+      rows = rows.filter(entry => promotionIsCurrent(entry.item));
     }
 
     if (query) {
@@ -179,12 +215,14 @@
 
   async function status(force = false) {
     const payload = await load(force);
+    const currentPromotions = payload.products.filter(item => promotionIsCurrent(item));
     return {
       ok: true,
       updatedAt: payload.updatedAt || null,
       productCount: payload.productCount ?? payload.products.length,
-      promotionCount: payload.promotionCount || 0,
+      promotionCount: currentPromotions.length,
       promotionUpdatedAt: payload.promotionUpdatedAt || null,
+      promotionStale: Boolean(payload.promotionStale),
       scope: payload.scope || null
     };
   }
@@ -198,9 +236,10 @@
   }
 
   function enrich(item, payload) {
+    const live = currentItem(item);
     return {
-      ...item,
-      source: item.source || "mpreis.at",
+      ...live,
+      source: live.source || "mpreis.at",
       retrievedAt: payload.updatedAt || new Date().toISOString()
     };
   }

@@ -17,7 +17,13 @@
     "Fleisch & Wurst", "Vorrat", "Tiefkühl", "Haushalt", "Drogerie", "Sonstiges"
   ];
 
-  const todayISO = () => new Date().toISOString().slice(0, 10);
+  const todayISO = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   const initialState = {
     schemaVersion: 4,
@@ -311,6 +317,38 @@
     return o.salePrice != null ? Number(o.salePrice) : Number(o.regularPrice);
   }
 
+  function promotionDateStatus(offer, today = todayISO()) {
+    const validFrom = offer?.validFrom ? String(offer.validFrom).slice(0, 10) : null;
+    const validUntil = offer?.validUntil ? String(offer.validUntil).slice(0, 10) : null;
+
+    if (validFrom && today < validFrom) {
+      return { active: false, reason: "future", label: `gültig ab ${validFrom}` };
+    }
+
+    if (validUntil && today > validUntil) {
+      return { active: false, reason: "expired", label: `abgelaufen am ${validUntil}` };
+    }
+
+    return { active: true, reason: null, label: "" };
+  }
+
+  function normalizedOffer(o) {
+    const copy = { ...o };
+    const status = promotionDateStatus(copy);
+
+    copy.promotionActive = status.active;
+    copy.promotionInactiveReason = status.reason;
+
+    if (copy.salePrice != null && !status.active) {
+      copy.inactivePromotion = copy.promotion || null;
+      copy.salePrice = null;
+      copy.promotion = null;
+      copy.promotionVerified = false;
+    }
+
+    return copy;
+  }
+
   function offerPricingForQuantity(offer, quantity = 1) {
     if (!offer) return null;
 
@@ -329,12 +367,13 @@
         unitPrice: regular,
         lineTotal: regular * qty,
         activeSale: false,
-        conditionMet: true
+        conditionMet: true,
+        promotionApplied: false
       };
     }
 
     const promotion = o.promotion || {};
-    const required = Math.max(1, Number(promotion.requiredQuantity || 1));
+    const required = Math.max(1, Math.ceil(Number(promotion.requiredQuantity || 1)));
     const conditional = ["quantity", "bundle"].includes(promotion.type) && required > 1;
 
     if (conditional && qty < required) {
@@ -343,7 +382,8 @@
         unitPrice: regular,
         lineTotal: regular * qty,
         activeSale: false,
-        conditionMet: false
+        conditionMet: false,
+        promotionApplied: false
       };
     }
 
@@ -360,8 +400,11 @@
       return {
         unitPrice: lineTotal / qty,
         lineTotal,
-        activeSale: true,
-        conditionMet: true
+        activeSale: fullGroups > 0,
+        conditionMet: fullGroups > 0,
+        promotionApplied: fullGroups > 0,
+        promotionGroups: fullGroups,
+        remainderPackages: remainder
       };
     }
 
@@ -369,8 +412,30 @@
       unitPrice: sale,
       lineTotal: sale * qty,
       activeSale: true,
-      conditionMet: true
+      conditionMet: true,
+      promotionApplied: true
     };
+  }
+
+  function promotionCandidatePackageCounts(offer, minimumPackageCount) {
+    const minimum = Math.max(1, Math.ceil(Number(minimumPackageCount || 1)));
+    const normalized = normalizedOffer(offer);
+    const promotion = normalized.promotion || {};
+    const required = Math.max(1, Math.ceil(Number(promotion.requiredQuantity || 1)));
+    const counts = new Set([minimum]);
+
+    if (normalized.salePrice != null && required > 1) {
+      if (promotion.type === "quantity" && minimum < required) {
+        counts.add(required);
+      }
+
+      if (promotion.type === "bundle") {
+        const nextFullGroup = Math.ceil(minimum / required) * required;
+        if (nextFullGroup >= minimum) counts.add(nextFullGroup);
+      }
+    }
+
+    return [...counts].sort((a, b) => a - b);
   }
 
   function offerPricingForTarget(product, offer, shoppingQuantity = 1) {
@@ -385,25 +450,53 @@
     const packageBase = packageUnit.baseAmount;
     if (!(packageBase > 0)) return null;
 
-    const packageCount = Math.max(1, Math.ceil((targetBase / packageBase) - 1e-10));
-    const packagePricing = offerPricingForQuantity(offer, packageCount);
-    if (!packagePricing) return null;
+    const minimumPackageCount = Math.max(
+      1,
+      Math.ceil((targetBase / packageBase) - 1e-10)
+    );
 
-    const deliveredBase = packageCount * packageBase;
-    const normalizedTargetPrice = packagePricing.lineTotal * (targetBase / deliveredBase);
+    const candidates = promotionCandidatePackageCounts(offer, minimumPackageCount)
+      .map(packageCount => {
+        const packagePricing = offerPricingForQuantity(offer, packageCount);
+        if (!packagePricing) return null;
 
-    return {
-      ...packagePricing,
-      packageCount,
-      targetBase,
-      deliveredBase,
-      baseUnit: targetUnit.baseUnit,
-      dimension: targetUnit.dimension,
-      packageBase,
-      overbuyBase: Math.max(0, deliveredBase - targetBase),
-      normalizedTargetPrice,
-      effectiveBaseUnitPrice: deliveredBase > 0 ? packagePricing.lineTotal / deliveredBase : null
-    };
+        const deliveredBase = packageCount * packageBase;
+        const normalizedTargetPrice = packagePricing.lineTotal * (targetBase / deliveredBase);
+
+        return {
+          ...packagePricing,
+          packageCount,
+          minimumPackageCount,
+          targetBase,
+          deliveredBase,
+          baseUnit: targetUnit.baseUnit,
+          dimension: targetUnit.dimension,
+          packageBase,
+          overbuyBase: Math.max(0, deliveredBase - targetBase),
+          normalizedTargetPrice,
+          effectiveBaseUnitPrice: deliveredBase > 0
+            ? packagePricing.lineTotal / deliveredBase
+            : null
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const totalDiff = a.lineTotal - b.lineTotal;
+        if (Math.abs(totalDiff) > 0.000001) return totalDiff;
+
+        if (Boolean(a.promotionApplied) !== Boolean(b.promotionApplied)) {
+          return a.promotionApplied ? -1 : 1;
+        }
+
+        const unitDiff =
+          Number(a.effectiveBaseUnitPrice ?? Infinity) -
+          Number(b.effectiveBaseUnitPrice ?? Infinity);
+        if (Math.abs(unitDiff) > 0.000001) return unitDiff;
+
+        return a.packageCount - b.packageCount;
+      });
+
+    return candidates[0] || null;
   }
 
   function pricingPackageSummary(product, offer, pricing) {
@@ -412,14 +505,25 @@
     const delivered = measureToDisplay(pricing.deliveredBase, pricing.dimension);
     const target = measureToDisplay(pricing.targetBase, pricing.dimension);
 
-    if (pricing.packageCount === 1 && Math.abs(pricing.deliveredBase - pricing.targetBase) < 1e-8) {
+    if (
+      pricing.packageCount === 1 &&
+      Math.abs(pricing.deliveredBase - pricing.targetBase) < 1e-8
+    ) {
       return `${packageLabel} · exakt ${target}`;
     }
 
     const overbuy = pricing.overbuyBase > 1e-8
       ? ` · Kaufmenge ${delivered}`
       : "";
-    return `${pricing.packageCount} × ${packageLabel}${overbuy}`;
+
+    const promoExtra = (
+      pricing.promotionApplied &&
+      pricing.packageCount > pricing.minimumPackageCount
+    )
+      ? " · Aktionsmenge gewählt"
+      : "";
+
+    return `${pricing.packageCount} × ${packageLabel}${overbuy}${promoExtra}`;
   }
 
   function pricedOfferForStore(product, storeId, quantity = 1) {
@@ -444,21 +548,11 @@
   }
 
   function validOffers(product) {
-    const today = todayISO();
     return (product.offers || []).filter(o => {
-      if (o.salePrice != null && o.validUntil && o.validUntil < today) {
-        return o.regularPrice != null;
-      }
-      return o.regularPrice != null || o.salePrice != null;
+      const normalized = normalizedOffer(o);
+      return normalized.regularPrice != null || normalized.salePrice != null;
     });
   }
-
-  function normalizedOffer(o) {
-    const copy = { ...o };
-    if (copy.salePrice != null && copy.validUntil && copy.validUntil < todayISO()) copy.salePrice = null;
-    return copy;
-  }
-
 
   function offerForStore(product, storeId) {
     return validOffers(product)
@@ -470,11 +564,21 @@
   function offerConditionLabel(offer) {
     const p = offer?.promotion;
     if (!p) return "";
-    if (p.label) return p.label;
-    if (p.type === "quantity" && p.requiredQuantity) return `ab ${p.requiredQuantity} Stück`;
+
+    const loyalty = p.loyaltyRequired && p.loyaltyProgram
+      ? ` · nur mit ${p.loyaltyProgram}`
+      : "";
+
+    if (p.label) return `${p.label}${loyalty}`;
+    if (p.type === "quantity" && p.requiredQuantity) {
+      return `ab ${p.requiredQuantity} Stück${loyalty}`;
+    }
+    if (p.type === "bundle" && p.paidQuantity != null && p.freeQuantity != null) {
+      return `${p.paidQuantity}+${p.freeQuantity} gratis${loyalty}`;
+    }
     if (p.type === "loyalty" && p.loyaltyProgram) return `nur mit ${p.loyaltyProgram}`;
-    if (p.type === "percentage" && p.discountPercent) return `-${p.discountPercent} %`;
-    return "Aktionsbedingung";
+    if (p.type === "percentage" && p.discountPercent) return `-${p.discountPercent} %${loyalty}`;
+    return `Aktionsbedingung${loyalty}`;
   }
 
   function freshnessInfo(offer) {
@@ -1491,6 +1595,9 @@
     if (live.lastError) {
       statusEl.textContent = "Fehler";
       statusEl.classList.add("live-error");
+    } else if (mpreisPublicStatus?.promotionStale) {
+      statusEl.textContent = "Preisstand ok · Aktionen pausiert";
+      statusEl.classList.add("live-error");
     } else if (mpreisPublicStatus?.updatedAt) {
       statusEl.textContent = "Aktuell";
       statusEl.classList.add("live-ok");
@@ -1770,6 +1877,7 @@
       salePrice: liveItem.salePrice ?? null,
       unitPrice: liveItem.unitPrice,
       unitPriceUnit: liveItem.unitPriceUnit,
+      validFrom: liveItem.validFrom ?? null,
       validUntil: liveItem.validUntil ?? null,
       updatedAt: date,
       source: liveItem.promotionVerified ? "mpreis.at" : (liveItem.source || "heisse-preise.io (MPREIS)"),
@@ -1914,6 +2022,9 @@
 
     if (live.lastError) {
       statusEl.textContent = "Fehler";
+      statusEl.classList.add("live-error");
+    } else if (sparPublicStatus?.promotionStale) {
+      statusEl.textContent = "Preisstand ok · Aktionen pausiert";
       statusEl.classList.add("live-error");
     } else if (sparPublicStatus?.updatedAt) {
       statusEl.textContent = "Aktuell";
@@ -2177,6 +2288,7 @@
       salePrice: liveItem.salePrice ?? null,
       unitPrice: liveItem.unitPrice,
       unitPriceUnit: liveItem.unitPriceUnit,
+      validFrom: liveItem.validFrom ?? null,
       validUntil: liveItem.validUntil ?? null,
       updatedAt: date,
       source: liveItem.promotionVerified ? "spar.at" : (liveItem.source || "heisse-preise.io (SPAR)"),
@@ -2324,6 +2436,9 @@
     if (live.lastError) {
       statusEl.textContent = "Fehler";
       statusEl.classList.add("live-error");
+    } else if (tgPublicStatus?.flyerCurrent === false && !(tgPublicStatus?.promotionCount > 0)) {
+      statusEl.textContent = "Ausgabe abgelaufen";
+      statusEl.classList.add("live-error");
     } else if (tgPublicStatus?.updatedAt) {
       statusEl.textContent = "Aktuell";
       statusEl.classList.add("live-ok");
@@ -2345,10 +2460,15 @@
         ? ` · Flyer-Zuordnung ${textLinked}+${spatialLinked}`
         : "";
 
-      lastEl.textContent = `Datenstand: ${updated.toLocaleString("de-AT", {
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit"
-      })} · ${flyerCount || tgPublicStatus.productCount || 0} Flugblatt-Angebote · ${linkable} sicher verknüpfbar${spatialInfo}${period}`;
+      lastEl.textContent = tgPublicStatus.flyerCurrent === false
+        ? `Datenstand: ${updated.toLocaleString("de-AT", {
+            day: "2-digit", month: "2-digit", year: "numeric",
+            hour: "2-digit", minute: "2-digit"
+          })} · Letzte Flugblattausgabe abgelaufen · aktuelle Aktionen werden erst nach erfolgreichem Datenlauf verwendet`
+        : `Datenstand: ${updated.toLocaleString("de-AT", {
+            day: "2-digit", month: "2-digit", year: "numeric",
+            hour: "2-digit", minute: "2-digit"
+          })} · ${flyerCount || tgPublicStatus.productCount || 0} Flugblatt-Angebote · ${linkable} sicher verknüpfbar${spatialInfo}${period}`;
     } else {
       lastEl.textContent = "Noch keine importierten T&G-Aktionsdaten vorhanden";
     }
@@ -2362,8 +2482,10 @@
 
     if (flyerBtn) {
       const url = tgPublicStatus?.flyer?.url;
-      flyerBtn.disabled = !url;
-      flyerBtn.dataset.flyerUrl = url || "";
+      const usable = Boolean(url) && tgPublicStatus?.flyerCurrent !== false;
+      flyerBtn.disabled = !usable;
+      flyerBtn.dataset.flyerUrl = usable ? url : "";
+      flyerBtn.textContent = usable ? "📄 Flugblatt" : "📄 Flugblatt wird aktualisiert";
     }
   }
 
@@ -2614,6 +2736,7 @@
       salePrice: liveItem.salePrice ?? null,
       unitPrice: liveItem.unitPrice,
       unitPriceUnit: liveItem.unitPriceUnit,
+      validFrom: liveItem.validFrom ?? null,
       validUntil: liveItem.validUntil ?? null,
       updatedAt: date,
       source: "tundg.at Spezialaktionen",
