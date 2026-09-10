@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-09T21:03:24Z",
+  "updatedAt": "2026-09-10T04:41:58Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -10,9 +10,9 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 1171,
-        "pagesChecked": 40,
-        "updatedAt": "2026-09-09T21:02:37Z",
+        "verifiedCount": 423,
+        "pagesChecked": 14,
+        "updatedAt": "2026-09-10T04:41:08Z",
         "error": null,
         "source": "mpreis.at"
       }
@@ -25,30 +25,30 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 887,
-        "rawProductsScanned": 22264,
-        "updatedAt": "2026-09-09T21:03:23Z",
+        "verifiedCount": 676,
+        "rawProductsScanned": 22362,
+        "updatedAt": "2026-09-10T04:41:58Z",
         "error": null,
         "source": "spar.at / FactFinder",
         "breakdown": {
-          "Aktion": 883,
-          "ab 2 Stück": 4
+          "Aktion": 674,
+          "ab 2 Stück": 2
         }
       }
     },
     "tg": {
-      "status": "ok",
+      "status": "stale",
       "productCount": 73,
-      "promotionCount": 4,
-      "stale": false,
-      "error": null,
+      "promotionCount": 75,
+      "stale": true,
+      "error": "Unplausibel wenige T&G-Aktionen (0). Vorhandene Daten werden nicht überschrieben.",
       "provider": "tundg.at",
       "scope": "Spezialaktionen + Osttirol-Flugblatt",
       "flyer": {
         "status": "ok",
         "productCount": 70,
         "linkableCount": 28,
-        "updatedAt": "2026-09-09T21:03:33Z",
+        "updatedAt": "2026-09-10T04:42:10Z",
         "error": null,
         "source": "T&G Osttirol Flugblatt"
       }
