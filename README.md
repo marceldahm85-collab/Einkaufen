@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 11.2
+# PreisPilot Osttirol – Version 11.3
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -805,3 +805,43 @@ Der MPREIS-Flugblattbutton verwendet nun direkt:
 `https://www.mpreis.at/aktionen/flugblatt?region=osttirol`
 
 Die frühere Tirol-Voreinstellung wurde entfernt.
+
+
+## Version 11.3 – persönliche Artikel bearbeiten
+
+Diese Version basiert direkt auf dem vom Nutzer heruntergeladenen Repository
+`Einkaufen-main.zip`.
+
+Persönliche Artikel können nun nachträglich geändert werden, ohne sie zu
+löschen oder neu anzulegen.
+
+Bearbeitbar sind:
+- Artikelname
+- Marke
+- Kategorie
+- Vergleichsmenge
+- Einheit
+
+Der Bearbeiten-Button ist an drei Stellen verfügbar:
+- `Artikel → Meine Artikel`
+- im Produktdetail
+- `Mehr → Datenbank → Artikel verwalten`
+
+Beim Speichern wird derselbe Produktdatensatz aktualisiert. Unverändert bleiben:
+- Produkt-ID
+- MPREIS-/SPAR-/T&G-Verknüpfungen
+- vorhandene Angebote und Preisverläufe
+- Favoritenstatus
+- Referenzen aus der Einkaufsliste
+
+### GitHub-Pages-Korrektur
+
+Im Repository war `live-search.js` bereits vorhanden und in `index.html` sowie
+im Service Worker eingetragen, aber der GitHub-Pages-Workflow kopierte die
+Datei nicht nach `_site`.
+
+Dadurch konnte die mit v11.2 eingeführte erweiterte Händlersuche im
+Pages-Deployment fehlen.
+
+Der Workflow kopiert jetzt zusätzlich `live-search.js` nach `_site` und prüft
+die Such-, Katalog- und Gebindelogik vor dem Deployment.

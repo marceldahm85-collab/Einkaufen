@@ -117,6 +117,7 @@
   let currentSparLinkProductId = null;
   let currentTgLinkProductId = null;
   let currentComparisonProductId = null;
+  let currentEditProductId = null;
   let mpreisSearchTimer = null;
   let sparSearchTimer = null;
   let tgSearchTimer = null;
@@ -1401,9 +1402,14 @@
             <span>${escapeHtml(product.brand || "ohne Marke")}</span>
             <span>·</span><span>${escapeHtml(product.category)}</span>
           </div>
-          <button class="comparison-amount-btn" data-edit-comparison="${product.id}" type="button">
-            Vergleich: <strong>${fmtAmount(product)}</strong> ✎
-          </button>
+          <div class="article-edit-row">
+            <button class="comparison-amount-btn" data-edit-comparison="${product.id}" type="button">
+              Vergleich: <strong>${fmtAmount(product)}</strong> ✎
+            </button>
+            <button class="article-edit-btn" data-edit-product="${product.id}" type="button">
+              ✎ Bearbeiten
+            </button>
+          </div>
           ${packageInfo ? `<div class="product-meta comparison-package-meta"><span>${escapeHtml(packageInfo)}</span></div>` : ""}
           ${store ? `<div class="market-label"><span class="market-dot" style="background:${store.color}"></span>${store.name}</div>` : ""}
         </div>
@@ -2762,6 +2768,7 @@
           <button class="database-live-btn tg-live-btn ${p.liveLinks?.tg ? "is-linked" : ""}" data-link-tg="${p.id}">
             ${p.liveLinks?.tg ? "T&G ✓" : "T&G"}
           </button>
+          <button class="database-edit" data-edit-product="${p.id}">Bearbeiten</button>
           <button class="database-delete" data-delete-product="${p.id}">Löschen</button>
         </div>
       </div>`).join("");
@@ -2801,9 +2808,14 @@
 
     $("#productDetailContent").innerHTML = `
       <div class="product-meta" style="margin-bottom:6px">${escapeHtml(p.brand || "")} · ${escapeHtml(p.category)}</div>
-      <button class="comparison-amount-btn detail-comparison-btn" data-edit-comparison="${p.id}" type="button">
-        Vergleichsmenge: <strong>${fmtAmount(p)}</strong> ✎
-      </button>
+      <div class="detail-product-edit-row">
+        <button class="comparison-amount-btn detail-comparison-btn" data-edit-comparison="${p.id}" type="button">
+          Vergleichsmenge: <strong>${fmtAmount(p)}</strong> ✎
+        </button>
+        <button class="article-edit-btn detail-edit-product-btn" data-edit-product="${p.id}" type="button">
+          ✎ Artikel bearbeiten
+        </button>
+      </div>
 
       ${stats ? `<div class="price-stat-grid">
         <div class="price-stat"><span>Tiefst</span><strong>${money(stats.min)}</strong></div>
@@ -2870,7 +2882,9 @@
     $("#existingStoreSelect").innerHTML = marketOptions;
     $("#customStoreSelect").innerHTML = `<option value="auto">Kein fester Markt</option>` + Object.values(retailers).map(r => `<option value="${r.id}">${r.name}</option>`).join("");
     $("#newProductStore").innerHTML = `<option value="">Kein Startpreis</option>` + Object.values(retailers).map(r => `<option value="${r.id}">${r.name}</option>`).join("");
-    $("#newProductCategory").innerHTML = categories.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("");
+    const categoryOptions = categories.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("");
+    $("#newProductCategory").innerHTML = categoryOptions;
+    if ($("#editProductCategory")) $("#editProductCategory").innerHTML = categoryOptions;
   }
 
   function openSheet(id) {
@@ -2996,6 +3010,92 @@
     return { value: +(price / amount).toFixed(2), unit: "Stk" };
   }
 
+
+  function openEditProduct(productId) {
+    const product = productById(productId);
+    if (!product) return;
+
+    populateForms();
+    currentEditProductId = productId;
+
+    $("#editProductId").value = product.id;
+    $("#editProductTitle").textContent = product.name;
+    $("#editProductName").value = product.name || "";
+    $("#editProductBrand").value = product.brand || "";
+    $("#editProductCategory").value = product.category || "Sonstiges";
+    $("#editProductAmount").value = Number(product.amount) || 1;
+    $("#editProductUnit").value = normalizeMeasureUnit(product.unit) || "Stk";
+
+    const linkCount = Object.values(product.liveLinks || {}).filter(Boolean).length;
+    const offerCount = (product.offers || []).length;
+    const shoppingCount = state.shopping
+      .filter(item => item.productId === product.id)
+      .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+
+    const parts = [];
+    if (linkCount) parts.push(`${linkCount} Händler-Verknüpfung${linkCount === 1 ? "" : "en"}`);
+    if (offerCount) parts.push(`${offerCount} Preis${offerCount === 1 ? "" : "e"}`);
+    if (shoppingCount) parts.push(`${shoppingCount}× auf der Einkaufsliste`);
+
+    $("#editProductPreserveNote").innerHTML = parts.length
+      ? `<strong>Bleibt erhalten:</strong> ${escapeHtml(parts.join(" · "))}`
+      : `<strong>Bleibt erhalten:</strong> Artikel-ID und alle bestehenden Zuordnungen`;
+
+    openSheet("editProductSheet");
+  }
+
+  function updateProductCore(product, values) {
+    if (!product) return false;
+
+    const name = String(values.name || "").trim();
+    const brand = String(values.brand || "").trim();
+    const category = String(values.category || "").trim();
+    const amount = Number(values.amount);
+    const unit = normalizeMeasureUnit(values.unit);
+
+    if (!name || !categories.includes(category)) return false;
+    if (!Number.isFinite(amount) || amount <= 0 || !unit) return false;
+    if (!normalizeMeasure(amount, unit)) return false;
+
+    // Intentionally update only editable core fields.
+    // ID, liveLinks, offers, history, favorite and shopping references stay intact.
+    product.name = name;
+    product.brand = brand;
+    product.category = category;
+    product.amount = amount;
+    product.unit = unit;
+
+    return true;
+  }
+
+  function saveEditedProduct() {
+    const productId = currentEditProductId || $("#editProductId")?.value;
+    const product = productById(productId);
+    if (!product) {
+      showToast("Artikel wurde nicht gefunden");
+      return;
+    }
+
+    const ok = updateProductCore(product, {
+      name: $("#editProductName").value,
+      brand: $("#editProductBrand").value,
+      category: $("#editProductCategory").value,
+      amount: $("#editProductAmount").value,
+      unit: $("#editProductUnit").value
+    });
+
+    if (!ok) {
+      showToast("Bitte gültige Artikeldaten eingeben");
+      return;
+    }
+
+    currentEditProductId = null;
+    saveState();
+    renderAll();
+    closeSheets();
+    showToast("Artikel aktualisiert");
+  }
+
   function deleteProduct(productId) {
     state.products = state.products.filter(p => p.id !== productId);
     state.shopping = state.shopping.filter(i => i.productId !== productId);
@@ -3106,6 +3206,9 @@
 
     const editComparison = e.target.closest("[data-edit-comparison]");
     if (editComparison) return openComparisonAmount(editComparison.dataset.editComparison);
+
+    const editProduct = e.target.closest("[data-edit-product]");
+    if (editProduct) return openEditProduct(editProduct.dataset.editProduct);
 
     const openProduct = e.target.closest("[data-open-product]");
     if (openProduct) {
@@ -3245,6 +3348,11 @@
   $("#comparisonAmountForm").addEventListener("submit", (e) => {
     e.preventDefault();
     saveComparisonAmount();
+  });
+
+  $("#editProductForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveEditedProduct();
   });
 
   $("#articleSearch").addEventListener("input", renderArticles);

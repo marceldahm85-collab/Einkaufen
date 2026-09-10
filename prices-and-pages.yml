@@ -35,6 +35,17 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Preis-, Mengen- und Suchlogik prüfen
+        run: |
+          node --check app.js
+          node --check live-search.js
+          node scripts/test_optimizer_quantity.js
+          node scripts/test_package_comparison.js
+          node scripts/test_search_aliases.js
+          node scripts/test_catalog_browse.js
+          node scripts/test_product_edit_preservation.js
+          python scripts/test_update_tg_flyer.py
+
       - name: MPREIS-Daten aktualisieren
         run: python scripts/update_mpreis.py
 
@@ -84,11 +95,62 @@ jobs:
               )
           PY
 
-      - name: SPAR-Aktionsfelder analysieren
-        run: python scripts/diagnose_spar_promotions.py
-
       - name: SPAR-Aktionen ergänzen
         run: python scripts/update_spar_actions.py
+
+      - name: T&G-Spezialaktionen aktualisieren
+        run: python scripts/update_tg.py
+
+      - name: T&G-Datenbestand prüfen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/tg.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          count = int(data.get("promotionCount") or 0)
+
+          print(f"T&G-Aktionen in data/tg.json: {count}")
+
+          if count < 1:
+              raise SystemExit(
+                  "T&G-Aktionsdaten sind leer. Deployment wird abgebrochen."
+              )
+          PY
+
+      - name: PDF-Textwerkzeug installieren
+        run: python -m pip install --disable-pip-version-check pypdf
+
+      - name: T&G-Osttirol-Flugblatt importieren
+        run: python scripts/update_tg_flyer.py
+
+      - name: T&G-Flugblattdaten prüfen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/tg.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          count = int(data.get("flyerProductCount") or 0)
+          linkable = int(data.get("flyerLinkableCount") or 0)
+          text_linkable = int(data.get("flyerTextLinkableCount") or 0)
+          spatial_linkable = int(data.get("flyerSpatialLinkableCount") or 0)
+
+          print(f"T&G-Flugblattprodukte: {count}")
+          print(f"Sicher über Textstruktur: {text_linkable}")
+          print(f"Zusätzlich über PDF-Positionen: {spatial_linkable}")
+          print(f"Insgesamt sicher verknüpfbar: {linkable}")
+
+          if count < 20:
+              raise SystemExit(
+                  "Unplausibel wenige T&G-Flugblattprodukte. "
+                  "Deployment wird abgebrochen."
+              )
+          PY
 
       - name: Öffentliche Preisdaten speichern
         shell: bash
@@ -112,7 +174,7 @@ jobs:
         run: |
           rm -rf _site
           mkdir -p _site
-          cp index.html styles.css app.js live-mpreis.js live-spar.js manifest.webmanifest sw.js _site/
+          cp index.html styles.css app.js live-search.js live-mpreis.js live-spar.js live-tg.js manifest.webmanifest sw.js _site/
           cp -R assets _site/assets
           cp -R data _site/data
           touch _site/.nojekyll

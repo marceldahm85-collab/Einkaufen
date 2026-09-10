@@ -1186,3 +1186,95 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
   font-size: 8px;
   font-weight: 500;
 }
+
+
+/* Version 11.3 – persönliche Artikel vollständig bearbeiten */
+.article-edit-row,
+.detail-product-edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.article-edit-row .comparison-amount-btn {
+  margin-top: 0;
+}
+
+.article-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent-purple) 18%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-purple) 7%, var(--surface-2));
+  color: var(--accent-purple);
+  font-size: 9px;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.detail-product-edit-row {
+  margin: 0 0 10px;
+}
+
+.detail-product-edit-row .detail-comparison-btn {
+  margin: 0;
+}
+
+.detail-edit-product-btn {
+  font-size: 10px;
+}
+
+.database-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.database-edit {
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent-purple) 10%, var(--surface-2));
+  color: var(--accent-purple);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.database-delete {
+  padding: 6px 5px;
+}
+
+.edit-product-help {
+  margin: -5px 0 14px;
+  line-height: 1.45;
+}
+
+.edit-product-preserve-note {
+  padding: 10px 11px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--success) 7%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--success) 14%, var(--line));
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.edit-product-preserve-note strong {
+  color: var(--success);
+}
+
+@media (max-width: 390px) {
+  .database-item {
+    align-items: flex-start;
+  }
+
+  .database-actions {
+    max-width: 190px;
+  }
+}

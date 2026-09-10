@@ -369,6 +369,65 @@
     </form>
   </section>
 
+
+  <section class="bottom-sheet" id="editProductSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">PERSÖNLICHER ARTIKEL</div>
+        <h2 id="editProductTitle">Artikel bearbeiten</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+
+    <p class="muted small edit-product-help">
+      Name, Marke, Kategorie und Vergleichsmenge können geändert werden.
+      Bestehende Händler-Verknüpfungen, Preise und Einkaufslisten-Einträge bleiben erhalten.
+    </p>
+
+    <form id="editProductForm" class="form-grid">
+      <input id="editProductId" type="hidden">
+
+      <label>
+        Artikelname
+        <input id="editProductName" type="text" required>
+      </label>
+
+      <label>
+        Marke
+        <input id="editProductBrand" type="text" placeholder="optional">
+      </label>
+
+      <label>
+        Kategorie
+        <select id="editProductCategory" required></select>
+      </label>
+
+      <div class="form-row">
+        <label>
+          Vergleichsmenge
+          <input id="editProductAmount" type="number" inputmode="decimal"
+                 min="0.001" step="0.001" required>
+        </label>
+
+        <label>
+          Einheit
+          <select id="editProductUnit">
+            <option value="l">l</option>
+            <option value="ml">ml</option>
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="Stk">Stk</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="editProductPreserveNote" class="edit-product-preserve-note"></div>
+
+      <button class="primary-btn full" type="submit">Änderungen speichern</button>
+    </form>
+  </section>
+
   <section class="bottom-sheet" id="comparisonAmountSheet" aria-hidden="true">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
