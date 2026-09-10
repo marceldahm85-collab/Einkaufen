@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Python einrichten
         uses: actions/setup-python@v6
@@ -163,16 +165,40 @@ jobs:
       - name: Öffentliche Preisdaten speichern
         shell: bash
         run: |
+          set -euo pipefail
+
           git config user.name "preis-pilot-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/
 
           if git diff --cached --quiet; then
             echo "Keine Datenänderungen."
-          else
-            git commit -m "chore: Preisdaten aktualisieren"
-            git push
+            exit 0
           fi
+
+          git commit -m "chore: Preisdaten aktualisieren"
+
+          # main kann sich während dieses Laufs ändern, z. B. wenn über die
+          # GitHub-Weboberfläche kurz nacheinander App-Dateien und Workflow
+          # aktualisiert werden. Niemals force-pushen: stattdessen den
+          # Daten-Commit sauber auf den neuesten main-Stand setzen.
+          for attempt in 1 2 3; do
+            echo "Push-Versuch ${attempt}/3 ..."
+
+            if git push origin HEAD:main; then
+              echo "Preisdaten erfolgreich gespeichert."
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::main hat sich während aller Push-Versuche erneut geändert."
+              exit 1
+            fi
+
+            echo "main wurde zwischenzeitlich aktualisiert – hole neuesten Stand und rebase ..."
+            git fetch origin main
+            git rebase origin/main
+          done
 
       - name: GitHub Pages konfigurieren
         uses: actions/configure-pages@v5
