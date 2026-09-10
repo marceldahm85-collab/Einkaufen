@@ -13,6 +13,7 @@ import urllib.request
 from datetime import date, datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "tg.json"
@@ -20,6 +21,10 @@ STATUS = ROOT / "data" / "update-status.json"
 
 SOURCE_URL = "https://www.tundg.at/aktionen/"
 MIN_EXPECTED_ACTIONS = 1
+
+
+def local_today():
+    return datetime.now(ZoneInfo("Europe/Vienna")).date()
 
 
 def now_iso():
@@ -107,7 +112,7 @@ def stable_id(name, description):
 
 
 def resolve_period(text, today=None):
-    today = today or date.today()
+    today = today or local_today()
 
     m = re.search(
         r"(\d{1,2})\.(\d{1,2})\.\s*(?:bis|[-–—])\s*"
@@ -365,37 +370,150 @@ def parse_special_actions(lines):
     return unique, valid_from, valid_until
 
 
+def _viewer_looks_valid(url):
+    try:
+        source = fetch_text(url, attempts=1)
+    except Exception:
+        return False
+
+    folded = source.casefold()
+    return "pdffile" in folded and ("flowpaper" in folded or "flowpaperviewer" in folded)
+
+
+def _viewer_candidates_for_period(current_url, start_iso):
+    if not current_url or not start_iso:
+        return []
+
+    try:
+        start = date.fromisoformat(start_iso)
+    except ValueError:
+        return []
+
+    parsed = urllib.parse.urlsplit(current_url)
+    match = re.search(r"/(20\d{2})/kw\d+/index\.html$", parsed.path, flags=re.I)
+    if not match:
+        return []
+
+    week = start.isocalendar().week
+    year = start.isocalendar().year
+    prefix = parsed.path[:match.start()]
+
+    candidates = []
+    for candidate_week in (week, week - 1, week + 1):
+        if candidate_week < 1 or candidate_week > 53:
+            continue
+        path = f"{prefix}/{year}/kw{candidate_week}/index.html"
+        candidate = urllib.parse.urlunsplit((
+            parsed.scheme,
+            parsed.netloc,
+            path,
+            "",
+            "",
+        ))
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    return candidates
+
+
+def select_active_flyer(flyer, today=None):
+    today = today or local_today()
+    result = dict(flyer or {})
+
+    current_start = result.get("currentValidFrom")
+    current_end = result.get("currentValidUntil")
+    upcoming_start = result.get("upcomingValidFrom")
+    upcoming_end = result.get("upcomingValidUntil")
+    current_url = result.get("url")
+
+    if not upcoming_start or not upcoming_end:
+        return result
+
+    try:
+        upcoming_start_date = date.fromisoformat(upcoming_start)
+        upcoming_end_date = date.fromisoformat(upcoming_end)
+    except ValueError:
+        return result
+
+    # The T&G page can keep yesterday's issue labelled as "Aktuelle Ausgabe"
+    # for a while on the first day of the next period. In that case derive the
+    # official Osttirol viewer from the new period's ISO week and probe it.
+    if not (upcoming_start_date <= today <= upcoming_end_date):
+        return result
+
+    for candidate in _viewer_candidates_for_period(current_url, upcoming_start):
+        if _viewer_looks_valid(candidate):
+            result["url"] = candidate
+            result["periodText"] = result.get("upcomingPeriodText")
+            result["validFrom"] = upcoming_start
+            result["validUntil"] = upcoming_end
+            result["selectedPeriod"] = "upcoming-now-active"
+            result["derivedFromCurrentUrl"] = current_url
+            return result
+
+    result["selectionWarning"] = (
+        "Die kommende Ausgabe ist laut Datum bereits aktiv, "
+        "der neue offizielle Osttirol-Viewer war aber noch nicht abrufbar."
+    )
+    result["derivedFromCurrentUrl"] = current_url
+    result["url"] = None
+    result["selectedPeriod"] = "upcoming-waiting-for-viewer"
+    return result
+
+
 def extract_flyer_metadata(source, lines):
     flyer_url = None
 
-    hrefs = re.findall(r'href\s*=\s*["\']([^"\']+)["\']', source, flags=re.I)
+    hrefs = re.findall(r"href\s*=\s*['\"]([^'\"]+)['\"]", source, flags=re.I)
     for href in hrefs:
         decoded = html.unescape(href)
         if "/flugblatt/tundg/osttirol/" in decoded.casefold():
             flyer_url = urllib.parse.urljoin(SOURCE_URL, decoded)
             break
 
-    period_text = None
-    current_period_start = None
-    current_period_end = None
+    current_text = None
+    upcoming_text = None
+    current_start = None
+    current_end = None
+    upcoming_start = None
+    upcoming_end = None
 
-    for line in lines:
-        m = re.search(
-            r"Aktuelle\s+Ausgabe\s+(.+?)(?:\s+Kommende\s+Ausgabe|$)",
-            line,
+    combined = " ".join(lines)
+
+    match = re.search(
+        r"Aktuelle\s+Ausgabe\s+(.+?)\s+Kommende\s+Ausgabe\s+(.+?)(?:\s+Tirol|\s+Salzburg|\s+Kärnten|\s+Osttirol|\s+Steiermark|$)",
+        combined,
+        flags=re.I,
+    )
+
+    if match:
+        current_text = match.group(1).strip()
+        upcoming_text = match.group(2).strip()
+        current_start, current_end = resolve_period(current_text)
+        upcoming_start, upcoming_end = resolve_period(upcoming_text)
+    else:
+        match = re.search(
+            r"Aktuelle\s+Ausgabe\s+(.+?)(?:\s+Tirol|\s+Salzburg|\s+Kärnten|\s+Osttirol|\s+Steiermark|$)",
+            combined,
             flags=re.I,
         )
-        if m:
-            period_text = m.group(1).strip()
-            current_period_start, current_period_end = resolve_period(period_text)
-            break
+        if match:
+            current_text = match.group(1).strip()
+            current_start, current_end = resolve_period(current_text)
 
     return {
         "region": "Osttirol",
         "url": flyer_url,
-        "periodText": period_text,
-        "validFrom": current_period_start,
-        "validUntil": current_period_end,
+        "periodText": current_text,
+        "validFrom": current_start,
+        "validUntil": current_end,
+        "currentPeriodText": current_text,
+        "currentValidFrom": current_start,
+        "currentValidUntil": current_end,
+        "upcomingPeriodText": upcoming_text,
+        "upcomingValidFrom": upcoming_start,
+        "upcomingValidUntil": upcoming_end,
+        "selectedPeriod": "current",
     }
 
 
@@ -424,7 +542,7 @@ def merge_history(item, previous):
                 seen.add((d, round(p, 2)))
 
     if item.get("salePrice") is not None:
-        d = date.today().isoformat()
+        d = local_today().isoformat()
         p = round(float(item["salePrice"]), 2)
         if (d, p) not in seen:
             history.append({"date": d, "price": p})
@@ -475,6 +593,7 @@ def main():
 
         actions, valid_from, valid_until = parse_special_actions(lines)
         flyer = extract_flyer_metadata(source, lines)
+        flyer = select_active_flyer(flyer)
 
         if len(actions) < MIN_EXPECTED_ACTIONS:
             raise RuntimeError(
@@ -558,6 +677,9 @@ def main():
         )
         print(f"T&G Gültigkeit: {valid_from or '—'} bis {valid_until or '—'}")
         print(f"T&G Osttirol-Flugblatt: {flyer.get('url') or 'Link nicht erkannt'}")
+        print(f"T&G Flugblatt-Auswahl: {flyer.get('selectedPeriod') or 'current'}")
+        if flyer.get("selectionWarning"):
+            print(f"WARNUNG: {flyer['selectionWarning']}", file=sys.stderr)
         return 0
 
     except Exception as exc:
@@ -579,7 +701,7 @@ def main():
             )
             print(
                 f"WARNUNG: T&G konnte nicht aktualisiert werden. "
-                f"Vorhandene {existing_actions} Aktionen bleiben aktiv. Fehler: {exc}",
+                f"Vorhandene {existing_actions} Einträge bleiben als letzter Datenstand erhalten. Fehler: {exc}",
                 file=sys.stderr,
             )
             return 0

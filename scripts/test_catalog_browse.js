@@ -25,6 +25,76 @@ async function loadModule(file, globalName, payload) {
   return api;
 }
 
+
+
+async function verifyPromotionSafety() {
+  const datedPayload = {
+    updatedAt: "2026-09-10T10:00:00Z",
+    products: [
+      {
+        remoteObjectId: "active",
+        retailerProductId: "active",
+        name: "Aktive Aktion",
+        currentPrice: 1,
+        regularPrice: 2,
+        salePrice: 1,
+        promotionVerified: true,
+        promotion: { type: "price_drop", label: "Aktion" }
+      },
+      {
+        remoteObjectId: "expired",
+        retailerProductId: "expired",
+        name: "Abgelaufene Aktion",
+        currentPrice: 1,
+        regularPrice: 2,
+        salePrice: 1,
+        validUntil: "2000-01-01",
+        promotionVerified: true,
+        promotion: { type: "bundle", requiredQuantity: 2, label: "1+1 gratis" }
+      },
+      {
+        remoteObjectId: "future",
+        retailerProductId: "future",
+        name: "Zukünftige Aktion",
+        currentPrice: 1,
+        regularPrice: 2,
+        salePrice: 1,
+        validFrom: "2999-01-01",
+        promotionVerified: true,
+        promotion: { type: "quantity", requiredQuantity: 2, label: "ab 2 Stück" }
+      }
+    ]
+  };
+
+  for (const [file, globalName] of [
+    ["live-mpreis.js", "MPreisLive"],
+    ["live-spar.js", "SparLive"],
+    ["live-tg.js", "TgLive"]
+  ]) {
+    const api = await loadModule(file, globalName, datedPayload);
+    const promos = await api.promotions();
+    assert.deepStrictEqual(Array.from(promos, item => item.name), ["Aktive Aktion"]);
+
+    const filtered = await api.browse({ promotionsOnly: true, limit: 20 });
+    assert.strictEqual(filtered.total, 1);
+    assert.strictEqual(filtered.items[0].name, "Aktive Aktion");
+  }
+
+  for (const [file, globalName] of [
+    ["live-mpreis.js", "MPreisLive"],
+    ["live-spar.js", "SparLive"]
+  ]) {
+    const stalePayload = JSON.parse(JSON.stringify(datedPayload));
+    stalePayload.promotionStale = true;
+    const api = await loadModule(file, globalName, stalePayload);
+    const promos = await api.promotions();
+    assert.strictEqual(promos.length, 0);
+    const status = await api.status();
+    assert.strictEqual(status.promotionCount, 0);
+    assert.strictEqual(status.promotionStale, true);
+  }
+}
+
 (async () => {
   const payload = {
     updatedAt: "2026-09-09T12:00:00Z",
@@ -100,7 +170,9 @@ async function loadModule(file, globalName, payload) {
     );
   }
 
-  console.log("Catalog browse tests OK");
+  await verifyPromotionSafety();
+
+  console.log("Catalog browse/promotion safety tests OK");
 })().catch(error => {
   console.error(error);
   process.exit(1);

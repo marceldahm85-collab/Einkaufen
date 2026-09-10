@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 from datetime import date, datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "tg.json"
@@ -29,6 +30,10 @@ MEASURE_START_RX = re.compile(
     r"|\bper\s+(?:kg|stück)\b|\baus\s+(?:Österreich|Tirol)\b",
     re.I,
 )
+
+
+def local_today():
+    return datetime.now(ZoneInfo("Europe/Vienna")).date()
 
 
 def now_iso():
@@ -1292,7 +1297,7 @@ def merge_history(item, previous):
         price = item.get("displayPrice")
 
     if price is not None:
-        d = date.today().isoformat()
+        d = local_today().isoformat()
         key = (d, round(float(price), 2))
 
         if key not in seen:
