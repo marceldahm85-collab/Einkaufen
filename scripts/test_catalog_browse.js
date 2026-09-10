@@ -15,6 +15,7 @@ async function loadModule(file, globalName, payload) {
   };
 
   vm.createContext(context);
+  vm.runInContext(fs.readFileSync("live-search.js", "utf8"), context, { filename: "live-search.js" });
   vm.runInContext(source, context, { filename: file });
 
   const api = context.window[globalName];
