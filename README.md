@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 11.1
+# PreisPilot Osttirol – Version 11.2
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -743,12 +743,12 @@ Die Händlerkarten unter `Mehr` besitzen nun ein einheitliches Zwei-Button-Layou
 
 ### MPREIS
 
-Verwendet wird die offizielle MPREIS-Flugblattseite mit Region `Tirol`:
+Seit Version 11.2 wird die offizielle MPREIS-Flugblattseite direkt mit Region
+`Osttirol` geöffnet:
 
-`https://www.mpreis.at/aktionen/flugblatt?region=tirol`
+`https://www.mpreis.at/aktionen/flugblatt?region=osttirol`
 
-MPREIS bietet auf seiner öffentlichen Flugblattseite aktuell eine Auswahl nach
-Bundesland. Für Osttirol wird daher Tirol verwendet.
+Die frühere Tirol-Voreinstellung aus Version 11.1 wurde damit korrigiert.
 
 ### SPAR / INTERSPAR
 
@@ -766,3 +766,42 @@ regionalen Osttirol-Flugblatt-Viewer aus `data/tg.json`.
 
 Damit müssen für die drei Händler keine kalenderwochenabhängigen URLs in der
 App gepflegt werden.
+
+
+## Version 11.2 – Gebindevergleich, bessere Produktsuche, MPREIS Osttirol
+
+### Vergleichsmenge statt blindem Gebindepreis
+
+Persönliche Artikel besitzen weiterhin `Menge + Einheit`, diese Werte werden
+jetzt ausdrücklich als **Vergleichsmenge** verwendet. Direkt in der Artikelliste
+kann die Vergleichsmenge über `Vergleich: … ✎` geändert werden.
+
+Jede Live-Verknüpfung merkt sich zusätzlich die tatsächliche Gebindegröße des
+Händlerprodukts. Für einen Vergleich berechnet PreisPilot zunächst, wie viele
+ganze Händlergebinde nötig sind, um die persönliche Vergleichsmenge zu decken.
+Erst auf diese Gebindeanzahl werden `ab N`, `1+1`, `2+1` usw. angewandt.
+
+Damit können z. B. eine 20×0,5-l-Bierkiste, ein 6×0,5-l-Pack und einzelne
+0,5-l-Dosen korrekt für dieselbe Zielmenge verglichen werden.
+
+### Erweiterte Händlerproduktsuche
+
+Die Heisse-Preise-Grunddaten enthalten keine belastbare allgemeine
+Produktkategorie. Deshalb erweitert `live-search.js` die Suche um eine lokale,
+deterministische Produkttyp-Taxonomie und vorsichtige Marken-Inferenz.
+
+Beispiel: Eine Suche nach `Bier` findet jetzt auch passende Artikel, bei denen
+der Datensatz hauptsächlich den Markennamen enthält. Entsprechende Aliasgruppen
+gibt es auch für häufige Produkttypen wie Kaffee, Milch, Käse, Joghurt, Nudeln,
+Wasser, Limonade, Saft, Wein, Sekt, Schokolade, Chips, Waschmittel usw.
+
+Die Verknüpfungssuche zeigt bis zu 60 Treffer und nennt zusätzlich die gesamte
+Trefferzahl. Der Händlerkatalog verwendet dieselbe erweiterte Suchlogik.
+
+### MPREIS Flugblatt
+
+Der MPREIS-Flugblattbutton verwendet nun direkt:
+
+`https://www.mpreis.at/aktionen/flugblatt?region=osttirol`
+
+Die frühere Tirol-Voreinstellung wurde entfernt.

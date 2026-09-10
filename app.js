@@ -20,7 +20,7 @@
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
   const initialState = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     settings: { theme: "system", region: "osttirol", shoppingSort: "added", shoppingStrategy: "cheapest" },
     live: {
       mpreis: { enabled: true, lastSync: null, lastError: null },
@@ -94,7 +94,7 @@
 
   let state = loadState();
   const OFFICIAL_FLYER_URLS = {
-    mpreis: "https://www.mpreis.at/aktionen/flugblatt?region=tirol",
+    mpreis: "https://www.mpreis.at/aktionen/flugblatt?region=osttirol",
     spar: "https://www.interspar.at/aktionen/osttirol"
   };
 
@@ -116,6 +116,7 @@
   let currentMpreisLinkProductId = null;
   let currentSparLinkProductId = null;
   let currentTgLinkProductId = null;
+  let currentComparisonProductId = null;
   let mpreisSearchTimer = null;
   let sparSearchTimer = null;
   let tgSearchTimer = null;
@@ -140,7 +141,7 @@
 
   function migrateState(input) {
     const migrated = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       settings: { ...initialState.settings, ...(input.settings || {}) },
       live: {
         mpreis: {
@@ -172,6 +173,15 @@
 
   function enrichOffer(product, offer) {
     const current = offer.salePrice != null ? Number(offer.salePrice) : Number(offer.regularPrice);
+    const linkedLiveOffer = Boolean(product?.liveLinks?.[offer.store]);
+    const explicitPackageAmount = Number(offer.packageAmount);
+    const packageAmountKnown = offer.packageAmountKnown != null
+      ? Boolean(offer.packageAmountKnown)
+      : (Number.isFinite(explicitPackageAmount) && explicitPackageAmount > 0) || !linkedLiveOffer;
+    const packageAmount = Number.isFinite(explicitPackageAmount) && explicitPackageAmount > 0
+      ? explicitPackageAmount
+      : (!linkedLiveOffer ? Number(product.amount) : null);
+    const packageUnit = offer.packageUnit || (!linkedLiveOffer ? product.unit : null);
     const updated = offer.updatedAt || todayISO();
     const source = offer.source || `${offer.store || "unknown"}.at`;
 
@@ -191,6 +201,9 @@
 
     return {
       retailerProductId: offer.retailerProductId || `${offer.store || "store"}_${product.id}`,
+      packageAmount,
+      packageUnit,
+      packageAmountKnown,
       source,
       retrievedAt: offer.retrievedAt || `${updated}T08:00:00`,
       promotion,
@@ -224,8 +237,73 @@
     return new Intl.NumberFormat("de-AT", { style: "currency", currency: "EUR" }).format(Number(value));
   }
 
+  function fmtNumber(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value ?? "");
+    return new Intl.NumberFormat("de-AT", { maximumFractionDigits: 3 }).format(n);
+  }
+
   function fmtAmount(p) {
-    return `${String(p.amount).replace(".", ",")} ${p.unit}`;
+    return `${fmtNumber(p.amount)} ${p.unit}`;
+  }
+
+  function normalizeMeasureUnit(unit) {
+    const value = String(unit || "").trim().toLowerCase();
+    if (["l", "liter", "litre"].includes(value)) return "l";
+    if (["ml", "milliliter"].includes(value)) return "ml";
+    if (["kg", "kilogramm"].includes(value)) return "kg";
+    if (["g", "gramm"].includes(value)) return "g";
+    if (["stk", "stk.", "stück", "stueck", "piece", "pieces"].includes(value)) return "Stk";
+    return String(unit || "").trim();
+  }
+
+  function normalizeMeasure(amount, unit) {
+    const value = Number(amount);
+    const normalizedUnit = normalizeMeasureUnit(unit);
+    if (!Number.isFinite(value) || value <= 0) return null;
+
+    if (normalizedUnit === "l") return { dimension: "volume", baseUnit: "l", baseAmount: value };
+    if (normalizedUnit === "ml") return { dimension: "volume", baseUnit: "l", baseAmount: value / 1000 };
+    if (normalizedUnit === "kg") return { dimension: "mass", baseUnit: "kg", baseAmount: value };
+    if (normalizedUnit === "g") return { dimension: "mass", baseUnit: "kg", baseAmount: value / 1000 };
+    if (normalizedUnit === "Stk") return { dimension: "count", baseUnit: "Stk", baseAmount: value };
+    return null;
+  }
+
+  function measureToDisplay(baseAmount, dimension) {
+    if (!Number.isFinite(Number(baseAmount))) return "—";
+    const amount = Number(baseAmount);
+    if (dimension === "volume") {
+      if (amount < 1 && amount * 1000 >= 1) return `${fmtNumber(amount * 1000)} ml`;
+      return `${fmtNumber(amount)} l`;
+    }
+    if (dimension === "mass") {
+      if (amount < 1 && amount * 1000 >= 1) return `${fmtNumber(amount * 1000)} g`;
+      return `${fmtNumber(amount)} kg`;
+    }
+    if (dimension === "count") return `${fmtNumber(amount)} Stk`;
+    return fmtNumber(amount);
+  }
+
+  function packageMeasureForOffer(product, offer) {
+    if (!offer) return null;
+
+    if (offer.packageAmountKnown === false) return null;
+
+    const hasExplicit = Number.isFinite(Number(offer.packageAmount)) && Number(offer.packageAmount) > 0 && offer.packageUnit;
+    const amount = hasExplicit ? Number(offer.packageAmount) : Number(product?.amount);
+    const unit = hasExplicit ? offer.packageUnit : product?.unit;
+    return normalizeMeasure(amount, unit);
+  }
+
+  function offerPackageLabel(product, offer) {
+    if (offer?.packageLabel) return String(offer.packageLabel);
+    const amount = Number(offer?.packageAmount);
+    if (Number.isFinite(amount) && amount > 0 && offer?.packageUnit) {
+      return `${fmtNumber(amount)} ${normalizeMeasureUnit(offer.packageUnit)}`;
+    }
+    if (offer?.packageAmountKnown === false) return "Gebinde unbekannt";
+    return product ? fmtAmount(product) : "Gebinde unbekannt";
   }
 
   function offerPrice(o) {
@@ -236,7 +314,7 @@
     if (!offer) return null;
 
     const o = normalizedOffer(offer);
-    const qty = Math.max(1, Number(quantity || 1));
+    const qty = Math.max(1, Math.ceil(Number(quantity || 1)));
     const regular = o.regularPrice != null && Number.isFinite(Number(o.regularPrice))
       ? Number(o.regularPrice)
       : null;
@@ -271,9 +349,6 @@
     if (promotion.type === "bundle" && required > 1) {
       const fullGroups = Math.floor(qty / required);
       const remainder = qty % required;
-
-      // The retailer feed stores the printed effective "je" price as salePrice.
-      // Complete promotion groups can therefore be valued directly from it.
       let lineTotal = fullGroups * required * sale;
 
       if (remainder) {
@@ -297,22 +372,71 @@
     };
   }
 
+  function offerPricingForTarget(product, offer, shoppingQuantity = 1) {
+    if (!product || !offer) return null;
+
+    const targetUnit = normalizeMeasure(product.amount, product.unit);
+    const packageUnit = packageMeasureForOffer(product, offer);
+    if (!targetUnit || !packageUnit || targetUnit.dimension !== packageUnit.dimension) return null;
+
+    const multiplier = Math.max(1, Number(shoppingQuantity || 1));
+    const targetBase = targetUnit.baseAmount * multiplier;
+    const packageBase = packageUnit.baseAmount;
+    if (!(packageBase > 0)) return null;
+
+    const packageCount = Math.max(1, Math.ceil((targetBase / packageBase) - 1e-10));
+    const packagePricing = offerPricingForQuantity(offer, packageCount);
+    if (!packagePricing) return null;
+
+    const deliveredBase = packageCount * packageBase;
+    const normalizedTargetPrice = packagePricing.lineTotal * (targetBase / deliveredBase);
+
+    return {
+      ...packagePricing,
+      packageCount,
+      targetBase,
+      deliveredBase,
+      baseUnit: targetUnit.baseUnit,
+      dimension: targetUnit.dimension,
+      packageBase,
+      overbuyBase: Math.max(0, deliveredBase - targetBase),
+      normalizedTargetPrice,
+      effectiveBaseUnitPrice: deliveredBase > 0 ? packagePricing.lineTotal / deliveredBase : null
+    };
+  }
+
+  function pricingPackageSummary(product, offer, pricing) {
+    if (!pricing) return "nicht vergleichbar";
+    const packageLabel = offerPackageLabel(product, offer);
+    const delivered = measureToDisplay(pricing.deliveredBase, pricing.dimension);
+    const target = measureToDisplay(pricing.targetBase, pricing.dimension);
+
+    if (pricing.packageCount === 1 && Math.abs(pricing.deliveredBase - pricing.targetBase) < 1e-8) {
+      return `${packageLabel} · exakt ${target}`;
+    }
+
+    const overbuy = pricing.overbuyBase > 1e-8
+      ? ` · Kaufmenge ${delivered}`
+      : "";
+    return `${pricing.packageCount} × ${packageLabel}${overbuy}`;
+  }
+
   function pricedOfferForStore(product, storeId, quantity = 1) {
     const offer = offerForStore(product, storeId);
     if (!offer) return null;
 
-    const pricing = offerPricingForQuantity(offer, quantity);
+    const pricing = offerPricingForTarget(product, offer, quantity);
     return pricing ? { offer, pricing } : null;
   }
 
   function cheapestPricedOffer(product, quantity = 1) {
     const candidates = validOffers(product)
       .map(normalizedOffer)
-      .map(offer => ({ offer, pricing: offerPricingForQuantity(offer, quantity) }))
+      .map(offer => ({ offer, pricing: offerPricingForTarget(product, offer, quantity) }))
       .filter(candidate => candidate.pricing)
       .sort((a, b) =>
         (a.pricing.lineTotal - b.pricing.lineTotal) ||
-        (a.pricing.unitPrice - b.pricing.unitPrice)
+        (a.pricing.effectiveBaseUnitPrice - b.pricing.effectiveBaseUnitPrice)
       );
 
     return candidates[0] || null;
@@ -366,13 +490,34 @@
 
   function productHistory(product) {
     const rows = [];
+    const target = normalizeMeasure(product.amount, product.unit);
+
     (product.offers || []).forEach(offer => {
-      (offer.history || []).forEach(h => rows.push({
-        store: offer.store,
-        date: h.date,
-        price: Number(h.price)
-      }));
+      const packageMeasure = packageMeasureForOffer(product, offer);
+      (offer.history || []).forEach(h => {
+        const rawPrice = Number(h.price);
+        let normalizedPrice = null;
+
+        if (
+          Number.isFinite(rawPrice) &&
+          target &&
+          packageMeasure &&
+          target.dimension === packageMeasure.dimension &&
+          packageMeasure.baseAmount > 0
+        ) {
+          normalizedPrice = rawPrice * target.baseAmount / packageMeasure.baseAmount;
+        }
+
+        rows.push({
+          store: offer.store,
+          date: h.date,
+          price: rawPrice,
+          normalizedPrice,
+          packageLabel: offerPackageLabel(product, offer)
+        });
+      });
     });
+
     return rows
       .filter(r => Number.isFinite(r.price))
       .sort((a,b) => b.date.localeCompare(a.date));
@@ -380,8 +525,10 @@
 
   function productPriceStats(product) {
     const history = productHistory(product);
-    if (!history.length) return null;
-    const prices = history.map(h => h.price);
+    const prices = history
+      .map(h => h.normalizedPrice)
+      .filter(price => Number.isFinite(price));
+    if (!prices.length) return null;
     return {
       min: Math.min(...prices),
       max: Math.max(...prices),
@@ -390,9 +537,7 @@
   }
 
   function cheapestOffer(product) {
-    const offers = validOffers(product).map(normalizedOffer);
-    if (!offers.length) return null;
-    return offers.sort((a,b) => offerPrice(a) - offerPrice(b))[0];
+    return cheapestPricedOffer(product, 1)?.offer || null;
   }
 
   function retailer(storeId) { return retailers[storeId] || { name: "Unbekannt", color: "#777", text: "#fff" }; }
@@ -472,26 +617,26 @@
     return id === "auto" ? "Ohne Markt" : retailer(id).name;
   }
 
-  function shoppingUnitPrice(item) {
-    if (item.custom) return Number(item.price || 0);
-
+  function shoppingCandidate(item) {
+    if (item.custom) return null;
     const quantity = Number(item.quantity || 1);
-    const candidate = item.preferredStore && item.preferredStore !== "auto"
+    return item.preferredStore && item.preferredStore !== "auto"
       ? pricedOfferForStore(item.product, item.preferredStore, quantity)
       : cheapestPricedOffer(item.product, quantity);
+  }
 
-    return candidate?.pricing.unitPrice || 0;
+  function shoppingUnitPrice(item) {
+    if (item.custom) return Number(item.price || 0);
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    const candidate = shoppingCandidate(item);
+    return candidate?.pricing?.lineTotal != null
+      ? candidate.pricing.lineTotal / quantity
+      : 0;
   }
 
   function shoppingItemTotal(item) {
     if (item.custom) return Number(item.price || 0) * Number(item.quantity || 1);
-
-    const quantity = Number(item.quantity || 1);
-    const candidate = item.preferredStore && item.preferredStore !== "auto"
-      ? pricedOfferForStore(item.product, item.preferredStore, quantity)
-      : cheapestPricedOffer(item.product, quantity);
-
-    return candidate?.pricing.lineTotal || 0;
+    return shoppingCandidate(item)?.pricing?.lineTotal || 0;
   }
 
   function renderShoppingCard(item) {
@@ -500,12 +645,14 @@
     const name = item.custom ? item.name : item.product.name;
     const meta = item.custom
       ? `${storeId === "auto" ? "Kein Markt" : store.name} · freier Artikel`
-      : `${item.product.brand || "ohne Marke"} · ${fmtAmount(item.product)}`;
+      : `${item.product.brand || "ohne Marke"} · Vergleich ${fmtAmount(item.product)}`;
     const price = shoppingUnitPrice(item);
-    const selectedOffer = !item.custom && storeId !== "auto"
-      ? offerForStore(item.product, storeId)
-      : null;
+    const candidate = !item.custom ? shoppingCandidate(item) : null;
+    const selectedOffer = candidate?.offer || null;
     const condition = selectedOffer ? offerConditionLabel(selectedOffer) : "";
+    const packageInfo = candidate
+      ? pricingPackageSummary(item.product, candidate.offer, candidate.pricing)
+      : "";
     const idAttr = item.custom ? `c:${item.id}` : `p:${item.id}`;
     return `
       <article class="product-card shopping-card ${item.checked ? "is-checked" : ""}">
@@ -513,6 +660,7 @@
         <div class="product-main" ${item.custom ? "" : `data-open-product="${item.product.id}"`}>
           <div class="product-name">${escapeHtml(name)}</div>
           <div class="product-meta"><span>${escapeHtml(meta)}</span></div>
+          ${packageInfo ? `<div class="product-meta comparison-package-meta"><span>${escapeHtml(packageInfo)}</span></div>` : ""}
           ${condition ? `<div class="product-meta"><span>${escapeHtml(condition)}</span></div>` : ""}
           ${storeId !== "auto" ? `<div class="market-label"><span class="market-dot" style="background:${store.color}"></span>${store.name}</div>` : ""}
         </div>
@@ -1238,24 +1386,31 @@
   }
 
   function renderArticleCard(product) {
-    const offer = cheapestOffer(product);
+    const candidate = cheapestPricedOffer(product, 1);
+    const offer = candidate?.offer || null;
+    const pricing = candidate?.pricing || null;
     const store = offer ? retailer(offer.store) : null;
-    const sale = offer && normalizedOffer(offer).salePrice != null;
+    const sale = offer && normalizedOffer(offer).salePrice != null && pricing?.activeSale;
+    const packageInfo = candidate ? pricingPackageSummary(product, offer, pricing) : "";
+
     return `
-      <article class="product-card">
+      <article class="product-card comparison-product-card">
         <div class="product-main" data-open-product="${product.id}">
           <div class="product-name">${escapeHtml(product.name)}</div>
           <div class="product-meta">
             <span>${escapeHtml(product.brand || "ohne Marke")}</span>
-            <span>·</span><span>${fmtAmount(product)}</span>
             <span>·</span><span>${escapeHtml(product.category)}</span>
           </div>
+          <button class="comparison-amount-btn" data-edit-comparison="${product.id}" type="button">
+            Vergleich: <strong>${fmtAmount(product)}</strong> ✎
+          </button>
+          ${packageInfo ? `<div class="product-meta comparison-package-meta"><span>${escapeHtml(packageInfo)}</span></div>` : ""}
           ${store ? `<div class="market-label"><span class="market-dot" style="background:${store.color}"></span>${store.name}</div>` : ""}
         </div>
         <div class="product-price-wrap">
-          ${offer ? `<div class="product-price ${sale ? "sale" : ""}">${money(offerPrice(normalizedOffer(offer)))}</div>
-          ${sale ? `<div class="old-price">${money(offer.regularPrice)}</div>` : ""}
-          <div class="product-meta" style="justify-content:flex-end">${offer.unitPrice ? `${money(offer.unitPrice)}/${offer.unitPriceUnit}` : ""}</div>` : `<div class="product-price">—</div>`}
+          ${candidate ? `<div class="product-price ${sale ? "sale" : ""}">${money(pricing.lineTotal)}</div>
+          <div class="product-meta comparison-price-label" style="justify-content:flex-end">für ${fmtAmount(product)}</div>
+          ${pricing.effectiveBaseUnitPrice ? `<div class="product-meta" style="justify-content:flex-end">${money(pricing.effectiveBaseUnitPrice)}/${pricing.baseUnit}</div>` : ""}` : `<div class="product-price">—</div><div class="product-meta comparison-price-label">Gebinde prüfen</div>`}
           <div class="card-actions" style="justify-content:flex-end">
             <button class="mini-add" data-add-product="${product.id}" aria-label="Zur Einkaufsliste hinzufügen">＋</button>
           </div>
@@ -1273,37 +1428,41 @@
 
     if (currentMarket === "all") {
       $("#marketOverview").style.setProperty("--market-color", "var(--primary)");
-      $("#marketOverview").innerHTML = `<div class="eyebrow">OSTTIROL</div><h2>Alle Märkte</h2><p class="muted">Aktuelle bekannte Preise aus ${Object.keys(retailers).length} Märkten · Demo-Datenbestand</p>`;
+      $("#marketOverview").innerHTML = `<div class="eyebrow">OSTTIROL</div><h2>Alle Märkte</h2><p class="muted">Preise auf die persönliche Vergleichsmenge normiert</p>`;
       const rows = state.products
-        .map(p => ({ p, o: cheapestOffer(p) }))
-        .filter(x => x.o)
-        .sort((a,b) => offerPrice(a.o) - offerPrice(b.o));
+        .map(p => ({ p, candidate: cheapestPricedOffer(p, 1) }))
+        .filter(x => x.candidate)
+        .sort((a,b) => a.candidate.pricing.lineTotal - b.candidate.pricing.lineTotal);
       $("#marketProductList").innerHTML = rows.map(({p}) => renderArticleCard(p)).join("");
       return;
     }
 
     const r = retailer(currentMarket);
     const rows = state.products
-      .map(p => ({ p, o: validOffers(p).map(normalizedOffer).find(o => o.store === currentMarket) }))
-      .filter(x => x.o)
-      .sort((a,b) => offerPrice(a.o) - offerPrice(b.o));
+      .map(p => ({ p, candidate: pricedOfferForStore(p, currentMarket, 1) }))
+      .filter(x => x.candidate)
+      .sort((a,b) => a.candidate.pricing.lineTotal - b.candidate.pricing.lineTotal);
 
     $("#marketOverview").style.setProperty("--market-color", r.color);
-    $("#marketOverview").innerHTML = `<div class="eyebrow">MARKT</div><h2>${r.name}</h2><p class="muted">${rows.length} bekannte Artikel für Osttirol</p>`;
+    $("#marketOverview").innerHTML = `<div class="eyebrow">MARKT</div><h2>${r.name}</h2><p class="muted">${rows.length} vergleichbare Artikel für Osttirol</p>`;
 
-    $("#marketProductList").innerHTML = rows.map(({p,o}) => {
-      const sale = o.salePrice != null;
+    $("#marketProductList").innerHTML = rows.map(({p,candidate}) => {
+      const o = candidate.offer;
+      const pricing = candidate.pricing;
+      const sale = o.salePrice != null && pricing.activeSale;
+      const packageInfo = pricingPackageSummary(p, o, pricing);
       return `
       <article class="product-card">
         <div class="product-main" data-open-product="${p.id}">
           <div class="product-name">${escapeHtml(p.name)}</div>
-          <div class="product-meta"><span>${escapeHtml(p.brand || "")}</span><span>·</span><span>${fmtAmount(p)}</span></div>
+          <div class="product-meta"><span>${escapeHtml(p.brand || "")}</span><span>·</span><span>Vergleich ${fmtAmount(p)}</span></div>
+          <div class="product-meta comparison-package-meta"><span>${escapeHtml(packageInfo)}</span></div>
           ${o.validUntil ? `<div class="product-meta"><span>${sale ? "Aktion" : "Preis"} bis ${formatDate(o.validUntil)}</span></div>` : ""}
         </div>
         <div class="product-price-wrap">
-          <div class="product-price ${sale ? "sale" : ""}">${money(offerPrice(o))}</div>
-          ${sale ? `<div class="old-price">${money(o.regularPrice)}</div>` : ""}
-          <div class="product-meta" style="justify-content:flex-end">${o.unitPrice ? `${money(o.unitPrice)}/${o.unitPriceUnit}` : ""}</div>
+          <div class="product-price ${sale ? "sale" : ""}">${money(pricing.lineTotal)}</div>
+          <div class="product-meta comparison-price-label" style="justify-content:flex-end">für ${fmtAmount(p)}</div>
+          ${pricing.effectiveBaseUnitPrice ? `<div class="product-meta" style="justify-content:flex-end">${money(pricing.effectiveBaseUnitPrice)}/${pricing.baseUnit}</div>` : ""}
           <div class="card-actions" style="justify-content:flex-end"><button class="mini-add" data-add-product="${p.id}" data-preferred-store="${currentMarket}">＋</button></div>
         </div>
       </article>`;
@@ -1478,9 +1637,10 @@
     resultEl.innerHTML = "";
 
     try {
-      const results = await window.MPreisLive.search(q, 20);
+      const page = await window.MPreisLive.browse({ query: q, offset: 0, limit: 60 });
+      const results = page.items;
       stateEl.textContent = results.length
-        ? `${results.length} Treffer – passenden Artikel antippen`
+        ? `${page.total.toLocaleString("de-AT")} Treffer · ${results.length} angezeigt – passenden Artikel antippen`
         : "Keine passenden MPREIS-Produkte gefunden.";
 
       resultEl.innerHTML = results.map((item, index) => `
@@ -1519,6 +1679,17 @@
     return `${String(amount).replace(".", ",")} ${unit}`;
   }
 
+  function livePackageFields(liveItem) {
+    const rawAmount = Array.isArray(liveItem?.amount) ? null : Number(liveItem?.amount);
+    const known = Number.isFinite(rawAmount) && rawAmount > 0 && Boolean(liveItem?.unit);
+    return {
+      packageAmount: known ? rawAmount : null,
+      packageUnit: known ? normalizeMeasureUnit(liveItem.unit) : null,
+      packageAmountKnown: known,
+      packageLabel: known ? formatLiveAmount({ amount: rawAmount, unit: normalizeMeasureUnit(liveItem.unit) }) : null
+    };
+  }
+
   function linkMpreisResult(productId, liveItem) {
     const product = productById(productId);
     if (!product || !liveItem) return;
@@ -1528,6 +1699,8 @@
       remoteObjectId: liveItem.remoteObjectId,
       retailerProductId: liveItem.retailerProductId,
       name: liveItem.name,
+      amount: Array.isArray(liveItem.amount) ? null : (Number(liveItem.amount) || null),
+      unit: liveItem.unit || null,
       linkedAt: new Date().toISOString()
     };
 
@@ -1586,6 +1759,7 @@
     Object.assign(offer, {
       retailerProductId: liveItem.retailerProductId,
       remoteObjectId: liveItem.remoteObjectId,
+      ...livePackageFields(liveItem),
       regularPrice: liveItem.regularPrice ?? liveItem.currentPrice,
       salePrice: liveItem.salePrice ?? null,
       unitPrice: liveItem.unitPrice,
@@ -1887,9 +2061,10 @@
     resultEl.innerHTML = "";
 
     try {
-      const results = await window.SparLive.search(q, 20);
+      const page = await window.SparLive.browse({ query: q, offset: 0, limit: 60 });
+      const results = page.items;
       stateEl.textContent = results.length
-        ? `${results.length} Treffer – passenden Artikel antippen`
+        ? `${page.total.toLocaleString("de-AT")} Treffer · ${results.length} angezeigt – passenden Artikel antippen`
         : "Keine passenden SPAR-Produkte gefunden.";
 
       resultEl.innerHTML = results.map((item, index) => `
@@ -1931,6 +2106,8 @@
       remoteObjectId: liveItem.remoteObjectId,
       retailerProductId: liveItem.retailerProductId,
       name: liveItem.name,
+      amount: Array.isArray(liveItem.amount) ? null : (Number(liveItem.amount) || null),
+      unit: liveItem.unit || null,
       linkedAt: new Date().toISOString()
     };
 
@@ -1989,6 +2166,7 @@
     Object.assign(offer, {
       retailerProductId: liveItem.retailerProductId,
       remoteObjectId: liveItem.remoteObjectId,
+      ...livePackageFields(liveItem),
       regularPrice: liveItem.regularPrice ?? liveItem.currentPrice,
       salePrice: liveItem.salePrice ?? null,
       unitPrice: liveItem.unitPrice,
@@ -2321,10 +2499,11 @@
     resultEl.innerHTML = "";
 
     try {
-      const results = await window.TgLive.search(q, 20);
+      const page = await window.TgLive.browse({ query: q, offset: 0, limit: 60 });
+      const results = page.items;
 
       stateEl.textContent = results.length
-        ? `${results.length} aktuelle Treffer – passenden Aktionsartikel antippen`
+        ? `${page.total.toLocaleString("de-AT")} Treffer · ${results.length} angezeigt – passenden Aktionsartikel antippen`
         : "Keine passende aktuell bepreiste T&G-Aktion gefunden.";
 
       resultEl.innerHTML = results.map((item, index) => `
@@ -2362,6 +2541,8 @@
       remoteObjectId: liveItem.remoteObjectId,
       retailerProductId: liveItem.retailerProductId,
       name: liveItem.name,
+      amount: Array.isArray(liveItem.amount) ? null : (Number(liveItem.amount) || null),
+      unit: liveItem.unit || null,
       linkedAt: new Date().toISOString()
     };
 
@@ -2422,6 +2603,7 @@
     Object.assign(offer, {
       retailerProductId: liveItem.retailerProductId,
       remoteObjectId: liveItem.remoteObjectId,
+      ...livePackageFields(liveItem),
       regularPrice: liveItem.regularPrice ?? null,
       salePrice: liveItem.salePrice ?? null,
       unitPrice: liveItem.unitPrice,
@@ -2604,39 +2786,56 @@
     if (!p) return;
 
     $("#detailTitle").textContent = p.name;
-    const offers = validOffers(p).map(normalizedOffer).sort((a,b) => offerPrice(a) - offerPrice(b));
+    const offerRows = validOffers(p).map(normalizedOffer).map(offer => ({
+      offer,
+      pricing: offerPricingForTarget(p, offer, 1)
+    })).sort((a,b) => {
+      if (a.pricing && !b.pricing) return -1;
+      if (!a.pricing && b.pricing) return 1;
+      if (!a.pricing && !b.pricing) return offerPrice(a.offer) - offerPrice(b.offer);
+      return a.pricing.lineTotal - b.pricing.lineTotal;
+    });
+    const comparableRows = offerRows.filter(row => row.pricing);
     const history = productHistory(p);
     const stats = productPriceStats(p);
 
     $("#productDetailContent").innerHTML = `
-      <div class="product-meta" style="margin-bottom:8px">${escapeHtml(p.brand || "")} · ${fmtAmount(p)} · ${escapeHtml(p.category)}</div>
+      <div class="product-meta" style="margin-bottom:6px">${escapeHtml(p.brand || "")} · ${escapeHtml(p.category)}</div>
+      <button class="comparison-amount-btn detail-comparison-btn" data-edit-comparison="${p.id}" type="button">
+        Vergleichsmenge: <strong>${fmtAmount(p)}</strong> ✎
+      </button>
 
       ${stats ? `<div class="price-stat-grid">
         <div class="price-stat"><span>Tiefst</span><strong>${money(stats.min)}</strong></div>
         <div class="price-stat"><span>Ø Verlauf</span><strong>${money(stats.avg)}</strong></div>
         <div class="price-stat"><span>Höchst</span><strong>${money(stats.max)}</strong></div>
-      </div>` : ""}
+      </div><div class="muted small comparison-stat-note">Preisverlauf auf ${fmtAmount(p)} normiert</div>` : ""}
 
       <div>
-        ${offers.length ? offers.map((o, idx) => {
+        ${offerRows.length ? offerRows.map((row) => {
+          const o = row.offer;
+          const pricing = row.pricing;
           const r = retailer(o.store);
           const fresh = freshnessInfo(o);
           const condition = offerConditionLabel(o);
+          const cheapest = pricing && comparableRows[0]?.offer === o;
 
-          return `<div class="detail-offer">
+          return `<div class="detail-offer ${pricing ? "" : "not-comparable"}">
             <div>
-              <div class="market-label"><span class="market-dot" style="background:${r.color}"></span>${r.name}${idx === 0 ? " · günstigster Preis" : ""}</div>
-              <div class="product-meta">${o.unitPrice ? `${money(o.unitPrice)}/${o.unitPriceUnit}` : ""}${o.validUntil ? ` · gültig bis ${formatDate(o.validUntil)}` : ""}</div>
+              <div class="market-label"><span class="market-dot" style="background:${r.color}"></span>${r.name}${cheapest ? " · günstigster Vergleich" : ""}</div>
+              <div class="product-meta">Gebinde: ${escapeHtml(offerPackageLabel(p, o))}${o.unitPrice ? ` · ${money(o.unitPrice)}/${escapeHtml(o.unitPriceUnit || "")}` : ""}</div>
+              ${pricing ? `<div class="product-meta comparison-package-meta">${escapeHtml(pricingPackageSummary(p, o, pricing))}</div>` : `<div class="product-meta comparison-incompatible">Nicht mit ${fmtAmount(p)} vergleichbar – Gebindeangabe fehlt oder Einheit passt nicht.</div>`}
               <div class="offer-extra">
-                ${o.salePrice != null ? `<span class="offer-badge">Aktion</span>` : ""}
+                ${o.salePrice != null && pricing?.activeSale ? `<span class="offer-badge">Aktion</span>` : ""}
                 ${condition ? `<span class="offer-badge condition">${escapeHtml(condition)}</span>` : ""}
                 <span class="freshness-badge ${fresh.current ? "current" : ""}">${escapeHtml(fresh.label)}</span>
               </div>
               <div class="offer-source">Quelle: ${escapeHtml(o.source || "unbekannt")} · Abruf ${escapeHtml((o.retrievedAt || o.updatedAt || "").replace("T", " ").slice(0,16))}</div>
             </div>
             <div>
-              <div class="price ${o.salePrice != null ? "sale" : ""}">${money(offerPrice(o))}</div>
-              ${o.salePrice != null ? `<div class="old-price">${money(o.regularPrice)}</div>` : ""}
+              <div class="price ${pricing?.activeSale ? "sale" : ""}">${pricing ? money(pricing.lineTotal) : money(offerPrice(o))}</div>
+              <div class="product-meta comparison-price-label">${pricing ? `für ${fmtAmount(p)}` : "Gebindepreis"}</div>
+              ${pricing?.effectiveBaseUnitPrice ? `<div class="product-meta">${money(pricing.effectiveBaseUnitPrice)}/${pricing.baseUnit}</div>` : ""}
             </div>
           </div>`;
         }).join("") : `<div class="empty-state"><p>Für diesen Artikel sind noch keine Preise hinterlegt.</p></div>`}
@@ -2648,9 +2847,9 @@
           <div class="history-list">
             ${history.slice(0,18).map(h => `
               <div class="history-row">
-                <div class="history-market"><span class="market-dot" style="background:${retailer(h.store).color}"></span><strong>${retailer(h.store).name}</strong></div>
+                <div class="history-market"><span class="market-dot" style="background:${retailer(h.store).color}"></span><strong>${retailer(h.store).name}</strong><small>${escapeHtml(h.packageLabel || "")}</small></div>
                 <span class="history-date">${formatDate(h.date)}</span>
-                <strong>${money(h.price)}</strong>
+                <strong>${h.normalizedPrice != null ? money(h.normalizedPrice) : money(h.price)}</strong>
               </div>`).join("")}
           </div>
         </details>` : ""}
@@ -2768,6 +2967,10 @@
       product.offers.push({
         retailerProductId: `${formData.store}_${id}`,
         store: formData.store,
+        packageAmount: product.amount,
+        packageUnit: product.unit,
+        packageAmountKnown: true,
+        packageLabel: fmtAmount(product),
         regularPrice: Number(formData.regularPrice),
         salePrice: formData.salePrice ? Number(formData.salePrice) : null,
         unitPrice: unitPrice.value,
@@ -2797,6 +3000,67 @@
     state.products = state.products.filter(p => p.id !== productId);
     state.shopping = state.shopping.filter(i => i.productId !== productId);
     saveState(); renderAll(); showToast("Artikel gelöscht");
+  }
+
+  function openComparisonAmount(productId) {
+    const product = productById(productId);
+    if (!product) return;
+
+    currentComparisonProductId = productId;
+    $("#comparisonProductId").value = productId;
+    $("#comparisonAmountTitle").textContent = product.name;
+    $("#comparisonAmount").value = Number(product.amount);
+    $("#comparisonUnit").value = normalizeMeasureUnit(product.unit) || "Stk";
+    renderComparisonPreview();
+    openSheet("comparisonAmountSheet");
+  }
+
+  function renderComparisonPreview() {
+    const product = productById(currentComparisonProductId);
+    const preview = $("#comparisonPreview");
+    if (!product || !preview) return;
+
+    const amount = Number($("#comparisonAmount")?.value);
+    const unit = $("#comparisonUnit")?.value;
+    const target = normalizeMeasure(amount, unit);
+    if (!target) {
+      preview.textContent = "Bitte eine gültige Vergleichsmenge eingeben.";
+      return;
+    }
+
+    const draft = { ...product, amount, unit };
+    const rows = validOffers(product).map(normalizedOffer).map(offer => {
+      const pricing = offerPricingForTarget(draft, offer, 1);
+      return pricing ? { offer, pricing } : null;
+    }).filter(Boolean).sort((a,b) => a.pricing.lineTotal - b.pricing.lineTotal);
+
+    if (!rows.length) {
+      preview.innerHTML = `<strong>${escapeHtml(fmtAmount(draft))}</strong><span>Für die vorhandenen Händlerverknüpfungen ist diese Einheit derzeit nicht vergleichbar.</span>`;
+      return;
+    }
+
+    preview.innerHTML = `
+      <strong>${escapeHtml(fmtAmount(draft))}</strong>
+      <span>${rows.length} Markt${rows.length === 1 ? "" : "e"} direkt vergleichbar · günstigster bekannter Einkauf ${money(rows[0].pricing.lineTotal)}</span>`;
+  }
+
+  function saveComparisonAmount() {
+    const product = productById(currentComparisonProductId || $("#comparisonProductId")?.value);
+    if (!product) return;
+
+    const amount = Number($("#comparisonAmount").value);
+    const unit = $("#comparisonUnit").value;
+    if (!Number.isFinite(amount) || amount <= 0 || !normalizeMeasure(amount, unit)) {
+      showToast("Ungültige Vergleichsmenge");
+      return;
+    }
+
+    product.amount = amount;
+    product.unit = unit;
+    saveState();
+    renderAll();
+    closeSheets();
+    showToast(`Vergleichsmenge: ${fmtAmount(product)}`);
   }
 
   function navigate(view) {
@@ -2839,6 +3103,9 @@
 
     const close = e.target.closest('[data-action="close-sheets"]');
     if (close) return closeSheets();
+
+    const editComparison = e.target.closest("[data-edit-comparison]");
+    if (editComparison) return openComparisonAmount(editComparison.dataset.editComparison);
 
     const openProduct = e.target.closest("[data-open-product]");
     if (openProduct) {
@@ -2972,6 +3239,13 @@
   });
 
   $("#sheetBackdrop").addEventListener("click", closeSheets);
+
+  $("#comparisonAmount").addEventListener("input", renderComparisonPreview);
+  $("#comparisonUnit").addEventListener("change", renderComparisonPreview);
+  $("#comparisonAmountForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveComparisonAmount();
+  });
 
   $("#articleSearch").addEventListener("input", renderArticles);
 

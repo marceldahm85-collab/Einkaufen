@@ -37,40 +37,26 @@
     return loadPromise;
   }
 
-  async function search(query, limit = 20) {
+  async function search(query, limit = 60) {
     const q = normalize(query);
     if (!q) return [];
 
     const payload = await load(false);
-    const tokens = q.split(/\s+/).filter(Boolean);
+    const rows = ensureBrowseIndex(payload);
 
-    return payload.products
-      .filter(item => item.salePrice != null)
-      .map(item => {
-        const name = normalize(item.name);
-        const description = normalize(item.description);
-        const hay = `${name} ${description}`;
-        let score = 999;
-
-        if (name === q) score = 0;
-        else if (name.startsWith(q)) score = 1;
-        else if (name.includes(q)) score = 2;
-        else if (tokens.every(t => hay.includes(t))) score = 3;
-        else {
-          const matches = tokens.filter(t => hay.includes(t)).length;
-          if (matches) score = 10 - Math.min(matches, 6);
-        }
-
-        return { item, score, nameLength: name.length };
-      })
-      .filter(x => x.score < 999)
-      .sort((a,b) =>
+    return rows
+      .map(entry => ({ entry, score: searchScore(entry, q) }))
+      .filter(row => row.score < 999)
+      .sort((a, b) =>
         (a.score - b.score) ||
-        (a.nameLength - b.nameLength) ||
-        String(a.item.name).localeCompare(String(b.item.name), "de")
+        (a.entry.name.length - b.entry.name.length) ||
+        a.entry.originalName.localeCompare(b.entry.originalName, "de", {
+          sensitivity: "base",
+          numeric: true
+        })
       )
-      .slice(0, Math.min(40, Math.max(1, Number(limit) || 20)))
-      .map(x => enrich(x.item, payload));
+      .slice(0, Math.min(100, Math.max(1, Number(limit) || 60)))
+      .map(row => enrich(row.entry.item, payload));
   }
 
   async function getObject(id) {
@@ -110,38 +96,49 @@
   function ensureBrowseIndex(payload) {
     if (browseIndex) return browseIndex;
 
-    browseIndex = payload.products
-      .map(item => ({
-        item,
-        name: normalize(item.name),
-        description: normalize(item.description),
-        originalName: String(item.name || "")
-      }))
-      .sort((a, b) =>
-        a.originalName.localeCompare(b.originalName, "de", {
-          sensitivity: "base",
-          numeric: true
-        })
-      );
+    const tools = window.RetailerSearch;
+    browseIndex = tools?.buildIndex
+      ? tools.buildIndex(payload.products)
+      : payload.products.map(item => ({
+          item,
+          name: normalize(item.name),
+          description: normalize(item.description),
+          baseHay: `${normalize(item.name)} ${normalize(item.description)}`,
+          searchHay: `${normalize(item.name)} ${normalize(item.description)}`,
+          originalName: String(item.name || "")
+        }));
+
+    browseIndex.sort((a, b) =>
+      a.originalName.localeCompare(b.originalName, "de", {
+        sensitivity: "base",
+        numeric: true
+      })
+    );
 
     return browseIndex;
   }
 
-  function browseScore(entry, query, tokens) {
-    if (!query) return 0;
+  function searchScore(entry, query) {
+    const tools = window.RetailerSearch;
+    if (tools?.score) return tools.score(entry, query);
 
+    const q = normalize(query);
+    const tokens = q.split(/\s+/).filter(Boolean);
     const name = entry.name;
     const hay = `${entry.name} ${entry.description}`;
 
-    if (name === query) return 0;
-    if (name.startsWith(query)) return 1;
-    if (name.includes(query)) return 2;
+    if (name === q) return 0;
+    if (name.startsWith(q)) return 1;
+    if (name.includes(q)) return 2;
     if (tokens.every(token => hay.includes(token))) return 3;
 
     const matches = tokens.filter(token => hay.includes(token)).length;
-    if (matches) return 10 - Math.min(matches, 6);
+    return matches ? 10 - Math.min(matches, 6) : 999;
+  }
 
-    return 999;
+  function browseScore(entry, query) {
+    if (!query) return 0;
+    return searchScore(entry, query);
   }
 
   async function browse(options = {}) {

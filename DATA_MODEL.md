@@ -84,3 +84,24 @@ ergänzt. Einkaufsliste und selbst angelegte Produkte bleiben dadurch erhalten.
 Die aktuell mitgelieferten Preise und Preisverläufe sind Testdaten. Zwei
 Aktionsbedingungen werden absichtlich als Demo erzeugt, damit die neue Logik bereits
 vor dem echten Internet-Import sichtbar getestet werden kann.
+
+
+## Version 11.2 – Vergleichsmenge und Händlergebinde
+
+`product.amount` + `product.unit` sind die persönliche **Vergleichsmenge**. Sie
+geben nicht mehr implizit die Gebindegröße jedes Händlers vor.
+
+Live-Angebote speichern zusätzlich:
+
+- `packageAmount`
+- `packageUnit`
+- `packageAmountKnown`
+- `packageLabel`
+
+Der Preisvergleich berechnet aus Vergleichsmenge und Händlergebinde die
+notwendige ganzzahlige Anzahl an Händlergebinden. Erst danach werden
+Mengen-/Bundle-Aktionsbedingungen ausgewertet.
+
+Beispiel: persönliche Vergleichsmenge `10 l`; Händler A verkauft `10 l`, Händler
+B `3 l`. Für A wird 1 Gebinde, für B werden 4 Gebinde (= 12 l Kaufmenge)
+berechnet. Verglichen werden die tatsächlichen Einkaufskosten.
