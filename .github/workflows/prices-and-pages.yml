@@ -35,10 +35,15 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Preis- und Mengenlogik prüfen
+      - name: Preis-, Mengen- und Suchlogik prüfen
         run: |
           node --check app.js
+          node --check live-search.js
           node scripts/test_optimizer_quantity.js
+          node scripts/test_package_comparison.js
+          node scripts/test_search_aliases.js
+          node scripts/test_catalog_browse.js
+          node scripts/test_product_edit_preservation.js
           python scripts/test_update_tg_flyer.py
 
       - name: MPREIS-Daten aktualisieren
@@ -169,7 +174,7 @@ jobs:
         run: |
           rm -rf _site
           mkdir -p _site
-          cp index.html styles.css app.js live-mpreis.js live-spar.js live-tg.js manifest.webmanifest sw.js _site/
+          cp index.html styles.css app.js live-search.js live-mpreis.js live-spar.js live-tg.js manifest.webmanifest sw.js _site/
           cp -R assets _site/assets
           cp -R data _site/data
           touch _site/.nojekyll
