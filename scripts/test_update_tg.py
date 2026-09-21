@@ -112,3 +112,23 @@ assert waiting["selectedPeriod"] == "upcoming-waiting-for-viewer"
 assert waiting.get("selectionWarning")
 
 print("T&G current-period rollover OK")
+
+
+# v11.4.2: If both old and new Osttirol hrefs are present, the href matching
+# the current publication's ISO start week must win.
+multi_source = """
+<a href="https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw35/index.html">alt</a>
+<a href="https://brochures.mpreis.at/flugblatt/tundg/osttirol/2026/kw37/index.html">neu</a>
+"""
+multi_lines = [
+    "T&G Flugblatt",
+    "Aktuelle Ausgabe 10.09.–23.09. Kommende Ausgabe 24.09.–07.10.",
+    "Tirol Salzburg Kärnten Osttirol Steiermark",
+]
+multi_meta = mod.extract_flyer_metadata(multi_source, multi_lines)
+assert multi_meta["url"].endswith("/2026/kw37/index.html")
+assert multi_meta["validFrom"] == "2026-09-10"
+assert multi_meta["validUntil"] == "2026-09-23"
+assert multi_meta["discoveredViewerCount"] == 2
+
+print("T&G multi-viewer period matching OK")

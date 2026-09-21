@@ -1341,6 +1341,77 @@ def update_status(
     )
 
 
+def _fresh_viewer_from_official_page(existing_flyer):
+    """Resolve the active Osttirol viewer independently from Spezialaktionen.
+
+    update_tg.py may intentionally preserve old product data when the
+    Spezialaktionen markup is temporarily empty/changed. The flyer rollover
+    must therefore not depend on that product parser succeeding.
+    """
+    try:
+        import update_tg as tg_meta
+
+        source = tg_meta.fetch_text(tg_meta.SOURCE_URL)
+        lines = tg_meta.visible_lines(source)
+        metadata = tg_meta.extract_flyer_metadata(source, lines)
+        metadata = tg_meta.select_active_flyer(metadata)
+
+        url = str(metadata.get("url") or "").strip()
+        if url:
+            return url, metadata, None
+
+        return None, metadata, metadata.get("selectionWarning") or (
+            "Auf tundg.at wurde kein aktuell nutzbarer Osttirol-Viewer erkannt."
+        )
+    except Exception as exc:
+        return None, None, f"Flugblatt-Metadaten konnten nicht frisch ermittelt werden: {exc}"
+
+
+def _period_contains_today(valid_from, valid_until, today=None):
+    today = today or local_today()
+
+    try:
+        start = date.fromisoformat(valid_from) if valid_from else None
+        end = date.fromisoformat(valid_until) if valid_until else None
+    except ValueError:
+        return False
+
+    if start and today < start:
+        return False
+    if end and today > end:
+        return False
+
+    return bool(start or end)
+
+
+def _assert_current_flyer_period(valid_from, valid_until, today=None):
+    today = today or local_today()
+
+    if not valid_from or not valid_until:
+        raise RuntimeError(
+            "Die Gültigkeit des T&G-Flugblatts konnte nicht sicher erkannt werden."
+        )
+
+    try:
+        start = date.fromisoformat(valid_from)
+        end = date.fromisoformat(valid_until)
+    except ValueError as exc:
+        raise RuntimeError(
+            "Ungültiges Gültigkeitsdatum im T&G-Flugblatt."
+        ) from exc
+
+    if today < start:
+        raise RuntimeError(
+            f"Das erkannte T&G-Flugblatt beginnt erst am {start.isoformat()}."
+        )
+
+    if today > end:
+        raise RuntimeError(
+            f"Das erkannte T&G-Flugblatt ist seit {end.isoformat()} abgelaufen."
+        )
+
+
+
 def main():
     if not DATA_PATH.exists():
         raise RuntimeError("data/tg.json fehlt.")
@@ -1359,10 +1430,45 @@ def main():
     previous_flyer_count = int(payload.get("flyerProductCount") or 0)
 
     flyer = payload.get("flyer") or {}
-    viewer_url = str(flyer.get("url") or "").strip()
+    stored_viewer_url = str(flyer.get("url") or "").strip()
+
+    fresh_viewer_url, fresh_metadata, discovery_warning = (
+        _fresh_viewer_from_official_page(flyer)
+    )
+
+    viewer_url = fresh_viewer_url or stored_viewer_url
 
     if not viewer_url:
-        raise RuntimeError("Kein T&G-Osttirol-Flugblatt-Link in data/tg.json.")
+        raise RuntimeError("Kein T&G-Osttirol-Flugblatt-Link verfügbar.")
+
+    if fresh_metadata and fresh_viewer_url:
+        old_pdf_url = flyer.get("pdfUrl")
+        old_page_count = flyer.get("pageCount")
+
+        flyer = {
+            **flyer,
+            **fresh_metadata,
+        }
+
+        if stored_viewer_url and stored_viewer_url != fresh_viewer_url:
+            flyer.pop("pdfUrl", None)
+            flyer.pop("pageCount", None)
+        else:
+            if old_pdf_url:
+                flyer["pdfUrl"] = old_pdf_url
+            if old_page_count:
+                flyer["pageCount"] = old_page_count
+
+        payload["flyer"] = flyer
+
+    if discovery_warning:
+        print(f"WARNUNG: {discovery_warning}", file=sys.stderr)
+
+    if stored_viewer_url != viewer_url:
+        print(f"T&G-Flugblattwechsel erkannt: {stored_viewer_url or '—'}")
+        print(f"Neuer Osttirol-Viewer: {viewer_url}")
+    else:
+        print(f"T&G-Osttirol-Viewer: {viewer_url}")
 
     try:
         pdf_url = download_pdf(viewer_url)
@@ -1378,6 +1484,7 @@ def main():
             page_layouts = [None] * len(page_texts)
 
         valid_from, valid_until = extract_validity(page_texts)
+        _assert_current_flyer_period(valid_from, valid_until)
 
         flyer_products = []
         text_linkable = 0

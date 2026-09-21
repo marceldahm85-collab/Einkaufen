@@ -116,3 +116,40 @@ assert sp["promotion"]["requiredQuantity"] == 2
 assert sp["promotionMatchMethod"] == "pdf-position"
 
 print("Spatial condition assignment OK")
+
+
+# v11.4.2: An expired publication must never be accepted as a successful
+# current flyer import merely because its old FlowPaper URL still works.
+from datetime import date
+
+mod._assert_current_flyer_period(
+    "2026-09-10",
+    "2026-09-23",
+    today=date(2026, 9, 10),
+)
+
+expired_raised = False
+try:
+    mod._assert_current_flyer_period(
+        "2026-08-27",
+        "2026-09-09",
+        today=date(2026, 9, 10),
+    )
+except RuntimeError as exc:
+    expired_raised = "abgelaufen" in str(exc)
+
+assert expired_raised
+
+future_raised = False
+try:
+    mod._assert_current_flyer_period(
+        "2026-09-24",
+        "2026-10-07",
+        today=date(2026, 9, 23),
+    )
+except RuntimeError as exc:
+    future_raised = "beginnt erst" in str(exc)
+
+assert future_raised
+
+print("T&G expired/future flyer guard OK")

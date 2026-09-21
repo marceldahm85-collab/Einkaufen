@@ -461,15 +461,48 @@ def select_active_flyer(flyer, today=None):
     return result
 
 
+def _viewer_period_week(url):
+    match = re.search(
+        r"/(20\d{2})/kw(\d{1,2})/index\.html",
+        str(url or ""),
+        flags=re.I,
+    )
+    if not match:
+        return None
+
+    return int(match.group(1)), int(match.group(2))
+
+
+def _select_period_matching_viewer(urls, start_iso):
+    if not urls:
+        return None
+
+    try:
+        start = date.fromisoformat(start_iso) if start_iso else None
+    except ValueError:
+        start = None
+
+    if start:
+        expected = (start.isocalendar().year, start.isocalendar().week)
+        for url in urls:
+            if _viewer_period_week(url) == expected:
+                return url
+
+    return urls[0]
+
+
 def extract_flyer_metadata(source, lines):
-    flyer_url = None
+    osttirol_urls = []
 
     hrefs = re.findall(r"href\s*=\s*['\"]([^'\"]+)['\"]", source, flags=re.I)
     for href in hrefs:
         decoded = html.unescape(href)
-        if "/flugblatt/tundg/osttirol/" in decoded.casefold():
-            flyer_url = urllib.parse.urljoin(SOURCE_URL, decoded)
-            break
+        if "/flugblatt/tundg/osttirol/" not in decoded.casefold():
+            continue
+
+        url = urllib.parse.urljoin(SOURCE_URL, decoded)
+        if url not in osttirol_urls:
+            osttirol_urls.append(url)
 
     current_text = None
     upcoming_text = None
@@ -501,6 +534,8 @@ def extract_flyer_metadata(source, lines):
             current_text = match.group(1).strip()
             current_start, current_end = resolve_period(current_text)
 
+    flyer_url = _select_period_matching_viewer(osttirol_urls, current_start)
+
     return {
         "region": "Osttirol",
         "url": flyer_url,
@@ -514,6 +549,7 @@ def extract_flyer_metadata(source, lines):
         "upcomingValidFrom": upcoming_start,
         "upcomingValidUntil": upcoming_end,
         "selectedPeriod": "current",
+        "discoveredViewerCount": len(osttirol_urls),
     }
 
 
@@ -586,6 +622,7 @@ def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     updated_at = now_iso()
     previous_payload = load_existing()
+    discovered_flyer = None
 
     try:
         source = fetch_text(SOURCE_URL)
@@ -594,6 +631,7 @@ def main():
         actions, valid_from, valid_until = parse_special_actions(lines)
         flyer = extract_flyer_metadata(source, lines)
         flyer = select_active_flyer(flyer)
+        discovered_flyer = flyer
 
         if len(actions) < MIN_EXPECTED_ACTIONS:
             raise RuntimeError(
@@ -691,6 +729,55 @@ def main():
             existing_actions = int(previous_payload.get("promotionCount") or 0)
 
         if existing_actions >= MIN_EXPECTED_ACTIONS:
+            flyer_metadata_saved = False
+
+            # A failure in the Spezialaktionen parser must never block a flyer
+            # rollover. Keep all previous products untouched, but persist a
+            # freshly discovered active Osttirol viewer if one was resolved.
+            if (
+                isinstance(previous_payload, dict)
+                and isinstance(discovered_flyer, dict)
+                and discovered_flyer.get("url")
+            ):
+                preserved = dict(previous_payload)
+                old_flyer = (
+                    previous_payload.get("flyer")
+                    if isinstance(previous_payload.get("flyer"), dict)
+                    else {}
+                )
+
+                merged_flyer = {
+                    **old_flyer,
+                    **discovered_flyer,
+                }
+
+                # PDF/page metadata belongs to the OLD publication and must
+                # not survive when the viewer URL changes.
+                if (
+                    old_flyer.get("url")
+                    and merged_flyer.get("url")
+                    and old_flyer.get("url") != merged_flyer.get("url")
+                ):
+                    merged_flyer.pop("pdfUrl", None)
+                    merged_flyer.pop("pageCount", None)
+
+                preserved["flyer"] = merged_flyer
+                preserved["flyerMetadataUpdatedAt"] = updated_at
+                preserved["specialActionsStale"] = True
+                preserved["specialActionsLastError"] = str(exc)
+
+                temp = OUT.with_suffix(".json.tmp")
+                temp.write_text(
+                    json.dumps(
+                        preserved,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ) + "\n",
+                    encoding="utf-8",
+                )
+                temp.replace(OUT)
+                flyer_metadata_saved = True
+
             write_status(
                 "stale",
                 updated_at,
@@ -700,10 +787,18 @@ def main():
                 stale=True,
             )
             print(
-                f"WARNUNG: T&G konnte nicht aktualisiert werden. "
-                f"Vorhandene {existing_actions} Einträge bleiben als letzter Datenstand erhalten. Fehler: {exc}",
+                f"WARNUNG: T&G-Spezialaktionen konnten nicht aktualisiert werden. "
+                f"Vorhandene {existing_actions} Einträge bleiben als letzter Datenstand erhalten. "
+                f"Fehler: {exc}",
                 file=sys.stderr,
             )
+
+            if flyer_metadata_saved:
+                print(
+                    "T&G-Flugblatt-Metadaten wurden trotzdem aktualisiert: "
+                    f"{discovered_flyer.get('url')}",
+                )
+
             return 0
 
         write_status(
