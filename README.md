@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 11.4
+# PreisPilot Osttirol – Version 11.4.2
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -846,3 +846,30 @@ Pages-Deployment fehlen.
 Der Workflow kopiert jetzt zusätzlich `live-search.js` nach `_site` und prüft
 die Such-, Katalog- und Gebindelogik vor dem Deployment.
 \n\n## Version 11.4 – Aktionslogik vollständig abgesichert\n\nDiese Version korrigiert die Aktionsberechnung in Einkaufsliste und Optimierer.\n\n### T&G 1+1 / Mehrfachgebinde\n\nEin verknüpftes Händlergebinde wird zuerst in die persönliche Vergleichsmenge\numgerechnet. Anschließend werden alle sinnvollen kaufbaren Paketmengen geprüft.\nDamit kann der Optimierer eine zusätzliche Packung/Kiste bewusst mitnehmen,\nwenn dadurch eine Aktion greift und der reale Kassenbetrag gleich hoch oder\nniedriger ist.\n\nBeispiel für eine aktive 1+1-Aktion:\n- Normalpreis pro 10-l-Kiste: 29,80 EUR\n- 1+1-Aktionspreis je Kiste: 14,90 EUR\n- 2 Kisten kosten zusammen 29,80 EUR, nicht 59,60 EUR.\n- Wird nur eine 10-l-Vergleichsmenge benötigt, darf die App trotzdem zwei\n  Kisten wählen, wenn die zweite gratis ist und der Kassenbetrag dadurch nicht\n  steigt.\n\n### Geprüfte Aktionstypen\n\n- normaler Aktions-/Preisreduktionspreis\n- Prozentaktion mit konkretem Aktionspreis\n- Mengenpreis `ab N Stück`\n- Bundles `1+1`, `2+1`, `4+2`, `12+12` und allgemeine N+M-Strukturen\n- Restmengen bei Bundles zum Normalpreis, sofern dieser bekannt ist\n- App-/Treuebedingungen bleiben am Preis sichtbar\n- Aktionen ohne sicheren Fixpreis bleiben vom Optimierer ausgeschlossen\n\n### Gültigkeitsdaten\n\nAktionspreise werden nur noch verwendet, wenn sie am lokalen Kalendertag in\nÖsterreich gültig sind. Zukünftige und abgelaufene Aktionen werden vollständig\naus der Aktionsdarstellung und aus der Preisberechnung entfernt. Dadurch kann\nnicht mehr `1+1 gratis` angezeigt werden, während im Hintergrund bereits der\nNormalpreis gerechnet wird.\n\nWenn ein MPREIS- oder SPAR-Aktionsimport als `promotionStale` markiert ist,\nwerden die alten Aktionspreise vorsorglich nicht mehr verwendet. Die normalen\nProduktpreise bleiben verfügbar.\n\n### T&G-Ausgabenwechsel\n\nDie offizielle T&G-Seite kann am ersten Gültigkeitstag noch die abgelaufene\nAusgabe als `Aktuelle Ausgabe` und die bereits begonnene Ausgabe als `Kommende\nAusgabe` anzeigen. Der Importer erkennt diesen Datumswechsel nun selbst, leitet\nden offiziellen Osttirol-Viewer aus der neuen Periode ab und prüft ihn vor der\nVerwendung. Ist der neue Viewer noch nicht erreichbar, werden alte Aktionen\nnicht als aktuell ausgegeben.\n\n### Integritätsprüfung\n\nVor jedem Pages-Deployment prüft `scripts/check_action_integrity.py` alle drei\nöffentlichen Datensätze auf ungültige Preise, Datumsintervalle, Mengenaktionen,\nBundle-Mengen und unsichere Optimierer-Freigaben.\n
+
+## Version 11.4.2 – T&G-Flugblattwechsel entkoppelt
+
+Der GitHub-Lauf vom 10.09.2026 hat einen konkreten Rollover-Fehler gezeigt:
+
+- der Parser der T&G-Spezialaktionen lieferte 0 Einträge,
+- die vorhandenen Daten wurden korrekt geschützt und nicht überschrieben,
+- dadurch wurde aber auch eine bereits ermittelte neue Flyer-URL nicht
+  gespeichert,
+- `update_tg_flyer.py` las anschließend wieder den alten Viewer aus
+  `data/tg.json` und importierte erneut die Ausgabe 27.08.–09.09.
+
+v11.4.2 trennt diese beiden Datenquellen vollständig:
+
+1. Ein Fehler/Leerstand bei Spezialaktionen darf den Flugblattwechsel nicht
+   mehr blockieren.
+2. Frisch gefundene Flyer-Metadaten werden auch bei konserviertem
+   Spezialaktionsbestand gespeichert.
+3. Der Flugblattimport fragt die offizielle T&G-Seite zusätzlich selbst ab und
+   ist nicht mehr ausschließlich auf den zuvor gespeicherten Viewer angewiesen.
+4. Wenn mehrere Osttirol-Viewer im HTML vorkommen, wird der Viewer gewählt,
+   dessen Kalenderwoche zum Beginn der aktuellen Ausgabe passt.
+5. Eine PDF, deren erkannter Gültigkeitszeitraum bereits abgelaufen oder noch
+   nicht begonnen hat, darf nicht mehr als erfolgreicher aktueller Import
+   gespeichert werden.
+
+Der non-fast-forward Push-Fix aus v11.4.1 bleibt vollständig enthalten.
