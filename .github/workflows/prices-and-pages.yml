@@ -119,7 +119,9 @@ jobs:
           data = json.loads(path.read_text(encoding="utf-8"))
           count = int(data.get("promotionCount") or 0)
 
-          print(f"T&G-Aktionen in data/tg.json: {count}")
+          stale = bool(data.get("specialActionsStale"))
+          print(f"T&G-Einträge in data/tg.json: {count}")
+          print(f"T&G-Spezialaktionen stale: {'ja' if stale else 'nein'}")
 
           if count < 1:
               raise SystemExit(
