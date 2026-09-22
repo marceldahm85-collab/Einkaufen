@@ -78,6 +78,7 @@
             <button data-catalog-store="mpreis" style="--catalog-store:#d50057">MPREIS</button>
             <button data-catalog-store="spar" style="--catalog-store:#00843d">SPAR</button>
             <button data-catalog-store="tg" style="--catalog-store:#ef7d00">T&G</button>
+            <button data-catalog-store="billa" style="--catalog-store:#e30613">BILLA</button>
           </div>
 
           <div class="search-wrap catalog-search-wrap">
@@ -150,7 +151,7 @@
           <div class="auto-match-toolbar">
             <div>
               <strong>Automatische Produktzuordnung</strong>
-              <div class="muted small">MPREIS, SPAR und T&G werden automatisch durchsucht.</div>
+              <div class="muted small">MPREIS, SPAR, T&G und BILLA werden automatisch durchsucht.</div>
             </div>
             <button class="secondary-btn" id="refreshAutoMatchesBtn" type="button">Neu suchen</button>
           </div>
@@ -262,6 +263,28 @@
 
           <p class="muted small live-note">
             T&G wird aus den offiziellen Spezialaktionen und dem regionalen Osttirol-Flugblatt ergänzt. Der Flugblatt-Link wird automatisch mit dem aktuellen Import aktualisiert.
+          </p>
+        </div>
+
+        <div class="settings-card billa-live-card">
+          <div class="section-head compact">
+            <div>
+              <div class="eyebrow">GITHUB-PREISDATEN</div>
+              <h2>BILLA</h2>
+            </div>
+            <span class="status-badge" id="billaLiveStatus">Bereit</span>
+          </div>
+
+          <div class="live-sync-summary">
+            <div>
+              <strong id="billaLinkedCount">0 Artikel verknüpft</strong>
+              <div class="muted small" id="billaLastSync">Datenstand wird geladen …</div>
+            </div>
+            <button class="secondary-btn" id="syncBillaBtn">Neu laden</button>
+          </div>
+
+          <p class="muted small live-note">
+            BILLA-Grundpreise und Preisverläufe werden aus dem öffentlichen Heisse-Preise-Datensatz aktualisiert. Der BILLA-Bestand ist bereits in Händlerkatalog, automatischer Zuordnung und Optimierer verfügbar. Der offizielle BILLA-Aktionsimport wird separat ergänzt.
           </p>
         </div>
 
@@ -507,6 +530,7 @@
       <button class="chip" data-auto-match-store="mpreis">MPREIS</button>
       <button class="chip" data-auto-match-store="spar">SPAR</button>
       <button class="chip" data-auto-match-store="tg">T&G</button>
+      <button class="chip" data-auto-match-store="billa">BILLA</button>
     </div>
 
     <div class="auto-match-sort-block">
@@ -739,6 +763,7 @@
   <script src="live-mpreis.js"></script>
   <script src="live-spar.js"></script>
   <script src="live-tg.js"></script>
+  <script src="live-billa.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

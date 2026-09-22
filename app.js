@@ -31,7 +31,8 @@
     live: {
       mpreis: { enabled: true, lastSync: null, lastError: null },
       spar: { enabled: true, lastSync: null, lastError: null },
-      tg: { enabled: true, lastSync: null, lastError: null }
+      tg: { enabled: true, lastSync: null, lastError: null },
+      billa: { enabled: true, lastSync: null, lastError: null }
     },
     shopping: [
       { id: "s1", productId: "p_milk", quantity: 2, checked: false, preferredStore: "auto", addedAt: 1 },
@@ -119,8 +120,8 @@
   let catalogLoading = false;
   let selectedCatalogItem = null;
   const CATALOG_PAGE_SIZE = 50;
-  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg"];
-  const AUTO_MATCH_ENGINE_VERSION = 2;
+  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa"];
+  const AUTO_MATCH_ENGINE_VERSION = 3;
   const AUTO_MATCH_LIMIT_PER_STORE = 40;
   const AUTO_MATCH_SEARCH_LIMIT = 400;
   const AUTO_MATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -142,6 +143,7 @@
   let mpreisPublicStatus = null;
   let sparPublicStatus = null;
   let tgPublicStatus = null;
+  let billaPublicStatus = null;
 
   const $ = (sel, root=document) => root.querySelector(sel);
   const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
@@ -174,6 +176,10 @@
         tg: {
           ...initialState.live.tg,
           ...(input.live?.tg || {})
+        },
+        billa: {
+          ...initialState.live.billa,
+          ...(input.live?.billa || {})
         }
       },
       shopping: Array.isArray(input.shopping) ? input.shopping : [],
@@ -657,6 +663,7 @@
     if (store === "mpreis") return window.MPreisLive;
     if (store === "spar") return window.SparLive;
     if (store === "tg") return window.TgLive;
+    if (store === "billa") return window.BillaLive;
     return null;
   }
 
@@ -1409,6 +1416,7 @@
     if (store === "mpreis") return window.MPreisLive;
     if (store === "spar") return window.SparLive;
     if (store === "tg") return window.TgLive;
+    if (store === "billa") return window.BillaLive;
     return null;
   }
 
@@ -1430,13 +1438,18 @@
 
     const promoButton = $("#catalogPromotionFilter");
     if (promoButton) {
-      promoButton.classList.toggle("is-active", catalogPromotionsOnly);
-      promoButton.setAttribute("aria-pressed", catalogPromotionsOnly ? "true" : "false");
+      const promotionsSupported = currentCatalogRetailer !== "billa";
+      if (!promotionsSupported) catalogPromotionsOnly = false;
+      promoButton.disabled = !promotionsSupported;
+      promoButton.textContent = promotionsSupported ? "🔥 Aktionen" : "🔥 Aktionen folgen";
+      promoButton.classList.toggle("is-active", promotionsSupported && catalogPromotionsOnly);
+      promoButton.setAttribute("aria-pressed", promotionsSupported && catalogPromotionsOnly ? "true" : "false");
+      promoButton.title = promotionsSupported ? "" : "BILLA-Aktionsimport folgt im nächsten Schritt.";
     }
   }
 
   function setCatalogRetailer(store) {
-    if (!["mpreis", "spar", "tg"].includes(store)) return;
+    if (!["mpreis", "spar", "tg", "billa"].includes(store)) return;
     if (currentCatalogRetailer === store) return;
 
     currentCatalogRetailer = store;
@@ -1794,6 +1807,7 @@
     if (store === "mpreis") linkMpreisResult(productId, item);
     else if (store === "spar") linkSparResult(productId, item);
     else if (store === "tg") linkTgResult(productId, item);
+    else if (store === "billa") linkBillaResult(productId, item);
     else return;
 
     selectedCatalogItem = null;
@@ -1837,6 +1851,7 @@
     if (store === "mpreis") linkMpreisResult(product.id, item);
     else if (store === "spar") linkSparResult(product.id, item);
     else if (store === "tg") linkTgResult(product.id, item);
+    else if (store === "billa") linkBillaResult(product.id, item);
 
     selectedCatalogItem = null;
     showToast("Persönlicher Artikel übernommen und verknüpft");
@@ -3379,6 +3394,243 @@
     return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
   }
 
+
+  function renderBillaLiveStatus() {
+    const live = state.live?.billa || {};
+    const linked = state.products.filter(p => p.liveLinks?.billa).length;
+    const autoLinked = state.products.filter(p => Array.isArray(p.autoMatches?.stores?.billa) && p.autoMatches.stores.billa.length).length;
+
+    const linkedEl = $("#billaLinkedCount");
+    const lastEl = $("#billaLastSync");
+    const statusEl = $("#billaLiveStatus");
+    if (!linkedEl || !lastEl || !statusEl) return;
+
+    linkedEl.textContent = autoLinked
+      ? `${autoLinked} Artikel automatisch${linked ? ` · ${linked} manuell` : ""}`
+      : `${linked} Artikel manuell verknüpft`;
+    statusEl.className = "status-badge";
+
+    if (live.lastError) {
+      statusEl.textContent = "Fehler";
+      statusEl.classList.add("live-error");
+    } else if (billaPublicStatus?.updatedAt) {
+      statusEl.textContent = "Aktuell";
+      statusEl.classList.add("live-ok");
+    } else {
+      statusEl.textContent = "Bereit";
+    }
+
+    if (billaPublicStatus?.updatedAt) {
+      const date = new Date(billaPublicStatus.updatedAt);
+      lastEl.textContent = `GitHub-Datenstand: ${date.toLocaleString("de-AT", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+      })} · ${billaPublicStatus.productCount || 0} Produkte`;
+    } else {
+      lastEl.textContent = "Noch keine importierten BILLA-Daten vorhanden";
+    }
+  }
+
+  async function refreshBillaPublicStatus(force = false) {
+    try {
+      if (!window.BillaLive?.status) throw new Error("BILLA-Datenmodul fehlt");
+      billaPublicStatus = await window.BillaLive.status(force);
+      state.live.billa.lastError = null;
+    } catch (error) {
+      billaPublicStatus = null;
+      state.live.billa.lastError = error.message;
+    }
+    saveState();
+    renderBillaLiveStatus();
+  }
+
+  function linkBillaResult(productId, liveItem) {
+    const product = productById(productId);
+    if (!product || !liveItem) return;
+
+    product.liveLinks = product.liveLinks || {};
+    product.liveLinks.billa = {
+      remoteObjectId: liveItem.remoteObjectId,
+      retailerProductId: liveItem.retailerProductId,
+      name: liveItem.name,
+      amount: Array.isArray(liveItem.amount) ? null : (Number(liveItem.amount) || null),
+      unit: liveItem.unit || null,
+      linkedAt: new Date().toISOString()
+    };
+
+    applyBillaLivePrice(product, liveItem);
+    state.live.billa.lastSync = new Date().toISOString();
+    state.live.billa.lastError = null;
+
+    saveState();
+    renderAll();
+    showToast("BILLA-Produkt verknüpft");
+    closeSheets();
+  }
+
+  function applyBillaLivePrice(product, liveItem) {
+    const now = liveItem.retrievedAt || new Date().toISOString();
+    const date = now.slice(0,10);
+    let offer = (product.offers || []).find(o => o.store === "billa");
+
+    if (!offer) {
+      offer = { store: "billa", history: [] };
+      product.offers = product.offers || [];
+      product.offers.push(offer);
+    }
+
+    const historyMap = new Map();
+    (Array.isArray(offer.history) ? offer.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) {
+        historyMap.set(h.date, { date: h.date, price: Number(h.price) });
+      }
+    });
+    (Array.isArray(liveItem.history) ? liveItem.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) {
+        historyMap.set(h.date, { date: h.date, price: Number(h.price) });
+      }
+    });
+
+    const currentPrice = liveItem.currentPrice ?? liveItem.displayPrice ?? liveItem.regularPrice ?? liveItem.salePrice;
+    if (Number.isFinite(Number(currentPrice))) {
+      historyMap.set(date, { date, price: Number(currentPrice) });
+    }
+
+    const history = [...historyMap.values()]
+      .sort((a,b) => b.date.localeCompare(a.date))
+      .slice(0, 250);
+
+    Object.assign(offer, {
+      retailerProductId: liveItem.retailerProductId,
+      remoteObjectId: liveItem.remoteObjectId,
+      ...livePackageFields(liveItem),
+      regularPrice: liveItem.regularPrice ?? liveItem.currentPrice,
+      salePrice: liveItem.salePrice ?? null,
+      unitPrice: liveItem.unitPrice,
+      unitPriceUnit: liveItem.unitPriceUnit,
+      validFrom: liveItem.validFrom ?? null,
+      validUntil: liveItem.validUntil ?? null,
+      updatedAt: date,
+      source: liveItem.promotionVerified ? "billa.at" : (liveItem.source || "heisse-preise.io (BILLA)"),
+      retrievedAt: now,
+      promotion: liveItem.promotion ?? null,
+      promotionVerified: Boolean(liveItem.promotionVerified),
+      history
+    });
+  }
+
+  async function syncLinkedBilla({ silent = false } = {}) {
+    const linkedProducts = state.products.filter(p => p.liveLinks?.billa);
+
+    if (!linkedProducts.length) {
+      if (!silent) showToast("Noch keine BILLA-Produkte manuell verknüpft");
+      return;
+    }
+
+    if (!window.BillaLive) {
+      state.live.billa.lastError = "Live-Modul fehlt";
+      saveState();
+      renderBillaLiveStatus();
+      if (!silent) showToast("BILLA-Datenmodul fehlt");
+      return;
+    }
+
+    const button = $("#syncBillaBtn");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Lädt …";
+    }
+
+    let updated = 0;
+    const errors = [];
+
+    for (let i = 0; i < linkedProducts.length; i += 4) {
+      const batch = linkedProducts.slice(i, i + 4);
+      const results = await Promise.allSettled(batch.map(async product => {
+        const link = product.liveLinks.billa;
+        let item;
+        try {
+          item = await window.BillaLive.getObject(link.remoteObjectId || link.retailerProductId);
+        } catch {
+          const candidates = await window.BillaLive.search(link.name || product.name, 10);
+          item = candidates.find(c =>
+            c.remoteObjectId === link.remoteObjectId ||
+            c.retailerProductId === link.retailerProductId
+          );
+          if (!item) throw new Error(`${product.name}: Produkt nicht mehr gefunden`);
+        }
+
+        applyBillaLivePrice(product, item);
+        product.liveLinks.billa = {
+          ...product.liveLinks.billa,
+          remoteObjectId: item.remoteObjectId,
+          retailerProductId: item.retailerProductId,
+          name: item.name
+        };
+      }));
+
+      results.forEach(result => {
+        if (result.status === "fulfilled") updated += 1;
+        else errors.push(String(result.reason?.message || result.reason || "Unbekannter Fehler"));
+      });
+    }
+
+    state.live.billa.lastSync = new Date().toISOString();
+    state.live.billa.lastError = errors.length ? errors.join(" | ") : null;
+    saveState();
+    renderAll();
+
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Neu laden";
+    }
+
+    if (!silent) {
+      showToast(errors.length
+        ? `${updated} aktualisiert · ${errors.length} Fehler`
+        : `${updated} BILLA-Preise aktualisiert`
+      );
+    }
+  }
+
+  async function reloadAndSyncBilla() {
+    const button = $("#syncBillaBtn");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Lädt …";
+    }
+
+    try {
+      if (!window.BillaLive?.reload) throw new Error("BILLA-Datenmodul fehlt");
+      billaPublicStatus = await window.BillaLive.reload();
+      state.live.billa.lastError = null;
+      saveState();
+      renderBillaLiveStatus();
+      await syncLinkedBilla({ silent: true });
+      await refreshAllAutoMatches({ force: true, silent: true });
+      showToast("BILLA-Daten und Auto-Treffer aktualisiert");
+    } catch (error) {
+      state.live.billa.lastError = error.message;
+      saveState();
+      renderBillaLiveStatus();
+      showToast("BILLA-Daten konnten nicht neu geladen werden");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Neu laden";
+      }
+    }
+  }
+
+  function shouldAutoSyncBilla() {
+    const linked = state.products.some(p => p.liveLinks?.billa);
+    if (!linked || !navigator.onLine) return false;
+
+    const last = state.live?.billa?.lastSync;
+    if (!last) return true;
+    return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
+  }
+
   function openOfficialFlyer(store) {
     const url = OFFICIAL_FLYER_URLS[store];
 
@@ -3439,6 +3691,7 @@
         <span><i style="background:${retailer("mpreis").color}"></i>MPREIS ${counts.mpreis || 0}</span>
         <span><i style="background:${retailer("spar").color}"></i>SPAR ${counts.spar || 0}</span>
         <span><i style="background:${retailer("tg").color}"></i>T&G ${counts.tg || 0}</span>
+        <span><i style="background:${retailer("billa").color}"></i>BILLA ${counts.billa || 0}</span>
       </div>
       ${fixed ? `<div class="auto-fixed-note">Fest gewählt: <strong>${escapeHtml(fixed.name)}</strong> · ${retailer(fixed.store).name}</div>` : ""}
     `;
@@ -3643,6 +3896,7 @@
             <span>MPREIS ${counts.mpreis || 0}</span>
             <span>SPAR ${counts.spar || 0}</span>
             <span>T&G ${counts.tg || 0}</span>
+            <span>BILLA ${counts.billa || 0}</span>
           </div>
           <div class="muted small">${total} passende Kandidaten · ${autoState}</div>
         </div>
@@ -3671,6 +3925,7 @@
     renderMpreisLiveStatus();
     renderSparLiveStatus();
     renderTgLiveStatus();
+    renderBillaLiveStatus();
 
     $$("#themeSegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.themeValue === state.settings.theme));
     $$("#shoppingStrategySegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.strategyValue === state.settings.shoppingStrategy));
@@ -4372,6 +4627,7 @@
   $("#syncMpreisBtn").addEventListener("click", reloadAndSyncMpreis);
   $("#syncSparBtn").addEventListener("click", reloadAndSyncSpar);
   $("#syncTgBtn").addEventListener("click", reloadAndSyncTg);
+  $("#syncBillaBtn").addEventListener("click", reloadAndSyncBilla);
   $("#shoppingSort").addEventListener("change", (e) => {
     state.settings.shoppingSort = e.target.value;
     saveState(); renderShopping();
@@ -4457,6 +4713,12 @@
   refreshTgPublicStatus().then(() => {
     if (shouldAutoSyncTg()) {
       setTimeout(() => syncLinkedTg({ silent: true }).catch(() => {}), 700);
+    }
+  });
+
+  refreshBillaPublicStatus().then(() => {
+    if (shouldAutoSyncBilla()) {
+      setTimeout(() => syncLinkedBilla({ silent: true }).catch(() => {}), 850);
     }
   });
 

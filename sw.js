@@ -1,4 +1,4 @@
-const CACHE = "preispilot-osttirol-v12-2";
+const CACHE = "preispilot-osttirol-v13-0";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./live-mpreis.js",
   "./live-spar.js",
   "./live-tg.js",
+  "./live-billa.js",
   "./manifest.webmanifest",
   "./assets/icon.svg"
 ];

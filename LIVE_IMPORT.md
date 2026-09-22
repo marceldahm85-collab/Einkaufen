@@ -49,3 +49,24 @@ Fallback akzeptiert.
 
 Die Aktionsstufe darf den Grundpreisimport nicht beschädigen. Bei unsicherer
 Extraktion bleibt die Aktion daher ungesetzt.
+
+
+## BILLA Adapter (Version 13.0)
+
+Dateien:
+- `scripts/update_billa.py`
+- `live-billa.js`
+- `data/billa.json`
+
+Der Grundbestand wird aus `https://heisse-preise.io/data/latest-canonical.json`
+mit `store=billa` übernommen. Produkt-ID, Name, Beschreibung, Menge, Einheit,
+aktueller Preis, Grundpreis, Bio-Kennzeichen und Preisverlauf werden in dasselbe
+öffentliche Schema wie MPREIS/SPAR normalisiert.
+
+BILLA ist damit im Händlerkatalog und in der automatischen Kandidatensuche
+verfügbar. Die persönlichen Matchingprofile und Kandidatenpools bleiben lokal.
+
+Die offizielle BILLA-Aktionsseite ist **noch nicht** als verifizierte
+Aktionsquelle freigeschaltet. Insbesondere `ab N`, `N+M`, jö-/Treuebedingungen
+und Gültigkeitszeiträume werden erst in einer separaten Aktionsstufe verwendet,
+wenn sie strukturiert und eindeutig einem Produkt zugeordnet werden können.

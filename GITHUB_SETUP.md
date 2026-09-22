@@ -12,3 +12,13 @@
 Der Workflow läuft außerdem automatisch alle 6 Stunden.
 
 Persönliche Einkaufsdaten werden dabei nicht verarbeitet oder hochgeladen.
+
+## BILLA ab v13.0
+
+Der Workflow erzeugt zusätzlich `data/billa.json` über `scripts/update_billa.py`.
+`live-billa.js` muss deshalb zusammen mit den übrigen App-Dateien in GitHub liegen
+und wird vom Pages-Schritt nach `_site/` kopiert.
+
+Beim manuellen Komplett-Upload gilt weiterhin: den vorhandenen Ordner `data/`
+nicht überschreiben. Der GitHub-Workflow aktualisiert die öffentlichen Datendateien
+selbst und ergänzt `billa.json` beim nächsten erfolgreichen Lauf.

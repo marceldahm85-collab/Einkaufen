@@ -1709,3 +1709,9 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
     font-size: 8px;
   }
 }
+
+/* v13.0 – Händlerkatalog: noch nicht freigeschaltete Aktionsquelle */
+.catalog-filter-btn:disabled {
+  opacity: .55;
+  cursor: default;
+}

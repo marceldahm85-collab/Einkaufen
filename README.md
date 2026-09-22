@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 12.2
+# PreisPilot Osttirol – Version 13.0
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -1008,3 +1008,35 @@ Kaffee-Joghurt oder Backwaren mit Butter als passende Alternativen eingestuft.
   automatisch ungültig und im Hintergrund neu aufgebaut.
 
 Die vorhandene Gebinde-, Aktions- und Optimiererlogik bleibt unverändert.
+
+
+## Version 13.0 – BILLA-Grundintegration
+
+BILLA ist jetzt als vierter automatisch angebundener Händler neben MPREIS, SPAR
+und T&G integriert.
+
+### Öffentlicher Datenimport
+
+`scripts/update_billa.py` übernimmt den BILLA-Bestand aus dem öffentlichen
+Heisse-Preise-Kanonikaldatensatz und erzeugt `data/billa.json`. Der Import besitzt
+dieselben Schutzmechanismen wie MPREIS/SPAR: unplausibel kleine oder temporär
+nicht erreichbare Datenbestände überschreiben keinen bereits gültigen Bestand.
+
+### App-Anbindung
+
+- `live-billa.js` stellt Suche, Browsing, Produktabruf und Matching bereit.
+- BILLA ist im Händlerkatalog auswählbar.
+- Automatische Produktzuordnung durchsucht jetzt MPREIS, SPAR, T&G und BILLA.
+- BILLA-Kandidaten fließen direkt in Artikelansicht, Einkaufsliste, Märkte und
+  alle drei Optimiererstrategien ein.
+- Die Matching-Engine-Version wurde erhöht, damit vorhandene v12.2-Kandidaten
+  automatisch um BILLA ergänzt werden.
+- Manuelle BILLA-Verknüpfungen aus dem Händlerkatalog bleiben optional möglich.
+
+### Aktionen
+
+Diese Stufe bindet bewusst zunächst den vollständigen BILLA-Grundbestand an.
+Der offizielle BILLA-Aktionsimport wird separat ergänzt, damit Mengenaktionen
+und Bundles erst dann in den Optimierer gelangen, wenn ihre Bedingungen sicher
+strukturiert erkannt werden. Bis dahin werden keine Aktionen aus bloßen
+Preisunterschieden erraten.

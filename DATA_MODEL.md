@@ -128,6 +128,7 @@ autoMatches:
     mpreis: [kompakte Kandidaten]
     spar:   [kompakte Kandidaten]
     tg:     [kompakte Kandidaten]
+    billa:  [kompakte Kandidaten]
 ```
 
 `autoMatches` und `matchingProfile` sind private Browserdaten. Sie werden nicht
@@ -140,3 +141,11 @@ Automatische Händlerkandidaten werden weiterhin ausschließlich lokal gespeiche
 Die Produkttyp-Erkennung ist jetzt name-zentriert: Beschreibungen dienen nur noch
 zur Such-/Ranking-Unterstützung, nicht mehr als alleinige Produkttyp-Evidenz.
 Mehrdeutige Kandidaten werden konservativ verworfen.
+
+
+## Version 13.0 – BILLA im automatischen Kandidatenpool
+
+`autoMatches.stores` kann zusätzlich `billa` enthalten. Die gespeicherten
+Kandidaten besitzen dasselbe kompakte Format wie bei MPREIS, SPAR und T&G.
+Der öffentliche BILLA-Datensatz liegt in `data/billa.json`; persönliche
+Zuordnungen werden weiterhin ausschließlich in `localStorage` gespeichert.

@@ -65,3 +65,16 @@ Kassenbetrag oder geringster Übermenge sortiert werden.
 Die Optimiererstrategien `cheapest`, `max2` und `one` verwenden weiterhin den
 realen Kassenbetrag (`lineTotal`). Dadurch bleibt die Optimierer-Invariante
 unverändert.
+
+
+## v13.0: BILLA
+
+BILLA ist ein regulärer Kandidatenmarkt der Optimierung. Für jeden persönlichen
+Artikel wird – sofern automatische BILLA-Treffer vorhanden sind – der günstigste
+vergleichbare BILLA-Kandidat für die verlangte Menge bewertet. `cheapest`,
+`max2` und `one` benötigen dafür keine Sonderlogik. Die bestehende Invariante
+`Günstigster <= Max. 2 <= 1 Markt` bleibt unverändert.
+
+Solange der verifizierte BILLA-Aktionsadapter noch nicht aktiv ist, werden nur
+die öffentlichen Grundpreise verwendet; Aktionsbedingungen werden nicht
+geschätzt.
