@@ -27,7 +27,7 @@
 
   const initialState = {
     schemaVersion: 5,
-    settings: { theme: "system", region: "osttirol", shoppingSort: "added", shoppingStrategy: "cheapest" },
+    settings: { theme: "system", region: "osttirol", shoppingSort: "added", shoppingStrategy: "cheapest", autoOptionSort: "unit" },
     live: {
       mpreis: { enabled: true, lastSync: null, lastError: null },
       spar: { enabled: true, lastSync: null, lastError: null },
@@ -127,6 +127,9 @@
   let currentAutoMatchProductId = null;
   let currentAutoMatchQuantity = 1;
   let currentAutoMatchStore = "all";
+  let currentAutoMatchSort = ["unit", "total", "fit"].includes(state.settings.autoOptionSort)
+    ? state.settings.autoOptionSort
+    : "unit";
   let currentMpreisLinkProductId = null;
   let currentSparLinkProductId = null;
   let currentTgLinkProductId = null;
@@ -557,6 +560,66 @@
     return candidates[0] || null;
   }
 
+  function offerPricingForTargetSortMode(product, offer, shoppingQuantity = 1, sortMode = "unit") {
+    const mode = ["unit", "total", "fit"].includes(sortMode) ? sortMode : "unit";
+
+    // The real optimizer continues to use offerPricingForTarget(), which
+    // minimizes checkout cost. In the alternatives browser we deliberately
+    // allow a different plan: e.g. buying the action minimum can have the
+    // best €/l even when the immediate checkout total is slightly higher.
+    if (mode === "total") return offerPricingForTarget(product, offer, shoppingQuantity);
+
+    const targetUnit = normalizeMeasure(product?.amount, product?.unit);
+    const packageUnit = packageMeasureForOffer(product, offer);
+    if (!targetUnit || !packageUnit || targetUnit.dimension !== packageUnit.dimension) return null;
+
+    const multiplier = Math.max(1, Number(shoppingQuantity || 1));
+    const targetBase = targetUnit.baseAmount * multiplier;
+    const packageBase = packageUnit.baseAmount;
+    if (!(packageBase > 0)) return null;
+
+    const minimumPackageCount = Math.max(1, Math.ceil((targetBase / packageBase) - 1e-10));
+    const plans = promotionCandidatePackageCounts(offer, minimumPackageCount)
+      .map(packageCount => {
+        const packagePricing = offerPricingForQuantity(offer, packageCount);
+        if (!packagePricing) return null;
+        const deliveredBase = packageCount * packageBase;
+        return {
+          ...packagePricing,
+          packageCount,
+          minimumPackageCount,
+          targetBase,
+          deliveredBase,
+          baseUnit: targetUnit.baseUnit,
+          dimension: targetUnit.dimension,
+          packageBase,
+          overbuyBase: Math.max(0, deliveredBase - targetBase),
+          normalizedTargetPrice: packagePricing.lineTotal * (targetBase / deliveredBase),
+          effectiveBaseUnitPrice: deliveredBase > 0 ? packagePricing.lineTotal / deliveredBase : null
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const aUnit = Number(a.effectiveBaseUnitPrice ?? Infinity);
+        const bUnit = Number(b.effectiveBaseUnitPrice ?? Infinity);
+        const aTotal = Number(a.lineTotal ?? Infinity);
+        const bTotal = Number(b.lineTotal ?? Infinity);
+        const aOver = Number(a.overbuyBase ?? Infinity);
+        const bOver = Number(b.overbuyBase ?? Infinity);
+
+        const comparisons = mode === "fit"
+          ? [aOver - bOver, aTotal - bTotal, aUnit - bUnit]
+          : [aUnit - bUnit, aOver - bOver, aTotal - bTotal];
+
+        for (const diff of comparisons) {
+          if (Number.isFinite(diff) && Math.abs(diff) > 0.000001) return diff;
+        }
+        return a.packageCount - b.packageCount;
+      });
+
+    return plans[0] || null;
+  }
+
   function pricingPackageSummary(product, offer, pricing) {
     if (!pricing) return "nicht vergleichbar";
     const packageLabel = offerPackageLabel(product, offer);
@@ -751,7 +814,9 @@
     return pricedOfferForStore(product, storeId, 1)?.offer || null;
   }
 
-  function rankedAutoOptions(product, quantity = 1, storeFilter = "all", limit = 10) {
+  function rankedAutoOptions(product, quantity = 1, storeFilter = "all", limit = 10, sortMode = "unit") {
+    const mode = ["unit", "total", "fit"].includes(sortMode) ? sortMode : "unit";
+
     const rows = storedAutoCandidates(product)
       .filter(candidate => storeFilter === "all" || candidate.store === storeFilter)
       .map(candidate => {
@@ -761,17 +826,63 @@
           candidateName: candidate.name || candidate.offer?.candidateName,
           automaticMatch: true
         });
-        const pricing = offerPricingForTarget(product, offer, quantity);
+        const pricing = offerPricingForTargetSortMode(product, offer, quantity, mode);
         return pricing ? { ...candidate, offer, pricing } : null;
       })
       .filter(Boolean)
-      .sort((a, b) =>
-        (a.pricing.lineTotal - b.pricing.lineTotal) ||
-        (a.pricing.effectiveBaseUnitPrice - b.pricing.effectiveBaseUnitPrice) ||
-        String(a.name || "").localeCompare(String(b.name || ""), "de")
-      );
+      .sort((a, b) => {
+        const aUnit = Number(a.pricing.effectiveBaseUnitPrice ?? Infinity);
+        const bUnit = Number(b.pricing.effectiveBaseUnitPrice ?? Infinity);
+        const aTotal = Number(a.pricing.lineTotal ?? Infinity);
+        const bTotal = Number(b.pricing.lineTotal ?? Infinity);
+        const aOver = Number(a.pricing.overbuyBase ?? Infinity);
+        const bOver = Number(b.pricing.overbuyBase ?? Infinity);
+
+        let comparisons;
+        if (mode === "total") {
+          comparisons = [aTotal - bTotal, aOver - bOver, aUnit - bUnit];
+        } else if (mode === "fit") {
+          comparisons = [aOver - bOver, aTotal - bTotal, aUnit - bUnit];
+        } else {
+          // Default for browsing/selection: compare what one litre, kilogram
+          // or piece effectively costs after package sizes and promotions.
+          comparisons = [aUnit - bUnit, aOver - bOver, aTotal - bTotal];
+        }
+
+        for (const diff of comparisons) {
+          if (Number.isFinite(diff) && Math.abs(diff) > 0.000001) return diff;
+        }
+
+        return String(a.name || "").localeCompare(String(b.name || ""), "de");
+      });
 
     return rows.slice(0, Math.max(1, Number(limit) || 10));
+  }
+
+  function autoOptionQuantityDetails(pricing) {
+    if (!pricing) return "";
+
+    const target = measureToDisplay(pricing.targetBase, pricing.dimension);
+    const delivered = measureToDisplay(pricing.deliveredBase, pricing.dimension);
+    const overbuy = Number(pricing.overbuyBase || 0);
+    const overbuyText = overbuy > 1e-8
+      ? `+${measureToDisplay(overbuy, pricing.dimension)} Übermenge`
+      : "keine Übermenge";
+
+    return `Vergleich ${target} · Kauf ${delivered} · ${overbuyText}`;
+  }
+
+  function autoOptionSortHint(sortMode, product) {
+    const target = normalizeMeasure(product?.amount, product?.unit);
+    const unit = target?.baseUnit || "Einheit";
+
+    if (sortMode === "total") {
+      return "Sortiert nach dem tatsächlichen Betrag an der Kassa.";
+    }
+    if (sortMode === "fit") {
+      return "Bevorzugt Angebote mit möglichst wenig Übermenge.";
+    }
+    return `Sortiert nach dem effektiven Preis pro ${unit} – inklusive Gebinde und Aktionen.`;
   }
 
   function autoMatchCount(product) {
@@ -3311,7 +3422,7 @@
     const profile = matchingProfile(product);
     const counts = autoMatchCountsByStore(product);
     const total = autoMatchCount(product);
-    const options = rankedAutoOptions(product, currentAutoMatchQuantity, currentAutoMatchStore, 10);
+    const options = rankedAutoOptions(product, currentAutoMatchQuantity, currentAutoMatchStore, 10, currentAutoMatchSort);
     const fixed = profile.fixedCandidateId
       ? storedAutoCandidates(product).find(candidate => candidate.id === profile.fixedCandidateId)
       : null;
@@ -3341,12 +3452,17 @@
         : "Keine Ausblendungen";
     }
     autoModeButton.textContent = profile.mode === "fixed"
-      ? "Automatisch günstigsten verwenden"
-      : "✓ Automatisch günstigster";
+      ? "Automatisch günstigsten Einkauf verwenden"
+      : "✓ Automatisch günstigster Einkauf";
 
     $$("#autoMatchStoreFilter [data-auto-match-store]").forEach(button => {
       button.classList.toggle("is-active", button.dataset.autoMatchStore === currentAutoMatchStore);
     });
+
+    $$("#autoMatchSortRow [data-auto-match-sort]").forEach(button => {
+      button.classList.toggle("is-active", button.dataset.autoMatchSort === currentAutoMatchSort);
+    });
+    $("#autoMatchSortHint").textContent = autoOptionSortHint(currentAutoMatchSort, product);
 
     const stateEl = $("#autoMatchState");
     const updatedAt = product.autoMatches?.updatedAt;
@@ -3386,11 +3502,12 @@
             <div class="auto-option-store"><span class="market-dot" style="background:${store.color}"></span>${store.name}</div>
             <strong>${escapeHtml(candidate.name)}</strong>
             <div class="muted small">${escapeHtml(packageInfo)}</div>
+            <div class="auto-option-quantity-detail">${escapeHtml(autoOptionQuantityDetails(candidate.pricing))}</div>
             ${condition ? `<div class="offer-extra"><span class="offer-badge condition">${escapeHtml(condition)}</span></div>` : ""}
           </div>
           <div class="auto-option-price">
-            <strong>${money(candidate.pricing.lineTotal)}</strong>
-            <span>${candidate.pricing.effectiveBaseUnitPrice != null ? `${money(candidate.pricing.effectiveBaseUnitPrice)}/${candidate.pricing.baseUnit}` : ""}</span>
+            <strong class="${currentAutoMatchSort === "total" ? "is-sort-primary" : ""}">${money(candidate.pricing.lineTotal)}</strong>
+            <span class="${currentAutoMatchSort === "unit" ? "is-sort-primary" : ""}">${candidate.pricing.effectiveBaseUnitPrice != null ? `${money(candidate.pricing.effectiveBaseUnitPrice)}/${candidate.pricing.baseUnit}` : ""}</span>
             <button class="auto-select-btn ${selected ? "is-selected" : ""}" data-auto-select-candidate="${escapeAttr(candidate.id)}" type="button" ${selected ? "disabled" : ""}>
               ${selected ? "Gewählt" : "Fest wählen"}
             </button>
@@ -4036,6 +4153,17 @@
     if (autoStoreFilter) {
       currentAutoMatchStore = autoStoreFilter.dataset.autoMatchStore;
       return renderAutoMatchSheet();
+    }
+
+    const autoSort = e.target.closest("[data-auto-match-sort]");
+    if (autoSort) {
+      const mode = autoSort.dataset.autoMatchSort;
+      if (["unit", "total", "fit"].includes(mode)) {
+        currentAutoMatchSort = mode;
+        state.settings.autoOptionSort = mode;
+        saveState();
+        return renderAutoMatchSheet();
+      }
     }
 
     const autoSelect = e.target.closest("[data-auto-select-candidate]");

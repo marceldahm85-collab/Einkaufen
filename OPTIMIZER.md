@@ -53,3 +53,15 @@ Kassenbelastung nach:
 Eine feste Kandidatenauswahl reduziert den automatischen Händlerkandidatenpool
 auf den vom Nutzer gewählten Datensatz; manuelle Preise anderer, noch nicht
 automatisch angebundener Märkte bleiben weiterhin verfügbar.
+
+
+## v12.1: Sortierung der Produktalternativen
+
+Die Reihenfolge in der manuellen Alternativenansicht ist vom eigentlichen
+Einkaufsoptimierer getrennt. Standardmäßig werden Alternativen nach effektivem
+EUR/l, EUR/kg oder EUR/Stk sortiert. Optional kann nach tatsächlichem
+Kassenbetrag oder geringster Übermenge sortiert werden.
+
+Die Optimiererstrategien `cheapest`, `max2` und `one` verwenden weiterhin den
+realen Kassenbetrag (`lineTotal`). Dadurch bleibt die Optimierer-Invariante
+unverändert.

@@ -1645,3 +1645,67 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Version 12.1 – Alternativen nach effektivem Einheitspreis bewerten */
+.auto-match-sort-block {
+  margin: 10px 0 7px;
+}
+
+.auto-match-sort-block > .eyebrow {
+  margin: 0 2px 5px;
+}
+
+.auto-match-sort-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.auto-match-sort-row button {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 8px 5px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 820;
+  line-height: 1.15;
+  cursor: pointer;
+}
+
+.auto-match-sort-row button.is-active {
+  color: var(--accent-blue);
+  border-color: color-mix(in srgb, var(--accent-blue) 30%, var(--line));
+  background: color-mix(in srgb, var(--accent-blue) 10%, var(--surface-2));
+}
+
+.auto-match-sort-hint {
+  min-height: 15px;
+  margin: 5px 2px 0;
+  line-height: 1.35;
+}
+
+.auto-option-quantity-detail {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 8.5px;
+  line-height: 1.3;
+}
+
+.auto-option-price > .is-sort-primary {
+  color: var(--accent-blue);
+  font-weight: 900;
+}
+
+@media (max-width: 355px) {
+  .auto-match-sort-row {
+    gap: 4px;
+  }
+
+  .auto-match-sort-row button {
+    padding-inline: 3px;
+    font-size: 8px;
+  }
+}

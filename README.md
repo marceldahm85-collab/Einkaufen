@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 12.0
+# PreisPilot Osttirol – Version 12.1
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -951,3 +951,32 @@ Händlerkandidaten angewandt. Die Invariante
 
 Die alten manuellen MPREIS-/SPAR-/T&G-Verknüpfungen bleiben als optionaler
 Fallback unter `Mehr -> Artikel verwalten -> Manuelle Verknüpfung` erhalten.
+
+
+## Version 12.1 – Einheitspreis als Standard für Alternativen
+
+Die automatische Alternativenliste sortiert jetzt standardmäßig nach dem
+effektiven Einheitspreis. Abhängig von der Vergleichsdimension ist das:
+
+- EUR/l bei Flüssigkeiten,
+- EUR/kg bei Gewichtsartikeln,
+- EUR/Stk bei Stückware.
+
+Der effektive Einheitspreis wird nach Anwendung von Händlergebinde,
+Mindestmenge und Bundle-Aktion berechnet. Eine 1+1-Aktion mit zwei 10-l-Kisten
+für zusammen 29,80 EUR wird daher als 1,49 EUR/l bewertet.
+
+In der Alternativenansicht stehen drei Sortierungen zur Verfügung:
+
+- `€/Einheit` – Standard; günstigster effektiver Grundpreis zuerst,
+- `Kaufpreis` – niedrigster tatsächlicher Kassenbetrag zuerst,
+- `Passendste Menge` – geringste Übermenge zuerst.
+
+Jede Kandidatenkarte zeigt zusätzlich Vergleichsmenge, tatsächlich gekaufte
+Menge und eine eventuelle Übermenge. Die gewählte Sortierung wird lokal in den
+Einstellungen gespeichert.
+
+Der Einkaufsoptimierer selbst bleibt bewusst unverändert: Er optimiert den
+realen Kassenbetrag unter Berücksichtigung von Gebinden und Aktionen. Die
+Einheitspreis-Sortierung dient der bewussten Produktauswahl und ersetzt nicht
+die Einkaufsbudget-Optimierung.
