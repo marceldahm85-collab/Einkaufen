@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-21T22:02:54Z",
+  "updatedAt": "2026-09-22T04:29:10Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -10,9 +10,9 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 798,
-        "pagesChecked": 29,
-        "updatedAt": "2026-09-21T22:02:03Z",
+        "verifiedCount": 805,
+        "pagesChecked": 30,
+        "updatedAt": "2026-09-22T04:28:27Z",
         "error": null,
         "source": "mpreis.at"
       }
@@ -25,13 +25,13 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 778,
+        "verifiedCount": 846,
         "rawProductsScanned": 22364,
-        "updatedAt": "2026-09-21T22:02:54Z",
+        "updatedAt": "2026-09-22T04:29:09Z",
         "error": null,
         "source": "spar.at / FactFinder",
         "breakdown": {
-          "Aktion": 776,
+          "Aktion": 844,
           "ab 2 Stück": 2
         }
       }
@@ -39,7 +39,7 @@
     "tg": {
       "status": "ok",
       "productCount": 70,
-      "promotionCount": 4,
+      "promotionCount": 72,
       "stale": false,
       "error": null,
       "provider": "tundg.at",
@@ -48,7 +48,7 @@
         "status": "ok",
         "productCount": 67,
         "linkableCount": 25,
-        "updatedAt": "2026-09-21T22:03:04Z",
+        "updatedAt": "2026-09-22T04:29:19Z",
         "error": null,
         "source": "T&G Osttirol Flugblatt"
       }
