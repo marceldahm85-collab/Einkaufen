@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 11.4.4
+# PreisPilot Osttirol – Version 12.0
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -903,3 +903,51 @@ vorhanden.
 Der Test lädt die Abhängigkeit nun korrekt und prüft zusätzlich, dass z. B.
 `9.998 l` beim Bearbeiten auf `10 l` normalisiert wird. Außerdem wird
 `test_amount_normalization.js` jetzt explizit im GitHub-Workflow ausgeführt.
+
+
+## Version 12.0 – automatische Produktzuordnung
+
+Persönliche Artikel müssen für MPREIS, SPAR und T&G nicht mehr einzeln 1:1 mit
+einem Händlerprodukt verknüpft werden.
+
+### Kandidatenpool statt Einzelverknüpfung
+
+Für jeden persönlichen Artikel erzeugt PreisPilot lokal ein Suchprofil. Es
+berücksichtigt:
+- Artikelname und optional eine konkrete Marke
+- erkannte Produkttypen wie Bier, Butter, Spaghetti, Kaffee usw.
+- Ausschlussbegriffe für typische Fehlzuordnungen
+- die Dimension der Vergleichsmenge (Volumen, Gewicht oder Stück)
+- bekannte Händlergebinde
+- aktuelle Mengen- und Bundle-Aktionen
+
+MPREIS, SPAR und T&G werden automatisch durchsucht. Pro Händler werden die
+besten vergleichbaren Kandidaten lokal zwischengespeichert. Es werden keine
+persönlichen Zuordnungen nach GitHub geschrieben.
+
+### Auswahl
+
+Im Modus `Automatisch günstigster` darf der Preisvergleich aus allen passenden
+Kandidaten je Händler den aktuell günstigsten realen Einkauf wählen.
+
+Über `Optionen` / `Treffer prüfen` werden die zehn günstigsten Kandidaten für
+die aktuelle Vergleichsmenge angezeigt. Ein Kandidat kann:
+- fest gewählt werden,
+- ausgeblendet werden,
+- später wieder durch den Automatikmodus ersetzt werden.
+
+Das Suchprofil lässt sich pro persönlichem Artikel anpassen.
+
+### Optimierer
+
+Die vorhandenen Strategien verwenden den Kandidatenpool direkt:
+- `Günstig`: günstigster passender Händlerartikel je persönlichem Artikel
+- `Max. 2`: bester passender Kandidat innerhalb jedes geprüften Marktpaars
+- `1 Markt`: bester passender Kandidat innerhalb des jeweiligen Markts
+
+Gebinde-, Mindestmengen- und N+M-Bundle-Logik wird erst auf den konkreten
+Händlerkandidaten angewandt. Die Invariante
+`Günstigster <= Max. 2 <= 1 Markt` bleibt erhalten.
+
+Die alten manuellen MPREIS-/SPAR-/T&G-Verknüpfungen bleiben als optionaler
+Fallback unter `Mehr -> Artikel verwalten -> Manuelle Verknüpfung` erhalten.

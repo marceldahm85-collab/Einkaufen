@@ -222,6 +222,53 @@
     };
   }
 
+
+  async function matchCandidates(profile, limit = 100) {
+    const payload = await load(false);
+    const rows = ensureBrowseIndex(payload);
+    const tools = window.RetailerSearch;
+    const safeLimit = Math.min(500, Math.max(1, Number(limit) || 100));
+
+    if (!tools?.matchProfile) {
+      const fallback = await search(profile?.query || "", safeLimit);
+      return { items: fallback, total: fallback.length };
+    }
+
+    const excludedIds = new Set(
+      Array.isArray(profile?.excludedIds) ? profile.excludedIds.map(String) : []
+    );
+
+    const matched = rows
+      .map(entry => ({
+        entry,
+        match: tools.matchProfile(entry, profile)
+      }))
+      .filter(row => {
+        if (!row.match?.matched) return false;
+        const item = row.entry.item || {};
+        const id = String(item.retailerProductId || item.remoteObjectId || "");
+        return !id || !excludedIds.has(id);
+      })
+      .sort((a, b) =>
+        (a.match.score - b.match.score) ||
+        (a.entry.name.length - b.entry.name.length) ||
+        a.entry.originalName.localeCompare(
+          b.entry.originalName,
+          "de",
+          { sensitivity: "base", numeric: true }
+        )
+      );
+
+    return {
+      items: matched.slice(0, safeLimit).map(row => ({
+        ...enrich(row.entry.item, payload),
+        matchScore: row.match.score,
+        matchCategories: [...(row.entry.categories || [])]
+      })),
+      total: matched.length
+    };
+  }
+
   async function status(force = false) {
     const payload = await load(force);
     const currentPromotions = payload.products.filter(item => promotionIsCurrent(item));
@@ -281,5 +328,5 @@
       .trim();
   }
 
-  window.TgLive = { search, browse, getObject, promotions, status, reload };
+  window.TgLive = { search, browse, matchCandidates, getObject, promotions, status, reload };
 })();

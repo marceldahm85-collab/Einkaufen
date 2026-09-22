@@ -147,6 +147,13 @@
             </div>
             <button class="icon-btn small" data-action="open-add-product" aria-label="Artikel anlegen">＋</button>
           </div>
+          <div class="auto-match-toolbar">
+            <div>
+              <strong>Automatische Produktzuordnung</strong>
+              <div class="muted small">MPREIS, SPAR und T&G werden automatisch durchsucht.</div>
+            </div>
+            <button class="secondary-btn" id="refreshAutoMatchesBtn" type="button">Neu suchen</button>
+          </div>
           <div id="databaseList" class="database-list"></div>
         </div>
 
@@ -464,6 +471,46 @@
       <div id="comparisonPreview" class="comparison-preview"></div>
       <button class="primary-btn full" type="submit">Vergleichsmenge speichern</button>
     </form>
+  </section>
+
+  <section class="bottom-sheet auto-match-sheet" id="autoMatchSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">AUTOMATISCHE ZUORDNUNG</div>
+        <h2 id="autoMatchTitle">Passende Produkte</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+
+    <div id="autoMatchSummary" class="auto-match-summary"></div>
+
+    <div class="auto-match-profile-card">
+      <label>
+        Suchprofil
+        <div class="auto-match-query-row">
+          <input id="autoMatchQuery" type="search" placeholder="z. B. Bier">
+          <button class="secondary-btn" id="saveAutoMatchQueryBtn" type="button">Übernehmen</button>
+        </div>
+      </label>
+      <div class="muted small">Die Suche wird zusätzlich nach Produkttyp, Einheit und bekannten Marken gefiltert.</div>
+    </div>
+
+    <div class="auto-match-mode-row">
+      <button class="secondary-btn is-active" id="useAutoMatchModeBtn" type="button">✓ Automatisch günstigster</button>
+      <button class="secondary-btn" id="refreshAutoMatchProductBtn" type="button">↻ Treffer neu suchen</button>
+      <button class="secondary-btn" id="resetAutoMatchExclusionsBtn" type="button">Ausblendungen zurücksetzen</button>
+    </div>
+
+    <div class="chip-row auto-match-store-filter" id="autoMatchStoreFilter">
+      <button class="chip is-active" data-auto-match-store="all">Alle</button>
+      <button class="chip" data-auto-match-store="mpreis">MPREIS</button>
+      <button class="chip" data-auto-match-store="spar">SPAR</button>
+      <button class="chip" data-auto-match-store="tg">T&G</button>
+    </div>
+
+    <div id="autoMatchState" class="muted small auto-match-state"></div>
+    <div id="autoMatchResults" class="stack auto-match-results"></div>
   </section>
 
   <section class="bottom-sheet" id="productDetailSheet" aria-hidden="true">

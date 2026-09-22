@@ -4,25 +4,25 @@
   const CATEGORY_DEFINITIONS = [
     {
       id: "bier",
-      aliases: ["bier", "biere", "bierkasten", "bierkiste", "kiste bier"],
-      markers: [" bier ", " märzen ", " pils ", " pilsner ", " radler ", " weizenbier ", " weissbier ", " weißbier ", " helles ", " goldbräu ", " zwickl ", " bockbier "],
-      brands: ["gösser", "stiegl", "zipfer", "puntigamer", "ottakringer", "schwechater", "wieselburger", "hirter", "villacher", "egger", "kaiser", "murauer", "mohren", "trumer", "zillertal bier", "augustiner", "hacker pschorr", "corona", "heineken", "budweiser", "budvar", "pilsner urquell", "bitburger", "warsteiner", "krombacher", "erdinger", "paulaner", "franziskaner", "guinness", "bierol"]
+      aliases: ["bier", "biere", "bierkasten", "bierkiste", "kiste bier", "maerzen", "märzen", "pils", "lager"],
+      markers: [" bier ", " märzen ", " maerzen ", " pils ", " pilsner ", " radler ", " weizenbier ", " weissbier ", " weißbier ", " helles ", " goldbräu ", " goldbraeu ", " zwickl ", " bockbier "],
+      brands: ["gösser", "goesser", "stiegl", "zipfer", "puntigamer", "ottakringer", "schwechater", "wieselburger", "hirter", "villacher", "egger", "kaiser", "murauer", "mohren", "trumer", "zillertal bier", "augustiner", "hacker pschorr", "corona", "heineken", "budweiser", "budvar", "pilsner urquell", "bitburger", "warsteiner", "krombacher", "erdinger", "paulaner", "franziskaner", "guinness", "bierol"]
     },
     {
       id: "kaffee",
-      aliases: ["kaffee", "kaffeebohnen", "espresso", "caffe", "café"],
+      aliases: ["kaffee", "kaffeebohnen", "espresso", "caffe", "café", "cafe", "bohnenkaffee"],
       markers: [" kaffee ", " espresso ", " caffè ", " caffe ", " kaffeebohnen ", " cappuccino "],
       brands: ["lavazza", "illy", "segafredo", "dallmayr", "jacobs", "tchibo", "meinl", "alps coffee"]
     },
     {
       id: "milch",
-      aliases: ["milch", "vollmilch", "haltbarmilch", "h milch"],
+      aliases: ["milch", "vollmilch", "haltbarmilch", "h milch", "frischmilch"],
       markers: [" vollmilch ", " h vollmilch ", " haltbarmilch ", " frischmilch "],
       brands: []
     },
     {
       id: "käse",
-      aliases: ["käse", "kaese", "gouda", "emmentaler"],
+      aliases: ["käse", "kaese", "gouda", "emmentaler", "mozzarella", "parmesan"],
       markers: [" käse ", " kaese ", " gouda ", " emmentaler ", " mozzarella ", " parmesan "],
       brands: []
     },
@@ -34,15 +34,15 @@
     },
     {
       id: "nudeln",
-      aliases: ["nudeln", "pasta", "teigwaren", "spaghetti", "penne"],
+      aliases: ["nudeln", "pasta", "teigwaren", "spaghetti", "penne", "fusilli", "tagliatelle"],
       markers: [" nudeln ", " pasta ", " spaghetti ", " penne ", " fusilli ", " tagliatelle ", " macaroni "],
-      brands: ["barilla", "de cecco"]
+      brands: ["barilla", "de cecco", "divella"]
     },
     {
       id: "wasser",
       aliases: ["wasser", "mineralwasser"],
       markers: [" mineralwasser ", " wasser still ", " wasser prickelnd "],
-      brands: ["vöslauer", "romerquelle", "römerquelle", "silberquelle", "alpquell"]
+      brands: ["vöslauer", "voeslauer", "romerquelle", "römerquelle", "silberquelle", "alpquell"]
     },
     {
       id: "limonade",
@@ -58,14 +58,14 @@
     },
     {
       id: "saft",
-      aliases: ["saft", "fruchtsaft", "fruchtsäfte", "smoothie"],
+      aliases: ["saft", "fruchtsaft", "fruchtsäfte", "smoothie", "nektar"],
       markers: [" saft ", " fruchtsaft ", " smoothie ", " nektar "],
       brands: ["rauch", "pfanner"]
     },
     {
       id: "wein",
       aliases: ["wein", "rotwein", "weißwein", "weisswein", "rosewein", "roséwein"],
-      markers: [" rotwein ", " weißwein ", " weisswein ", " roséwein ", " rosewein ", " zweigelt ", " grüner veltliner ", " chardonnay ", " lugana "],
+      markers: [" rotwein ", " weißwein ", " weisswein ", " roséwein ", " rosewein ", " zweigelt ", " grüner veltliner ", " gruener veltliner ", " chardonnay ", " lugana "],
       brands: []
     },
     {
@@ -108,7 +108,7 @@
       id: "katzenfutter",
       aliases: ["katzenfutter", "katze", "katzen"],
       markers: [" katzenfutter ", " katzensnack "],
-      brands: ["whiskas", "dreamies"]
+      brands: ["whiskas", "dreamies", "felix"]
     },
     {
       id: "hundefutter",
@@ -121,7 +121,12 @@
   const BRAND_STOP = new Set([
     "bio", "premium", "classic", "original", "natur", "jeden", "meine",
     "mein", "unsere", "unser", "fresh", "best", "selection", "spar",
-    "mpreis", "s budget", "s-budget", "t&g", "t", "m"
+    "mpreis", "s budget", "s-budget", "t&g", "t", "m", "verschiedene",
+    "vergleichbar", "ohne", "marke"
+  ]);
+
+  const GENERIC_BRANDS = new Set([
+    "verschiedene", "vergleichbar", "ohne marke", "diverse", "eigenmarke"
   ]);
 
   function normalize(value) {
@@ -151,7 +156,7 @@
 
     for (const def of prepared) {
       const markerMatch = def.normalizedMarkers.some(marker =>
-        text.includes(` ${marker} `) || text.includes(` ${marker}`) || text.includes(`${marker} `)
+        text.includes(` ${marker} `)
       );
       const brandMatch = def.normalizedBrands.some(brand =>
         name === brand || name.startsWith(`${brand} `)
@@ -204,7 +209,16 @@
       const ranked = [...map.entries()].sort((a, b) => b[1] - a[1]);
       const total = ranked.reduce((sum, [, count]) => sum + count, 0);
       if (!ranked.length || ranked[0][1] < 2 || ranked[0][1] / total < 0.65) return;
-      propagated.set(brand, ranked[0][0]);
+
+      // Only propagate category knowledge for brands explicitly known for that
+      // category. This avoids broad manufacturers such as Schärdinger turning
+      // "Butterkäse" or "Buttermilch" into Butter candidates merely because
+      // many products of the same manufacturer are butter.
+      const category = ranked[0][0];
+      const def = prepared.find(entry => entry.id === category);
+      if (!def?.normalizedBrands?.includes(brand)) return;
+
+      propagated.set(brand, category);
     });
 
     rows.forEach(row => {
@@ -245,5 +259,164 @@
     return 999;
   }
 
-  window.RetailerSearch = { normalize, buildIndex, score };
+  function categoryIdsForText(value) {
+    const text = padded(value);
+    const compact = normalize(value);
+    const result = [];
+
+    prepared.forEach(def => {
+      const aliasMatch = def.normalizedAliases.some(alias =>
+        compact === alias || text.includes(` ${alias} `)
+      );
+      const brandMatch = def.normalizedBrands.some(brand =>
+        compact === brand || compact.startsWith(`${brand} `) || text.includes(` ${brand} `)
+      );
+      const markerMatch = def.normalizedMarkers.some(marker =>
+        text.includes(` ${marker} `)
+      );
+      if (aliasMatch || brandMatch || markerMatch) result.push(def.id);
+    });
+
+    return [...new Set(result)];
+  }
+
+  function specificBrand(product) {
+    const full = normalize(product?.brand || "");
+    if (!full || /\b(vergleichbar|verschiedene|diverse|ohne marke)\b/.test(full)) return "";
+
+    const raw = String(product?.brand || "").split("/")[0].trim();
+    const brand = normalize(raw);
+    if (!brand || GENERIC_BRANDS.has(brand)) return "";
+    return brand;
+  }
+
+  function automaticExclusions(query, categoryIds) {
+    const q = padded(query);
+    const exclusions = [];
+
+    if (categoryIds.includes("bier")) {
+      if (!q.includes(" radler ")) exclusions.push("radler");
+      if (!q.includes(" alkoholfrei ") && !q.includes(" 0 0 ")) {
+        exclusions.push("alkoholfrei", "alkfrei", "alkfr", "alk fr", "0 0");
+      }
+      exclusions.push("biersenf", "bierkase", "bierkäse", "dosenadapter", "preisel");
+    }
+
+    if (categoryIds.includes("butter")) {
+      exclusions.push(
+        "croissant", "buttertoast", "butter toast", "butterzopf",
+        "butterkeks", "buttergemuse", "buttergemüse", "buttermilch",
+        "butterkase", "butterkäse", "butterschmalz", "butterdose",
+        "nussschnecke", "laugenspitz", "topfengolatsche", "pinze",
+        "sables", "sablés", "madeleine", "chicken", "hauskeks",
+        "alpenkeks", "peanut", "truffel", "trüffel", "krauter",
+        "kräuter"
+      );
+    }
+
+    if (categoryIds.includes("limonade") && q.includes(" original ")) {
+      exclusions.push("zero", "light", "cherry", "vanilla", "koffeinfrei");
+    }
+
+    if (categoryIds.includes("kaffee") && (q.includes(" bohnen ") || q.includes(" crema "))) {
+      exclusions.push("kapsel", "kapseln", "pads", "instant", "löslich", "loeslich");
+    }
+
+    if (categoryIds.includes("milch") && q.includes(" vollmilch ")) {
+      exclusions.push("hafer", "soja", "mandel", "kokos");
+    }
+
+    return [...new Set(exclusions.map(normalize).filter(Boolean))];
+  }
+
+  function profileForProduct(product) {
+    const stored = product?.matchingProfile || {};
+    const query = String(stored.query || product?.name || "").trim();
+    const combined = `${query} ${product?.brand || ""}`;
+    const categoryIds = Array.isArray(stored.categoryIds) && stored.categoryIds.length
+      ? stored.categoryIds.map(normalize)
+      : categoryIdsForText(combined);
+
+    const explicitExclusions = Array.isArray(stored.exclusions)
+      ? stored.exclusions.map(normalize).filter(Boolean)
+      : [];
+
+    const normalizedQuery = normalize(query);
+    let requiredAny = [];
+    if (normalizedQuery.includes("spaghetti")) {
+      requiredAny = ["spaghetti", "spaghettini", "spaghettoni"];
+    } else if (normalizedQuery.includes("vollmilch")) {
+      requiredAny = ["vollmilch"];
+    } else if (normalizedQuery.includes("teebutter")) {
+      requiredAny = ["teebutter"];
+    }
+
+    return {
+      query,
+      normalizedQuery,
+      categoryIds,
+      requiredAny,
+      requiredBrand: stored.requiredBrand != null
+        ? normalize(stored.requiredBrand)
+        : specificBrand(product),
+      exclusions: [...new Set([
+        ...automaticExclusions(query, categoryIds),
+        ...explicitExclusions
+      ])],
+      excludedIds: Array.isArray(stored.excludedIds)
+        ? stored.excludedIds.map(String)
+        : []
+    };
+  }
+
+  function matchProfile(entry, profile) {
+    const p = profile || {};
+    const baseHay = entry?.baseHay || "";
+    const categories = Array.isArray(entry?.categories) ? entry.categories : [];
+
+    if (Array.isArray(p.categoryIds) && p.categoryIds.length) {
+      if (!p.categoryIds.some(id => categories.includes(id))) {
+        return { matched: false, score: 999, reason: "category" };
+      }
+    }
+
+    if (Array.isArray(p.requiredAny) && p.requiredAny.length) {
+      const requiredHit = p.requiredAny.some(term => baseHay.includes(normalize(term)));
+      if (!requiredHit) return { matched: false, score: 999, reason: "subtype" };
+    }
+
+    if (p.requiredBrand && !baseHay.includes(normalize(p.requiredBrand))) {
+      return { matched: false, score: 999, reason: "brand" };
+    }
+
+    if (Array.isArray(p.exclusions)) {
+      const hit = p.exclusions.find(term => term && baseHay.includes(normalize(term)));
+      if (hit) return { matched: false, score: 999, reason: `exclude:${hit}` };
+    }
+
+    let resultScore = score(entry, p.query || p.normalizedQuery || "");
+
+    // A strong category/brand match is allowed even if the literal query is
+    // missing. This is what makes brand-only records such as "Gösser" useful
+    // for a personal product named "Bier".
+    if (resultScore >= 999 && Array.isArray(p.categoryIds) && p.categoryIds.length) {
+      resultScore = p.requiredBrand ? 24 : 28;
+    }
+
+    return {
+      matched: resultScore < 999,
+      score: resultScore,
+      reason: resultScore < 999 ? "match" : "query"
+    };
+  }
+
+  window.RetailerSearch = {
+    normalize,
+    buildIndex,
+    score,
+    directCategories,
+    categoryIdsForText,
+    profileForProduct,
+    matchProfile
+  };
 })();

@@ -26,7 +26,7 @@
   };
 
   const initialState = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     settings: { theme: "system", region: "osttirol", shoppingSort: "added", shoppingStrategy: "cheapest" },
     live: {
       mpreis: { enabled: true, lastSync: null, lastError: null },
@@ -119,6 +119,14 @@
   let catalogLoading = false;
   let selectedCatalogItem = null;
   const CATALOG_PAGE_SIZE = 50;
+  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg"];
+  const AUTO_MATCH_LIMIT_PER_STORE = 40;
+  const AUTO_MATCH_SEARCH_LIMIT = 400;
+  const AUTO_MATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+  let autoMatchRefreshing = false;
+  let currentAutoMatchProductId = null;
+  let currentAutoMatchQuantity = 1;
+  let currentAutoMatchStore = "all";
   let currentMpreisLinkProductId = null;
   let currentSparLinkProductId = null;
   let currentTgLinkProductId = null;
@@ -148,7 +156,7 @@
 
   function migrateState(input) {
     const migrated = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       settings: { ...initialState.settings, ...(input.settings || {}) },
       live: {
         mpreis: {
@@ -171,11 +179,23 @@
 
     migrated.products = migrated.products.map(product => {
       const cleanAmount = cleanComparisonAmount(product.amount, product.unit);
+      const matchingProfile = product.matchingProfile || {};
       const migratedProduct = {
         ...product,
         amount: Number.isFinite(cleanAmount) && cleanAmount > 0 ? cleanAmount : product.amount,
         unit: normalizeMeasureUnit(product.unit) || product.unit,
-        liveLinks: product.liveLinks || {}
+        liveLinks: product.liveLinks || {},
+        matchingProfile: {
+          mode: matchingProfile.mode === "fixed" ? "fixed" : "auto",
+          query: String(matchingProfile.query || product.name || "").trim(),
+          queryAuto: matchingProfile.queryAuto !== false,
+          fixedCandidateId: matchingProfile.fixedCandidateId || null,
+          exclusions: Array.isArray(matchingProfile.exclusions) ? matchingProfile.exclusions : [],
+          excludedIds: Array.isArray(matchingProfile.excludedIds) ? matchingProfile.excludedIds : []
+        },
+        autoMatches: product.autoMatches && typeof product.autoMatches === "object"
+          ? product.autoMatches
+          : { updatedAt: null, query: null, stores: {}, counts: {} }
       };
 
       migratedProduct.offers = (product.offers || []).map(offer =>
@@ -564,12 +584,154 @@
     return `${pricing.packageCount} × ${packageLabel}${overbuy}${promoExtra}`;
   }
 
-  function pricedOfferForStore(product, storeId, quantity = 1) {
-    const offer = offerForStore(product, storeId);
-    if (!offer) return null;
+  function autoCandidateKey(store, itemOrOffer) {
+    const id = itemOrOffer?.retailerProductId || itemOrOffer?.remoteObjectId || itemOrOffer?.id;
+    return id ? `${store}:${String(id)}` : "";
+  }
 
-    const pricing = offerPricingForTarget(product, offer, quantity);
-    return pricing ? { offer, pricing } : null;
+  function autoLiveModule(store) {
+    if (store === "mpreis") return window.MPreisLive;
+    if (store === "spar") return window.SparLive;
+    if (store === "tg") return window.TgLive;
+    return null;
+  }
+
+  function autoOfferFromLiveItem(store, liveItem) {
+    if (!liveItem || liveItem.optimizerEligible === false) return null;
+
+    const packageFields = livePackageFields(liveItem);
+    if (!packageFields.packageAmountKnown) return null;
+
+    const current = liveItem.currentPrice ?? liveItem.displayPrice ?? liveItem.salePrice ?? liveItem.regularPrice;
+    const regular = liveItem.regularPrice ?? (liveItem.salePrice == null ? current : null);
+    const sale = liveItem.salePrice ?? null;
+
+    if (regular == null && sale == null) return null;
+
+    return {
+      store,
+      retailerProductId: liveItem.retailerProductId || liveItem.remoteObjectId,
+      remoteObjectId: liveItem.remoteObjectId || liveItem.retailerProductId,
+      candidateName: liveItem.name || "Händlerprodukt",
+      automaticMatch: true,
+      ...packageFields,
+      regularPrice: regular != null ? Number(regular) : null,
+      salePrice: sale != null ? Number(sale) : null,
+      unitPrice: liveItem.unitPrice ?? null,
+      unitPriceUnit: liveItem.unitPriceUnit ?? null,
+      validFrom: liveItem.validFrom ?? null,
+      validUntil: liveItem.validUntil ?? null,
+      promotion: liveItem.promotion ?? null,
+      promotionVerified: Boolean(liveItem.promotionVerified),
+      updatedAt: String(liveItem.retrievedAt || new Date().toISOString()).slice(0, 10),
+      retrievedAt: liveItem.retrievedAt || new Date().toISOString(),
+      source: liveItem.source || `${store}.at`
+    };
+  }
+
+  function matchingProfile(product) {
+    const stored = product?.matchingProfile || {};
+    const profile = window.RetailerSearch?.profileForProduct
+      ? window.RetailerSearch.profileForProduct(product)
+      : { query: stored.query || product?.name || "", excludedIds: stored.excludedIds || [] };
+
+    return {
+      ...profile,
+      mode: stored.mode === "fixed" ? "fixed" : "auto",
+      fixedCandidateId: stored.fixedCandidateId || null,
+      excludedIds: Array.isArray(stored.excludedIds) ? stored.excludedIds.map(String) : []
+    };
+  }
+
+  function storedAutoCandidates(product, options) {
+    options = options || {};
+    const includeExcluded = Boolean(options.includeExcluded);
+    const stores = product?.autoMatches?.stores || {};
+    const profile = matchingProfile(product);
+    const excluded = new Set(profile.excludedIds || []);
+    const rows = [];
+
+    AUTO_MATCH_STORES.forEach(store => {
+      (Array.isArray(stores[store]) ? stores[store] : []).forEach(candidate => {
+        if (!candidate?.offer) return;
+        const id = candidate.id || autoCandidateKey(store, candidate.offer);
+        if (!includeExcluded && id && excluded.has(id)) return;
+        rows.push({ ...candidate, id, store });
+      });
+    });
+
+    return rows;
+  }
+
+  function activeAutoCandidates(product) {
+    const profile = matchingProfile(product);
+    const rows = storedAutoCandidates(product);
+
+    if (profile.mode === "fixed" && profile.fixedCandidateId) {
+      const fixed = rows.find(row => row.id === profile.fixedCandidateId);
+      return fixed ? [fixed] : [];
+    }
+
+    return rows;
+  }
+
+  function baseOffersForProduct(product) {
+    const offers = Array.isArray(product?.offers) ? product.offers : [];
+    const storesWithAutoData = new Set(
+      AUTO_MATCH_STORES.filter(store =>
+        Array.isArray(product?.autoMatches?.stores?.[store]) &&
+        product.autoMatches.stores[store].length > 0
+      )
+    );
+
+    return offers.filter(offer => {
+      if (!AUTO_MATCH_STORES.includes(offer.store)) return true;
+      if (offer.source === "manuell") return true;
+      return !storesWithAutoData.has(offer.store);
+    });
+  }
+
+  function validOffers(product) {
+    const combined = [
+      ...baseOffersForProduct(product),
+      ...activeAutoCandidates(product).map(candidate => ({
+        ...candidate.offer,
+        autoCandidateId: candidate.id,
+        candidateName: candidate.name || candidate.offer.candidateName,
+        automaticMatch: true
+      }))
+    ];
+
+    const seen = new Set();
+    return combined.filter(offer => {
+      const normalized = normalizedOffer(offer);
+      if (normalized.regularPrice == null && normalized.salePrice == null) return false;
+
+      const key = [
+        offer.store,
+        offer.retailerProductId || offer.remoteObjectId || "",
+        offer.packageAmount || "",
+        offer.packageUnit || ""
+      ].join("|");
+
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function pricedOfferForStore(product, storeId, quantity = 1) {
+    const candidates = validOffers(product)
+      .filter(offer => offer.store === storeId)
+      .map(normalizedOffer)
+      .map(offer => ({ offer, pricing: offerPricingForTarget(product, offer, quantity) }))
+      .filter(candidate => candidate.pricing)
+      .sort((a, b) =>
+        (a.pricing.lineTotal - b.pricing.lineTotal) ||
+        (a.pricing.effectiveBaseUnitPrice - b.pricing.effectiveBaseUnitPrice)
+      );
+
+    return candidates[0] || null;
   }
 
   function cheapestPricedOffer(product, quantity = 1) {
@@ -585,19 +747,45 @@
     return candidates[0] || null;
   }
 
-  function validOffers(product) {
-    return (product.offers || []).filter(o => {
-      const normalized = normalizedOffer(o);
-      return normalized.regularPrice != null || normalized.salePrice != null;
-    });
+  function offerForStore(product, storeId) {
+    return pricedOfferForStore(product, storeId, 1)?.offer || null;
   }
 
-  function offerForStore(product, storeId) {
-    return validOffers(product)
-      .map(normalizedOffer)
-      .filter(o => o.store === storeId)
-      .sort((a,b) => String(b.retrievedAt || b.updatedAt || "").localeCompare(String(a.retrievedAt || a.updatedAt || "")))[0] || null;
+  function rankedAutoOptions(product, quantity = 1, storeFilter = "all", limit = 10) {
+    const rows = storedAutoCandidates(product)
+      .filter(candidate => storeFilter === "all" || candidate.store === storeFilter)
+      .map(candidate => {
+        const offer = normalizedOffer({
+          ...candidate.offer,
+          autoCandidateId: candidate.id,
+          candidateName: candidate.name || candidate.offer?.candidateName,
+          automaticMatch: true
+        });
+        const pricing = offerPricingForTarget(product, offer, quantity);
+        return pricing ? { ...candidate, offer, pricing } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) =>
+        (a.pricing.lineTotal - b.pricing.lineTotal) ||
+        (a.pricing.effectiveBaseUnitPrice - b.pricing.effectiveBaseUnitPrice) ||
+        String(a.name || "").localeCompare(String(b.name || ""), "de")
+      );
+
+    return rows.slice(0, Math.max(1, Number(limit) || 10));
   }
+
+  function autoMatchCount(product) {
+    return storedAutoCandidates(product).length;
+  }
+
+  function autoMatchCountsByStore(product) {
+    const rows = storedAutoCandidates(product);
+    return AUTO_MATCH_STORES.reduce((result, store) => {
+      result[store] = rows.filter(row => row.store === store).length;
+      return result;
+    }, {});
+  }
+
 
   function offerConditionLabel(offer) {
     const p = offer?.promotion;
@@ -796,6 +984,7 @@
     const packageInfo = candidate
       ? pricingPackageSummary(item.product, candidate.offer, candidate.pricing)
       : "";
+    const candidateName = selectedOffer?.candidateName || "";
     const idAttr = item.custom ? `c:${item.id}` : `p:${item.id}`;
     return `
       <article class="product-card shopping-card ${item.checked ? "is-checked" : ""}">
@@ -803,8 +992,10 @@
         <div class="product-main" ${item.custom ? "" : `data-open-product="${item.product.id}"`}>
           <div class="product-name">${escapeHtml(name)}</div>
           <div class="product-meta"><span>${escapeHtml(meta)}</span></div>
+          ${candidateName ? `<div class="product-meta auto-selected-product"><span>${escapeHtml(candidateName)}</span></div>` : ""}
           ${packageInfo ? `<div class="product-meta comparison-package-meta"><span>${escapeHtml(packageInfo)}</span></div>` : ""}
           ${condition ? `<div class="product-meta"><span>${escapeHtml(condition)}</span></div>` : ""}
+          ${!item.custom ? `<button class="auto-options-link" data-auto-options-product="${item.product.id}" data-auto-options-quantity="${item.quantity}" type="button">${autoMatchCount(item.product) ? "Alternativen" : "Auto-Treffer"}</button>` : ""}
           ${storeId !== "auto" ? `<div class="market-label"><span class="market-dot" style="background:${store.color}"></span>${store.name}</div>` : ""}
         </div>
         <div class="product-price-wrap">
@@ -1516,7 +1707,16 @@
       unit: normalizeMeasureUnit(item.unit) || "Stk",
       favorite: false,
       offers: [],
-      liveLinks: {}
+      liveLinks: {},
+      matchingProfile: {
+        mode: "auto",
+        query: String(item.name || "Neuer Artikel").trim(),
+        queryAuto: true,
+        fixedCandidateId: null,
+        exclusions: [],
+        excludedIds: []
+      },
+      autoMatches: { updatedAt: null, query: null, stores: {}, counts: {} }
     };
 
     state.products.push(product);
@@ -1537,6 +1737,9 @@
     const store = offer ? retailer(offer.store) : null;
     const sale = offer && normalizedOffer(offer).salePrice != null && pricing?.activeSale;
     const packageInfo = candidate ? pricingPackageSummary(product, offer, pricing) : "";
+    const candidateName = offer?.candidateName || "";
+    const matchCount = autoMatchCount(product);
+    const fixedMode = matchingProfile(product).mode === "fixed";
 
     return `
       <article class="product-card comparison-product-card">
@@ -1554,7 +1757,14 @@
               ✎ Bearbeiten
             </button>
           </div>
+          ${candidateName ? `<div class="product-meta auto-selected-product"><span>${escapeHtml(candidateName)}</span></div>` : ""}
           ${packageInfo ? `<div class="product-meta comparison-package-meta"><span>${escapeHtml(packageInfo)}</span></div>` : ""}
+          <div class="auto-match-card-row">
+            <button class="auto-options-link" data-auto-options-product="${product.id}" data-auto-options-quantity="1" type="button">
+              ${fixedMode ? "Fest gewählt" : (matchCount ? `${Math.min(10, matchCount)} Optionen` : "Auto-Treffer")}
+            </button>
+            ${matchCount ? `<span class="auto-match-count">${matchCount} Kandidaten</span>` : `<span class="auto-match-count">noch nicht gesucht</span>`}
+          </div>
           ${store ? `<div class="market-label"><span class="market-dot" style="background:${store.color}"></span>${store.name}</div>` : ""}
         </div>
         <div class="product-price-wrap">
@@ -1622,6 +1832,7 @@
   function renderMpreisLiveStatus() {
     const live = state.live?.mpreis || {};
     const linked = state.products.filter(p => p.liveLinks?.mpreis).length;
+    const autoLinked = state.products.filter(p => Array.isArray(p.autoMatches?.stores?.mpreis) && p.autoMatches.stores.mpreis.length).length;
 
     const linkedEl = $("#mpreisLinkedCount");
     const lastEl = $("#mpreisLastSync");
@@ -1629,7 +1840,9 @@
     const promoBtn = $("#showMpreisPromotionsBtn");
     if (!linkedEl || !lastEl || !statusEl) return;
 
-    linkedEl.textContent = `${linked} Artikel verknüpft`;
+    linkedEl.textContent = autoLinked
+      ? `${autoLinked} Artikel automatisch${linked ? ` · ${linked} manuell` : ""}`
+      : `${linked} Artikel manuell verknüpft`;
     statusEl.className = "status-badge";
 
     if (live.lastError) {
@@ -1843,6 +2056,159 @@
     };
   }
 
+
+  function compactAutoCandidate(store, liveItem, offer) {
+    const id = autoCandidateKey(store, liveItem);
+    return {
+      id,
+      store,
+      name: String(liveItem.name || "Händlerprodukt"),
+      description: String(liveItem.description || "").slice(0, 180),
+      matchScore: Number(liveItem.matchScore ?? 999),
+      matchCategories: Array.isArray(liveItem.matchCategories)
+        ? liveItem.matchCategories.slice(0, 6)
+        : [],
+      offer
+    };
+  }
+
+  async function refreshAutoMatchesForProduct(product, { silent = true } = {}) {
+    if (!product) return { updated: 0, errors: [] };
+
+    const profile = matchingProfile(product);
+    const nextStores = {};
+    const nextCounts = {};
+    const errors = [];
+    let updated = 0;
+
+    for (const store of AUTO_MATCH_STORES) {
+      const module = autoLiveModule(store);
+      if (!module?.matchCandidates) {
+        nextStores[store] = [];
+        nextCounts[store] = 0;
+        errors.push(`${retailer(store).name}: Matching-Modul fehlt`);
+        continue;
+      }
+
+      try {
+        const storeProfile = {
+          ...profile,
+          excludedIds: (profile.excludedIds || [])
+            .filter(id => String(id).startsWith(`${store}:`))
+            .map(id => String(id).slice(store.length + 1))
+        };
+
+        const result = await module.matchCandidates(storeProfile, AUTO_MATCH_SEARCH_LIMIT);
+        const candidates = [];
+
+        for (const liveItem of result.items || []) {
+          const candidateId = autoCandidateKey(store, liveItem);
+          if (!candidateId || (profile.excludedIds || []).includes(candidateId)) continue;
+
+          const offer = autoOfferFromLiveItem(store, liveItem);
+          if (!offer) continue;
+
+          const pricing = offerPricingForTarget(product, offer, 1);
+          if (!pricing) continue;
+
+          candidates.push({
+            candidate: compactAutoCandidate(store, liveItem, offer),
+            pricing
+          });
+        }
+
+        candidates.sort((a, b) =>
+          (a.pricing.lineTotal - b.pricing.lineTotal) ||
+          (a.pricing.effectiveBaseUnitPrice - b.pricing.effectiveBaseUnitPrice) ||
+          (a.candidate.matchScore - b.candidate.matchScore)
+        );
+
+        nextStores[store] = candidates
+          .slice(0, AUTO_MATCH_LIMIT_PER_STORE)
+          .map(row => row.candidate);
+        nextCounts[store] = candidates.length;
+        updated += nextStores[store].length;
+      } catch (error) {
+        nextStores[store] = [];
+        nextCounts[store] = 0;
+        errors.push(`${retailer(store).name}: ${error.message}`);
+      }
+    }
+
+    product.autoMatches = {
+      updatedAt: new Date().toISOString(),
+      query: profile.query,
+      stores: nextStores,
+      counts: nextCounts,
+      error: errors.length ? errors.join(" | ") : null
+    };
+
+    const fixedId = product.matchingProfile?.fixedCandidateId;
+    if (
+      product.matchingProfile?.mode === "fixed" &&
+      fixedId &&
+      !storedAutoCandidates(product).some(candidate => candidate.id === fixedId)
+    ) {
+      product.matchingProfile.mode = "auto";
+      product.matchingProfile.fixedCandidateId = null;
+    }
+
+    if (!silent && errors.length) {
+      showToast(`Treffer aktualisiert · ${errors.length} Händler mit Fehler`);
+    }
+
+    return { updated, errors };
+  }
+
+  function autoMatchesNeedRefresh(product) {
+    const profile = matchingProfile(product);
+    const cache = product?.autoMatches || {};
+    if (!cache.updatedAt) return true;
+    if (String(cache.query || "") !== String(profile.query || "")) return true;
+
+    const age = Date.now() - new Date(cache.updatedAt).getTime();
+    return !Number.isFinite(age) || age > AUTO_MATCH_MAX_AGE_MS;
+  }
+
+  async function refreshAllAutoMatches({ force = false, silent = true } = {}) {
+    if (autoMatchRefreshing || !navigator.onLine) return;
+    autoMatchRefreshing = true;
+    renderMore();
+
+    const targets = state.products.filter(product => force || autoMatchesNeedRefresh(product));
+    let updated = 0;
+    const errors = [];
+
+    try {
+      // Small batches keep mobile devices responsive while the retailer index
+      // scans tens of thousands of public products.
+      for (let i = 0; i < targets.length; i += 2) {
+        const batch = targets.slice(i, i + 2);
+        const results = await Promise.all(
+          batch.map(product => refreshAutoMatchesForProduct(product, { silent: true }))
+        );
+        results.forEach(result => {
+          updated += result.updated;
+          errors.push(...result.errors);
+        });
+        saveState();
+        renderAll();
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      if (!silent) {
+        showToast(errors.length
+          ? `${updated} Auto-Treffer · ${errors.length} Fehler`
+          : `${updated} Auto-Treffer aktualisiert`
+        );
+      }
+    } finally {
+      autoMatchRefreshing = false;
+      saveState();
+      renderAll();
+    }
+  }
+
   function linkMpreisResult(productId, liveItem) {
     const product = productById(productId);
     if (!product || !liveItem) return;
@@ -2050,6 +2416,7 @@
   function renderSparLiveStatus() {
     const live = state.live?.spar || {};
     const linked = state.products.filter(p => p.liveLinks?.spar).length;
+    const autoLinked = state.products.filter(p => Array.isArray(p.autoMatches?.stores?.spar) && p.autoMatches.stores.spar.length).length;
 
     const linkedEl = $("#sparLinkedCount");
     const lastEl = $("#sparLastSync");
@@ -2057,7 +2424,9 @@
     const promoBtn = $("#showSparPromotionsBtn");
     if (!linkedEl || !lastEl || !statusEl) return;
 
-    linkedEl.textContent = `${linked} Artikel verknüpft`;
+    linkedEl.textContent = autoLinked
+      ? `${autoLinked} Artikel automatisch${linked ? ` · ${linked} manuell` : ""}`
+      : `${linked} Artikel manuell verknüpft`;
     statusEl.className = "status-badge";
 
     if (live.lastError) {
@@ -2461,6 +2830,7 @@
   function renderTgLiveStatus() {
     const live = state.live?.tg || {};
     const linked = state.products.filter(p => p.liveLinks?.tg).length;
+    const autoLinked = state.products.filter(p => Array.isArray(p.autoMatches?.stores?.tg) && p.autoMatches.stores.tg.length).length;
 
     const linkedEl = $("#tgLinkedCount");
     const lastEl = $("#tgLastSync");
@@ -2470,7 +2840,9 @@
 
     if (!linkedEl || !lastEl || !statusEl) return;
 
-    linkedEl.textContent = `${linked} Artikel verknüpft`;
+    linkedEl.textContent = autoLinked
+      ? `${autoLinked} Artikel automatisch${linked ? ` · ${linked} manuell` : ""}`
+      : `${linked} Artikel manuell verknüpft`;
     statusEl.className = "status-badge";
 
     if (live.lastError) {
@@ -2914,27 +3286,267 @@
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
+  function openAutoMatchSheet(productId, quantity = 1, store = "all") {
+    const product = productById(productId);
+    if (!product) return;
+
+    currentAutoMatchProductId = productId;
+    currentAutoMatchQuantity = Math.max(1, Number(quantity || 1));
+    currentAutoMatchStore = AUTO_MATCH_STORES.includes(store) ? store : "all";
+
+    $("#autoMatchTitle").textContent = product.name;
+    $("#autoMatchQuery").value = matchingProfile(product).query || product.name;
+    renderAutoMatchSheet();
+    openSheet("autoMatchSheet");
+
+    if (autoMatchesNeedRefresh(product)) {
+      setTimeout(() => refreshCurrentAutoMatchProduct({ silent: true }), 80);
+    }
+  }
+
+  function renderAutoMatchSheet() {
+    const product = productById(currentAutoMatchProductId);
+    if (!product) return;
+
+    const profile = matchingProfile(product);
+    const counts = autoMatchCountsByStore(product);
+    const total = autoMatchCount(product);
+    const options = rankedAutoOptions(product, currentAutoMatchQuantity, currentAutoMatchStore, 10);
+    const fixed = profile.fixedCandidateId
+      ? storedAutoCandidates(product).find(candidate => candidate.id === profile.fixedCandidateId)
+      : null;
+
+    $("#autoMatchSummary").innerHTML = `
+      <div class="auto-match-summary-main">
+        <div><strong>${total}</strong><span> passende Kandidaten</span></div>
+        <div class="muted small">Vergleich: ${escapeHtml(fmtAmount(product))}${currentAutoMatchQuantity > 1 ? ` × ${currentAutoMatchQuantity}` : ""}</div>
+      </div>
+      <div class="auto-match-store-counts">
+        <span><i style="background:${retailer("mpreis").color}"></i>MPREIS ${counts.mpreis || 0}</span>
+        <span><i style="background:${retailer("spar").color}"></i>SPAR ${counts.spar || 0}</span>
+        <span><i style="background:${retailer("tg").color}"></i>T&G ${counts.tg || 0}</span>
+      </div>
+      ${fixed ? `<div class="auto-fixed-note">Fest gewählt: <strong>${escapeHtml(fixed.name)}</strong> · ${retailer(fixed.store).name}</div>` : ""}
+    `;
+
+    const autoModeButton = $("#useAutoMatchModeBtn");
+    autoModeButton.classList.toggle("is-active", profile.mode !== "fixed");
+
+    const resetExclusionsButton = $("#resetAutoMatchExclusionsBtn");
+    if (resetExclusionsButton) {
+      const excludedCount = (profile.excludedIds || []).length;
+      resetExclusionsButton.disabled = excludedCount === 0;
+      resetExclusionsButton.textContent = excludedCount
+        ? `Ausblendungen zurücksetzen (${excludedCount})`
+        : "Keine Ausblendungen";
+    }
+    autoModeButton.textContent = profile.mode === "fixed"
+      ? "Automatisch günstigsten verwenden"
+      : "✓ Automatisch günstigster";
+
+    $$("#autoMatchStoreFilter [data-auto-match-store]").forEach(button => {
+      button.classList.toggle("is-active", button.dataset.autoMatchStore === currentAutoMatchStore);
+    });
+
+    const stateEl = $("#autoMatchState");
+    const updatedAt = product.autoMatches?.updatedAt;
+    if (autoMatchRefreshing) {
+      stateEl.textContent = "Passende Händlerprodukte werden gesucht …";
+    } else if (product.autoMatches?.error) {
+      stateEl.textContent = `Letzte Suche mit Hinweis: ${product.autoMatches.error}`;
+    } else if (updatedAt) {
+      const date = new Date(updatedAt);
+      stateEl.textContent = `Letzte automatische Suche: ${date.toLocaleString("de-AT", {
+        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+      })}`;
+    } else {
+      stateEl.textContent = "Noch keine automatische Suche durchgeführt.";
+    }
+
+    const resultsEl = $("#autoMatchResults");
+    if (!options.length) {
+      resultsEl.innerHTML = `
+        <div class="empty-state compact-auto-empty">
+          <strong>Keine vergleichbaren Treffer</strong>
+          <p>Suchprofil prüfen oder die Händlerdaten neu durchsuchen.</p>
+        </div>`;
+      return;
+    }
+
+    resultsEl.innerHTML = options.map((candidate, index) => {
+      const store = retailer(candidate.store);
+      const condition = offerConditionLabel(candidate.offer);
+      const packageInfo = pricingPackageSummary(product, candidate.offer, candidate.pricing);
+      const selected = profile.mode === "fixed" && profile.fixedCandidateId === candidate.id;
+
+      return `
+        <article class="auto-option-card" style="--auto-store:${store.color}">
+          <div class="auto-option-rank">${index + 1}</div>
+          <div class="auto-option-main">
+            <div class="auto-option-store"><span class="market-dot" style="background:${store.color}"></span>${store.name}</div>
+            <strong>${escapeHtml(candidate.name)}</strong>
+            <div class="muted small">${escapeHtml(packageInfo)}</div>
+            ${condition ? `<div class="offer-extra"><span class="offer-badge condition">${escapeHtml(condition)}</span></div>` : ""}
+          </div>
+          <div class="auto-option-price">
+            <strong>${money(candidate.pricing.lineTotal)}</strong>
+            <span>${candidate.pricing.effectiveBaseUnitPrice != null ? `${money(candidate.pricing.effectiveBaseUnitPrice)}/${candidate.pricing.baseUnit}` : ""}</span>
+            <button class="auto-select-btn ${selected ? "is-selected" : ""}" data-auto-select-candidate="${escapeAttr(candidate.id)}" type="button" ${selected ? "disabled" : ""}>
+              ${selected ? "Gewählt" : "Fest wählen"}
+            </button>
+            <button class="auto-exclude-btn" data-auto-exclude-candidate="${escapeAttr(candidate.id)}" type="button">Ausblenden</button>
+          </div>
+        </article>`;
+    }).join("");
+  }
+
+  async function refreshCurrentAutoMatchProduct({ silent = false } = {}) {
+    const product = productById(currentAutoMatchProductId);
+    if (!product || autoMatchRefreshing) return;
+
+    autoMatchRefreshing = true;
+    renderAutoMatchSheet();
+    renderMore();
+
+    try {
+      const result = await refreshAutoMatchesForProduct(product, { silent: true });
+      saveState();
+      renderAll();
+      renderAutoMatchSheet();
+      if (!silent) {
+        showToast(result.errors.length
+          ? `${result.updated} Treffer · ${result.errors.length} Fehler`
+          : `${result.updated} Treffer aktualisiert`
+        );
+      }
+    } finally {
+      autoMatchRefreshing = false;
+      renderAll();
+      renderAutoMatchSheet();
+    }
+  }
+
+  function useAutomaticMatching(productId = currentAutoMatchProductId) {
+    const product = productById(productId);
+    if (!product) return;
+    product.matchingProfile = product.matchingProfile || {};
+    product.matchingProfile.mode = "auto";
+    product.matchingProfile.fixedCandidateId = null;
+    saveState();
+    renderAll();
+    renderAutoMatchSheet();
+    showToast("Automatisch günstigster Treffer aktiviert");
+  }
+
+  function selectFixedAutoCandidate(candidateId) {
+    const product = productById(currentAutoMatchProductId);
+    if (!product) return;
+    const candidate = storedAutoCandidates(product).find(row => row.id === candidateId);
+    if (!candidate) return;
+
+    product.matchingProfile = product.matchingProfile || {};
+    product.matchingProfile.mode = "fixed";
+    product.matchingProfile.fixedCandidateId = candidate.id;
+    saveState();
+    renderAll();
+    renderAutoMatchSheet();
+    showToast(`${candidate.name} fest gewählt`);
+  }
+
+  function excludeAutoCandidate(candidateId) {
+    const product = productById(currentAutoMatchProductId);
+    if (!product) return;
+    product.matchingProfile = product.matchingProfile || {};
+    product.matchingProfile.excludedIds = Array.isArray(product.matchingProfile.excludedIds)
+      ? product.matchingProfile.excludedIds
+      : [];
+
+    if (!product.matchingProfile.excludedIds.includes(candidateId)) {
+      product.matchingProfile.excludedIds.push(candidateId);
+    }
+
+    if (product.matchingProfile.fixedCandidateId === candidateId) {
+      product.matchingProfile.mode = "auto";
+      product.matchingProfile.fixedCandidateId = null;
+    }
+
+    saveState();
+    renderAll();
+    renderAutoMatchSheet();
+  }
+
+  function resetAutoMatchExclusions() {
+    const product = productById(currentAutoMatchProductId);
+    if (!product) return;
+    product.matchingProfile = product.matchingProfile || {};
+    product.matchingProfile.excludedIds = [];
+    saveState();
+    renderAll();
+    renderAutoMatchSheet();
+    showToast("Ausblendungen zurückgesetzt");
+  }
+
+  function saveAutoMatchQuery() {
+    const product = productById(currentAutoMatchProductId);
+    if (!product) return;
+    const query = String($("#autoMatchQuery")?.value || "").trim();
+    if (query.length < 2) {
+      showToast("Suchprofil benötigt mindestens 2 Zeichen");
+      return;
+    }
+
+    product.matchingProfile = product.matchingProfile || {};
+    product.matchingProfile.query = query;
+    product.matchingProfile.queryAuto = false;
+    product.matchingProfile.mode = "auto";
+    product.matchingProfile.fixedCandidateId = null;
+    product.autoMatches = { updatedAt: null, query: null, stores: {}, counts: {} };
+    saveState();
+    renderAll();
+    refreshCurrentAutoMatchProduct({ silent: false });
+  }
+
   function renderMore() {
-    $("#databaseList").innerHTML = state.products.map(p => `
-      <div class="database-item">
-        <div>
+    $("#databaseList").innerHTML = state.products.map(p => {
+      const counts = autoMatchCountsByStore(p);
+      const total = autoMatchCount(p);
+      const profile = matchingProfile(p);
+      const autoState = p.autoMatches?.updatedAt ? "aktuell" : "noch nicht gesucht";
+
+      return `
+      <div class="database-item database-auto-item">
+        <div class="database-auto-main">
           <strong>${escapeHtml(p.name)}</strong>
-          <div class="muted">${escapeHtml(p.category)} · ${fmtAmount(p)} · ${(p.offers || []).length} Preise</div>
+          <div class="muted">${escapeHtml(p.category)} · ${fmtAmount(p)}</div>
+          <div class="auto-database-status">
+            <span class="auto-database-badge ${profile.mode === "fixed" ? "is-fixed" : ""}">${profile.mode === "fixed" ? "Fest gewählt" : "Automatisch"}</span>
+            <span>MPREIS ${counts.mpreis || 0}</span>
+            <span>SPAR ${counts.spar || 0}</span>
+            <span>T&G ${counts.tg || 0}</span>
+          </div>
+          <div class="muted small">${total} passende Kandidaten · ${autoState}</div>
         </div>
-        <div class="database-actions">
-          <button class="database-live-btn ${p.liveLinks?.mpreis ? "is-linked" : ""}" data-link-mpreis="${p.id}">
-            ${p.liveLinks?.mpreis ? "MPREIS ✓" : "MPREIS"}
-          </button>
-          <button class="database-live-btn spar-live-btn ${p.liveLinks?.spar ? "is-linked" : ""}" data-link-spar="${p.id}">
-            ${p.liveLinks?.spar ? "SPAR ✓" : "SPAR"}
-          </button>
-          <button class="database-live-btn tg-live-btn ${p.liveLinks?.tg ? "is-linked" : ""}" data-link-tg="${p.id}">
-            ${p.liveLinks?.tg ? "T&G ✓" : "T&G"}
-          </button>
+        <div class="database-actions database-auto-actions">
+          <button class="database-auto-review" data-auto-options-product="${p.id}" data-auto-options-quantity="1">Treffer prüfen</button>
           <button class="database-edit" data-edit-product="${p.id}">Bearbeiten</button>
           <button class="database-delete" data-delete-product="${p.id}">Löschen</button>
         </div>
-      </div>`).join("");
+        <details class="manual-links-details">
+          <summary>Manuelle Verknüpfung (optional)</summary>
+          <div class="manual-links-row">
+            <button class="database-live-btn ${p.liveLinks?.mpreis ? "is-linked" : ""}" data-link-mpreis="${p.id}">${p.liveLinks?.mpreis ? "MPREIS ✓" : "MPREIS"}</button>
+            <button class="database-live-btn spar-live-btn ${p.liveLinks?.spar ? "is-linked" : ""}" data-link-spar="${p.id}">${p.liveLinks?.spar ? "SPAR ✓" : "SPAR"}</button>
+            <button class="database-live-btn tg-live-btn ${p.liveLinks?.tg ? "is-linked" : ""}" data-link-tg="${p.id}">${p.liveLinks?.tg ? "T&G ✓" : "T&G"}</button>
+          </div>
+        </details>
+      </div>`;
+    }).join("");
+
+    const autoRefreshButton = $("#refreshAutoMatchesBtn");
+    if (autoRefreshButton) {
+      autoRefreshButton.disabled = autoMatchRefreshing;
+      autoRefreshButton.textContent = autoMatchRefreshing ? "Sucht …" : "Neu suchen";
+    }
 
     renderMpreisLiveStatus();
     renderSparLiveStatus();
@@ -2966,6 +3578,7 @@
       return a.pricing.lineTotal - b.pricing.lineTotal;
     });
     const comparableRows = offerRows.filter(row => row.pricing);
+    const visibleOfferRows = offerRows.slice(0, 12);
     const history = productHistory(p);
     const stats = productPriceStats(p);
 
@@ -2978,6 +3591,9 @@
         <button class="article-edit-btn detail-edit-product-btn" data-edit-product="${p.id}" type="button">
           ✎ Artikel bearbeiten
         </button>
+        <button class="article-edit-btn detail-edit-product-btn" data-auto-options-product="${p.id}" data-auto-options-quantity="1" type="button">
+          ${autoMatchCount(p) ? "10 Alternativen" : "Auto-Treffer"}
+        </button>
       </div>
 
       ${stats ? `<div class="price-stat-grid">
@@ -2987,7 +3603,7 @@
       </div><div class="muted small comparison-stat-note">Preisverlauf auf ${fmtAmount(p)} normiert</div>` : ""}
 
       <div>
-        ${offerRows.length ? offerRows.map((row) => {
+        ${visibleOfferRows.length ? visibleOfferRows.map((row) => {
           const o = row.offer;
           const pricing = row.pricing;
           const r = retailer(o.store);
@@ -3014,6 +3630,7 @@
             </div>
           </div>`;
         }).join("") : `<div class="empty-state"><p>Für diesen Artikel sind noch keine Preise hinterlegt.</p></div>`}
+        ${offerRows.length > visibleOfferRows.length ? `<button class="secondary-btn full detail-more-options" data-auto-options-product="${p.id}" data-auto-options-quantity="1">Weitere automatische Alternativen anzeigen</button>` : ""}
       </div>
 
       ${history.length ? `
@@ -3136,7 +3753,17 @@
       amount: Number(formData.amount),
       unit: formData.unit,
       favorite: false,
-      offers: []
+      offers: [],
+      liveLinks: {},
+      matchingProfile: {
+        mode: "auto",
+        query: formData.name,
+        queryAuto: true,
+        fixedCandidateId: null,
+        exclusions: [],
+        excludedIds: []
+      },
+      autoMatches: { updatedAt: null, query: null, stores: {}, counts: {} }
     };
     if (formData.store && formData.regularPrice) {
       const unitPrice = calculateUnitPrice(Number(formData.salePrice || formData.regularPrice), product.amount, product.unit);
@@ -3162,6 +3789,9 @@
     }
     state.products.push(product);
     saveState(); renderAll(); showToast("Artikel gespeichert");
+    setTimeout(() => refreshAutoMatchesForProduct(product, { silent: true })
+      .then(() => { saveState(); renderAll(); })
+      .catch(() => {}), 100);
   }
 
   function calculateUnitPrice(price, amount, unit) {
@@ -3210,6 +3840,7 @@
   function updateProductCore(product, values) {
     if (!product) return false;
 
+    const previousIdentity = `${product.name || ""}|${product.brand || ""}|${product.category || ""}|${normalizeMeasureUnit(product.unit) || ""}`;
     const name = String(values.name || "").trim();
     const brand = String(values.brand || "").trim();
     const category = String(values.category || "").trim();
@@ -3227,6 +3858,19 @@
     product.category = category;
     product.amount = cleanComparisonAmount(amount, unit);
     product.unit = unit;
+
+    product.matchingProfile = product.matchingProfile || {};
+    if (product.matchingProfile.queryAuto !== false) {
+      product.matchingProfile.query = name;
+      product.matchingProfile.queryAuto = true;
+    }
+
+    const nextIdentity = `${name}|${brand}|${category}|${unit}`;
+    if (previousIdentity !== nextIdentity) {
+      product.matchingProfile.mode = "auto";
+      product.matchingProfile.fixedCandidateId = null;
+      product.autoMatches = { updatedAt: null, query: null, stores: {}, counts: {} };
+    }
 
     return true;
   }
@@ -3252,11 +3896,18 @@
       return;
     }
 
+    const editedProduct = product;
     currentEditProductId = null;
     saveState();
     renderAll();
     closeSheets();
     showToast("Artikel aktualisiert");
+
+    if (autoMatchesNeedRefresh(editedProduct)) {
+      setTimeout(() => refreshAutoMatchesForProduct(editedProduct, { silent: true })
+        .then(() => { saveState(); renderAll(); })
+        .catch(() => {}), 100);
+    }
   }
 
   function deleteProduct(productId) {
@@ -3372,6 +4023,38 @@
 
     const editProduct = e.target.closest("[data-edit-product]");
     if (editProduct) return openEditProduct(editProduct.dataset.editProduct);
+
+    const autoOptions = e.target.closest("[data-auto-options-product]");
+    if (autoOptions) {
+      return openAutoMatchSheet(
+        autoOptions.dataset.autoOptionsProduct,
+        autoOptions.dataset.autoOptionsQuantity || 1
+      );
+    }
+
+    const autoStoreFilter = e.target.closest("[data-auto-match-store]");
+    if (autoStoreFilter) {
+      currentAutoMatchStore = autoStoreFilter.dataset.autoMatchStore;
+      return renderAutoMatchSheet();
+    }
+
+    const autoSelect = e.target.closest("[data-auto-select-candidate]");
+    if (autoSelect) return selectFixedAutoCandidate(autoSelect.dataset.autoSelectCandidate);
+
+    const autoExclude = e.target.closest("[data-auto-exclude-candidate]");
+    if (autoExclude) return excludeAutoCandidate(autoExclude.dataset.autoExcludeCandidate);
+
+    const autoMode = e.target.closest("#useAutoMatchModeBtn");
+    if (autoMode) return useAutomaticMatching();
+
+    const refreshAutoProduct = e.target.closest("#refreshAutoMatchProductBtn");
+    if (refreshAutoProduct) return refreshCurrentAutoMatchProduct({ silent: false });
+
+    const saveAutoQuery = e.target.closest("#saveAutoMatchQueryBtn");
+    if (saveAutoQuery) return saveAutoMatchQuery();
+
+    const resetAutoExclusions = e.target.closest("#resetAutoMatchExclusionsBtn");
+    if (resetAutoExclusions) return resetAutoMatchExclusions();
 
     const openProduct = e.target.closest("[data-open-product]");
     if (openProduct) {
@@ -3551,6 +4234,10 @@
     tgSearchTimer = setTimeout(() => searchTgProducts(query), 320);
   });
 
+  $("#refreshAutoMatchesBtn").addEventListener("click", () => {
+    refreshAllAutoMatches({ force: true, silent: false });
+  });
+
   $("#syncMpreisBtn").addEventListener("click", reloadAndSyncMpreis);
   $("#syncSparBtn").addEventListener("click", reloadAndSyncSpar);
   $("#syncTgBtn").addEventListener("click", reloadAndSyncTg);
@@ -3641,4 +4328,11 @@
       setTimeout(() => syncLinkedTg({ silent: true }).catch(() => {}), 700);
     }
   });
+
+  // Automatic candidate pools are local/private and refreshed independently
+  // from the old 1:1 live links. Existing cached candidates render instantly;
+  // stale/missing pools are rebuilt in the background.
+  setTimeout(() => {
+    refreshAllAutoMatches({ force: false, silent: true }).catch(() => {});
+  }, 1100);
 })();

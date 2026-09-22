@@ -33,3 +33,23 @@ Die App zeigt stattdessen:
 
 Eine unvollständige Teilsumme wird niemals mit einer vollständigen Gesamtsumme
 gleichgesetzt.
+
+
+## Automatische Kandidaten ab v12.0
+
+Ein persönlicher Artikel kann pro Markt mehrere passende Händlerprodukte
+besitzen. `pricedOfferForStore()` bewertet sämtliche aktiven Kandidaten des
+Markts für die tatsächlich gewünschte Einkaufsmenge und wählt erst danach die
+günstigste reale Kaufkombination.
+
+Damit wird nicht der niedrigste aufgedruckte Gebindepreis gewählt, sondern die
+Kassenbelastung nach:
+- benötigter Anzahl ganzer Gebinde,
+- Mindestmengen,
+- N+M-Bundles,
+- Gültigkeitszeitraum,
+- Vergleichsmenge.
+
+Eine feste Kandidatenauswahl reduziert den automatischen Händlerkandidatenpool
+auf den vom Nutzer gewählten Datensatz; manuelle Preise anderer, noch nicht
+automatisch angebundener Märkte bleiben weiterhin verfügbar.

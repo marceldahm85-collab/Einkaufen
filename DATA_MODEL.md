@@ -105,3 +105,30 @@ Mengen-/Bundle-Aktionsbedingungen ausgewertet.
 Beispiel: persönliche Vergleichsmenge `10 l`; Händler A verkauft `10 l`, Händler
 B `3 l`. Für A wird 1 Gebinde, für B werden 4 Gebinde (= 12 l Kaufmenge)
 berechnet. Verglichen werden die tatsächlichen Einkaufskosten.
+
+
+## Schema v5 – automatische Händlerkandidaten
+
+Persönliche Produkte besitzen zusätzlich:
+
+```text
+matchingProfile:
+  mode: auto | fixed
+  query: lokaler Suchbegriff
+  queryAuto: bool
+  fixedCandidateId: optional
+  exclusions: []
+  excludedIds: []
+
+autoMatches:
+  updatedAt
+  query
+  counts
+  stores:
+    mpreis: [kompakte Kandidaten]
+    spar:   [kompakte Kandidaten]
+    tg:     [kompakte Kandidaten]
+```
+
+`autoMatches` und `matchingProfile` sind private Browserdaten. Sie werden nicht
+in den öffentlichen GitHub-Preisdatenbestand geschrieben.
