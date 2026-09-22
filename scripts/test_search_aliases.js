@@ -72,4 +72,101 @@ const colaMatches = safetyRows.filter(row => api.matchProfile(row, colaProfile).
 assert(colaMatches.includes("Coca Cola Original"));
 assert(!colaMatches.includes("Coca Cola Zero"));
 
+
+// v12.2 regression: Descriptions may mention another product type without
+// turning the item into an automatic candidate.
+const regressionItems = [
+  {
+    name: "Wiener Feinkristallzucker",
+    description: "Feiner Zucker, ideal zum Süßen von Kaffee und Tee"
+  },
+  {
+    name: "TM BB Fruchtjoghurt Kaffee",
+    description: "Joghurt mit Kaffeegeschmack"
+  },
+  {
+    name: "Tirol Milch Joghurt Kaffee",
+    description: "Joghurt, Sorte Kaffee"
+  },
+  {
+    name: "Lavazza Caffè Crema",
+    description: "Ganze Bohnen"
+  },
+  {
+    name: "Dallmayr Crema d'Oro",
+    description: "Kaffeebohnen"
+  },
+  {
+    name: "S-BUDGET Apfelstrudel",
+    description: "mit feiner Butter"
+  },
+  {
+    name: "Butter-Topfengolatsche",
+    description: "100 g"
+  },
+  {
+    name: "Ölz Butter Madeleines",
+    description: "200 g"
+  },
+  {
+    name: "SPAR PREMIUM Danish Butter Cookies",
+    description: "250 g"
+  },
+  {
+    name: "Schärdinger Teebutter",
+    description: "250 g"
+  },
+  {
+    name: "Crafties Chips Puntigamer Bier",
+    description: "Chips mit Biergeschmack"
+  },
+  {
+    name: "Zipfer Märzen",
+    description: "0,5 l"
+  },
+  {
+    name: "Barilla Pesto Genovese",
+    description: "190 g"
+  }
+];
+
+const regressionRows = api.buildIndex(regressionItems);
+
+const coffeeProfile = api.profileForProduct({
+  name: "Caffè Crema Bohnen",
+  brand: "verschiedene",
+  matchingProfile: { query: "Caffè Crema Bohnen" }
+});
+const coffeeMatches = regressionRows
+  .filter(row => api.matchProfile(row, coffeeProfile).matched)
+  .map(row => row.item.name);
+assert(coffeeMatches.includes("Lavazza Caffè Crema"));
+assert(coffeeMatches.includes("Dallmayr Crema d'Oro"));
+assert(!coffeeMatches.includes("Wiener Feinkristallzucker"));
+assert(!coffeeMatches.includes("TM BB Fruchtjoghurt Kaffee"));
+assert(!coffeeMatches.includes("Tirol Milch Joghurt Kaffee"));
+
+const butterRegressionMatches = regressionRows
+  .filter(row => api.matchProfile(row, butterProfile).matched)
+  .map(row => row.item.name);
+assert(butterRegressionMatches.includes("Schärdinger Teebutter"));
+assert(!butterRegressionMatches.includes("S-BUDGET Apfelstrudel"));
+assert(!butterRegressionMatches.includes("Butter-Topfengolatsche"));
+assert(!butterRegressionMatches.includes("Ölz Butter Madeleines"));
+assert(!butterRegressionMatches.includes("SPAR PREMIUM Danish Butter Cookies"));
+
+const beerRegressionMatches = regressionRows
+  .filter(row => api.matchProfile(row, beerProfile).matched)
+  .map(row => row.item.name);
+assert(beerRegressionMatches.includes("Zipfer Märzen"));
+assert(!beerRegressionMatches.includes("Crafties Chips Puntigamer Bier"));
+
+// Broad brands must not classify unrelated product ranges.
+const spaghettiRegressionMatches = regressionRows
+  .filter(row => api.matchProfile(row, spaghettiProfile).matched)
+  .map(row => row.item.name);
+assert(!spaghettiRegressionMatches.includes("Barilla Pesto Genovese"));
+
+assert.strictEqual(api.version, 2);
+
 console.log("Search alias/profile safety tests OK");
