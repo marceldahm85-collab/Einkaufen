@@ -129,6 +129,42 @@
     "verschiedene", "vergleichbar", "ohne marke", "diverse", "eigenmarke"
   ]);
 
+  const MATCH_ENGINE_VERSION = 2;
+
+  const TRUSTED_BRAND_CATEGORIES = {
+    bier: [
+      "gösser", "goesser", "stiegl", "zipfer", "puntigamer", "ottakringer",
+      "schwechater", "wieselburger", "hirter", "villacher", "egger", "kaiser",
+      "murauer", "mohren", "trumer", "zillertal bier", "augustiner",
+      "hacker pschorr", "corona", "heineken", "budweiser", "budvar",
+      "pilsner urquell", "bitburger", "warsteiner", "krombacher", "erdinger",
+      "paulaner", "franziskaner", "guinness", "bierol"
+    ],
+    kaffee: [
+      "lavazza", "illy", "segafredo", "dallmayr", "jacobs",
+      "julius meinl", "meinl", "alps coffee"
+    ],
+    wasser: [
+      "vöslauer", "voeslauer", "römerquelle", "romerquelle",
+      "silberquelle", "alpquell"
+    ],
+    limonade: ["coca cola", "coca-cola", "pepsi", "almdudler", "schweppes"],
+    energy: ["red bull", "monster"],
+    sekt: ["valdo"],
+    schokolade: ["milka", "lindt", "ritter sport"],
+    toilettenpapier: ["cosy"],
+    waschmittel: ["ariel", "persil", "fewa"],
+    katzenfutter: ["whiskas", "dreamies"],
+    hundefutter: ["pedigree"]
+  };
+
+  const TRUSTED_BRANDS_PREPARED = Object.fromEntries(
+    Object.entries(TRUSTED_BRAND_CATEGORIES).map(([category, brands]) => [
+      category,
+      brands.map(normalize)
+    ])
+  );
+
   function normalize(value) {
     return String(value || "")
       .normalize("NFD")
@@ -149,22 +185,62 @@
     normalizedBrands: [...new Set(def.brands.map(normalize).filter(Boolean))]
   }));
 
+  function nameHasMarker(name, marker) {
+    const paddedName = ` ${name} `;
+    return paddedName.includes(` ${marker} `);
+  }
+
+  function trustedBrandCategoriesForName(name) {
+    const normalizedName = normalize(name);
+    const result = [];
+
+    Object.entries(TRUSTED_BRANDS_PREPARED).forEach(([category, brands]) => {
+      const hit = brands.some(brand =>
+        normalizedName === brand ||
+        normalizedName.startsWith(`${brand} `)
+      );
+      if (hit) result.push(category);
+    });
+
+    return result;
+  }
+
+  function exactKnownBrandCategories(name) {
+    const normalizedName = normalize(name);
+    const result = [];
+
+    prepared.forEach(def => {
+      const exact = def.normalizedBrands.some(brand => normalizedName === brand);
+      if (exact) result.push(def.id);
+    });
+
+    return result;
+  }
+
   function directCategories(item) {
-    const text = padded(`${item?.name || ""} ${item?.description || ""}`);
     const name = normalize(item?.name || "");
     const result = [];
 
     for (const def of prepared) {
+      const aliasMatch = def.normalizedAliases.some(alias =>
+        name === alias || nameHasMarker(name, alias)
+      );
       const markerMatch = def.normalizedMarkers.some(marker =>
-        text.includes(` ${marker} `)
+        nameHasMarker(name, marker)
       );
-      const brandMatch = def.normalizedBrands.some(brand =>
-        name === brand || name.startsWith(`${brand} `)
-      );
-      if (markerMatch || brandMatch) result.push(def.id);
+      if (aliasMatch || markerMatch) result.push(def.id);
     }
 
+    result.push(...exactKnownBrandCategories(name));
+    result.push(...trustedBrandCategoriesForName(name));
+
     return [...new Set(result)];
+  }
+
+  function conflictingCategories(entryCategories, profileCategories) {
+    if (!Array.isArray(entryCategories) || entryCategories.length <= 1) return [];
+    const allowed = new Set(profileCategories || []);
+    return entryCategories.filter(category => !allowed.has(category));
   }
 
   function brandKey(item) {
@@ -223,7 +299,15 @@
 
     rows.forEach(row => {
       const inferred = propagated.get(row.brandKey);
-      if (inferred && !row.categories.includes(inferred)) row.categories.push(inferred);
+      const brandOnly = Boolean(
+        inferred &&
+        row.categories.length === 0 &&
+        row.name === row.brandKey
+      );
+
+      if (brandOnly && !row.categories.includes(inferred)) {
+        row.categories.push(inferred);
+      }
 
       const aliases = row.categories.flatMap(category => {
         const def = prepared.find(entry => entry.id === category);
@@ -299,18 +383,30 @@
       if (!q.includes(" alkoholfrei ") && !q.includes(" 0 0 ")) {
         exclusions.push("alkoholfrei", "alkfrei", "alkfr", "alk fr", "0 0");
       }
-      exclusions.push("biersenf", "bierkase", "bierkäse", "dosenadapter", "preisel");
+      exclusions.push(
+        "biersenf", "bierkase", "bierkäse", "dosenadapter", "preisel",
+        "af"
+      );
     }
 
     if (categoryIds.includes("butter")) {
       exclusions.push(
-        "croissant", "buttertoast", "butter toast", "butterzopf",
-        "butterkeks", "buttergemuse", "buttergemüse", "buttermilch",
-        "butterkase", "butterkäse", "butterschmalz", "butterdose",
-        "nussschnecke", "laugenspitz", "topfengolatsche", "pinze",
-        "sables", "sablés", "madeleine", "chicken", "hauskeks",
-        "alpenkeks", "peanut", "truffel", "trüffel", "krauter",
-        "kräuter"
+        "croissant", "toast", "zopf", "stollen", "brioche", "breze",
+        "brezel", "laugenspitz", "pinze", "keks", "kekse", "gebäck", "geback",
+        "popcorn", "strudel", "nusskrone", "krone", "marillenspitz",
+        "baguette", "flutes", "schnecke", "brille", "kipferl",
+        "madeleine", "sables", "waffel", "waffeln", "cracker", "chicken",
+        "gemüse", "gemuse", "buttermilch", "butterkase", "butterkäse",
+        "butterschmalz", "butterdose", "peanut", "truffel", "trüffel",
+        "krauter", "kräuter", "knoblauch", "margarine", "rama",
+        "skin", "lip", "lotion", "balsam", "dusch", "topfengolatsche",
+        "khorasan", "brot", "spekulatius", "rosinen", "cookies",
+        "kohlrabi", "aroma", "vanille", "spargel", "sandwich", "salami",
+        "honigzopf", "mürbteig", "murbteig", "shortbread", "backstube",
+        "plunder", "protein bar", "germteig", "blätterteig", "blatterteig",
+        "porridge", "body", "toilettentücher", "toilettentucher", "shea",
+        "kakao", "streichgenuss", "rapsöl", "rapsol", "olivenöl", "olivenol",
+        "halbfett", "fettreduziert", "florentiner", "linzeraugen"
       );
     }
 
@@ -319,7 +415,17 @@
     }
 
     if (categoryIds.includes("kaffee") && (q.includes(" bohnen ") || q.includes(" crema "))) {
-      exclusions.push("kapsel", "kapseln", "pads", "instant", "löslich", "loeslich");
+      exclusions.push(
+        "kapsel", "kapseln", "pads", "instant", "löslich", "loeslich",
+        "gemahlen", "filterkaffee", "tassimo", "nespresso", "dolce gusto"
+      );
+    }
+
+    if (categoryIds.includes("nudeln") && q.includes(" spaghetti ")) {
+      exclusions.push(
+        "fix", "sauce", "bolognese", "carbonara", "napoli",
+        "fertiggericht", "snack", "suppe"
+      );
     }
 
     if (categoryIds.includes("milch") && q.includes(" vollmilch ")) {
@@ -343,12 +449,21 @@
 
     const normalizedQuery = normalize(query);
     let requiredAny = [];
+
     if (normalizedQuery.includes("spaghetti")) {
       requiredAny = ["spaghetti", "spaghettini", "spaghettoni"];
     } else if (normalizedQuery.includes("vollmilch")) {
       requiredAny = ["vollmilch"];
     } else if (normalizedQuery.includes("teebutter")) {
       requiredAny = ["teebutter"];
+    } else if (
+      categoryIds.includes("kaffee") &&
+      /\b(bohne|bohnen|crema)\b/.test(normalizedQuery)
+    ) {
+      requiredAny = [
+        "bohne", "bohnen", "kaffeebohnen",
+        "crema", "espresso", "caffe", "cafe"
+      ];
     }
 
     return {
@@ -371,34 +486,63 @@
 
   function matchProfile(entry, profile) {
     const p = profile || {};
-    const baseHay = entry?.baseHay || "";
+    const nameHay = entry?.name || "";
     const categories = Array.isArray(entry?.categories) ? entry.categories : [];
 
     if (Array.isArray(p.categoryIds) && p.categoryIds.length) {
       if (!p.categoryIds.some(id => categories.includes(id))) {
         return { matched: false, score: 999, reason: "category" };
       }
+
+      const conflicts = conflictingCategories(categories, p.categoryIds);
+      if (conflicts.length) {
+        return {
+          matched: false,
+          score: 999,
+          reason: `category-conflict:${conflicts.join(",")}`
+        };
+      }
     }
 
     if (Array.isArray(p.requiredAny) && p.requiredAny.length) {
-      const requiredHit = p.requiredAny.some(term => baseHay.includes(normalize(term)));
+      const requiredHit = p.requiredAny.some(term =>
+        nameHay.includes(normalize(term))
+      );
       if (!requiredHit) return { matched: false, score: 999, reason: "subtype" };
     }
 
-    if (p.requiredBrand && !baseHay.includes(normalize(p.requiredBrand))) {
+    if (p.requiredBrand && !nameHay.includes(normalize(p.requiredBrand))) {
       return { matched: false, score: 999, reason: "brand" };
     }
 
     if (Array.isArray(p.exclusions)) {
-      const hit = p.exclusions.find(term => term && baseHay.includes(normalize(term)));
+      const hit = p.exclusions.find(term => {
+        const normalizedTerm = normalize(term);
+        if (!normalizedTerm) return false;
+        return normalizedTerm.length >= 5
+          ? nameHay.includes(normalizedTerm)
+          : nameHasMarker(nameHay, normalizedTerm);
+      });
       if (hit) return { matched: false, score: 999, reason: `exclude:${hit}` };
+    }
+
+    const queryText = normalize(p.query || p.normalizedQuery || "");
+    const meaningfulTokens = queryText
+      .split(/\s+/)
+      .filter(token => token.length >= 3);
+
+    // Ohne bekannten Produkttyp darf eine Beschreibung allein niemals eine
+    // automatische Zuordnung erzeugen.
+    if (
+      (!Array.isArray(p.categoryIds) || p.categoryIds.length === 0) &&
+      meaningfulTokens.length &&
+      !meaningfulTokens.some(token => nameHasMarker(nameHay, token))
+    ) {
+      return { matched: false, score: 999, reason: "name-evidence" };
     }
 
     let resultScore = score(entry, p.query || p.normalizedQuery || "");
 
-    // A strong category/brand match is allowed even if the literal query is
-    // missing. This is what makes brand-only records such as "Gösser" useful
-    // for a personal product named "Bier".
     if (resultScore >= 999 && Array.isArray(p.categoryIds) && p.categoryIds.length) {
       resultScore = p.requiredBrand ? 24 : 28;
     }
@@ -411,6 +555,7 @@
   }
 
   window.RetailerSearch = {
+    version: MATCH_ENGINE_VERSION,
     normalize,
     buildIndex,
     score,

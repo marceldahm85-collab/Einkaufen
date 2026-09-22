@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 12.1
+# PreisPilot Osttirol – Version 12.2
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -980,3 +980,31 @@ Der Einkaufsoptimierer selbst bleibt bewusst unverändert: Er optimiert den
 realen Kassenbetrag unter Berücksichtigung von Gebinden und Aktionen. Die
 Einheitspreis-Sortierung dient der bewussten Produktauswahl und ersetzt nicht
 die Einkaufsbudget-Optimierung.
+
+
+## Version 12.2 – automatische Zuordnung präzisiert
+
+Die automatische Produktzuordnung verwendet jetzt eine strengere Produkttyp-Erkennung.
+
+### Ursache des Problems
+
+Bis v12.1 konnte bereits eine Erwähnung eines Produkttyps in der Beschreibung
+einen Kandidaten qualifizieren. Dadurch wurden z. B. Zucker mit Hinweis auf Kaffee,
+Kaffee-Joghurt oder Backwaren mit Butter als passende Alternativen eingestuft.
+
+### Neue Regeln
+
+- Der Produkttyp muss primär aus dem Produktnamen bzw. einer bewusst
+  vertrauenswürdigen, produkttyp-spezifischen Marke stammen.
+- Beschreibungstexte dürfen einen Kandidaten nicht mehr allein qualifizieren.
+- Kandidaten mit mehreren widersprüchlichen Produkttypen werden verworfen.
+- Für spezifische Untertypen wie `Caffè Crema Bohnen`, `Spaghetti`,
+  `Vollmilch` und `Teebutter` gelten zusätzliche Namensanforderungen.
+- Breite Marken wie Barilla, Danone, Rauch, Kelly's oder Felix werden nicht
+  pauschal auf eine Produktgruppe abgebildet.
+- Die Butter-Zuordnung filtert typische Backwaren, Desserts, Kosmetik,
+  Margarine/Butter-Mischprodukte und ähnliche Fehlzuordnungen.
+- Alte Kandidaten-Caches werden durch eine neue Matching-Engine-Version
+  automatisch ungültig und im Hintergrund neu aufgebaut.
+
+Die vorhandene Gebinde-, Aktions- und Optimiererlogik bleibt unverändert.

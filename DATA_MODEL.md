@@ -132,3 +132,11 @@ autoMatches:
 
 `autoMatches` und `matchingProfile` sind private Browserdaten. Sie werden nicht
 in den öffentlichen GitHub-Preisdatenbestand geschrieben.
+
+
+## Matching Engine v2 (v12.2)
+
+Automatische Händlerkandidaten werden weiterhin ausschließlich lokal gespeichert.
+Die Produkttyp-Erkennung ist jetzt name-zentriert: Beschreibungen dienen nur noch
+zur Such-/Ranking-Unterstützung, nicht mehr als alleinige Produkttyp-Evidenz.
+Mehrdeutige Kandidaten werden konservativ verworfen.

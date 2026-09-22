@@ -120,6 +120,7 @@
   let selectedCatalogItem = null;
   const CATALOG_PAGE_SIZE = 50;
   const AUTO_MATCH_STORES = ["mpreis", "spar", "tg"];
+  const AUTO_MATCH_ENGINE_VERSION = 2;
   const AUTO_MATCH_LIMIT_PER_STORE = 40;
   const AUTO_MATCH_SEARCH_LIMIT = 400;
   const AUTO_MATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -198,7 +199,7 @@
         },
         autoMatches: product.autoMatches && typeof product.autoMatches === "object"
           ? product.autoMatches
-          : { updatedAt: null, query: null, stores: {}, counts: {} }
+          : { engineVersion: 0, updatedAt: null, query: null, stores: {}, counts: {} }
       };
 
       migratedProduct.offers = (product.offers || []).map(offer =>
@@ -1827,7 +1828,7 @@
         exclusions: [],
         excludedIds: []
       },
-      autoMatches: { updatedAt: null, query: null, stores: {}, counts: {} }
+      autoMatches: { engineVersion: 0, updatedAt: null, query: null, stores: {}, counts: {} }
     };
 
     state.products.push(product);
@@ -2247,6 +2248,7 @@
     }
 
     product.autoMatches = {
+      engineVersion: AUTO_MATCH_ENGINE_VERSION,
       updatedAt: new Date().toISOString(),
       query: profile.query,
       stores: nextStores,
@@ -2275,6 +2277,7 @@
     const profile = matchingProfile(product);
     const cache = product?.autoMatches || {};
     if (!cache.updatedAt) return true;
+    if (Number(cache.engineVersion || 0) !== AUTO_MATCH_ENGINE_VERSION) return true;
     if (String(cache.query || "") !== String(profile.query || "")) return true;
 
     const age = Date.now() - new Date(cache.updatedAt).getTime();
@@ -3617,7 +3620,7 @@
     product.matchingProfile.queryAuto = false;
     product.matchingProfile.mode = "auto";
     product.matchingProfile.fixedCandidateId = null;
-    product.autoMatches = { updatedAt: null, query: null, stores: {}, counts: {} };
+    product.autoMatches = { engineVersion: 0, updatedAt: null, query: null, stores: {}, counts: {} };
     saveState();
     renderAll();
     refreshCurrentAutoMatchProduct({ silent: false });
@@ -3880,7 +3883,7 @@
         exclusions: [],
         excludedIds: []
       },
-      autoMatches: { updatedAt: null, query: null, stores: {}, counts: {} }
+      autoMatches: { engineVersion: 0, updatedAt: null, query: null, stores: {}, counts: {} }
     };
     if (formData.store && formData.regularPrice) {
       const unitPrice = calculateUnitPrice(Number(formData.salePrice || formData.regularPrice), product.amount, product.unit);
@@ -3986,7 +3989,7 @@
     if (previousIdentity !== nextIdentity) {
       product.matchingProfile.mode = "auto";
       product.matchingProfile.fixedCandidateId = null;
-      product.autoMatches = { updatedAt: null, query: null, stores: {}, counts: {} };
+      product.autoMatches = { engineVersion: 0, updatedAt: null, query: null, stores: {}, counts: {} };
     }
 
     return true;
