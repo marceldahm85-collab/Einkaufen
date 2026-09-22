@@ -660,6 +660,10 @@ def main():
 
         combined_products = actions + preserved_flyer
 
+        special_priced_count = sum(
+            1 for x in actions
+            if x.get("salePrice") is not None or x.get("displayPrice") is not None
+        )
         priced_count = sum(
             1 for x in combined_products
             if x.get("salePrice") is not None or x.get("displayPrice") is not None
@@ -676,6 +680,8 @@ def main():
             "updatedAt": updated_at,
             "productCount": priced_count,
             "promotionCount": len(combined_products),
+            "specialActionCount": len(actions),
+            "specialPricedCount": special_priced_count,
             "validFrom": valid_from,
             "validUntil": valid_until,
             "flyer": flyer,
@@ -707,11 +713,15 @@ def main():
         )
         temp.replace(OUT)
 
-        write_status("ok", updated_at, priced_count, len(actions))
+        write_status("ok", updated_at, priced_count, len(combined_products))
 
         print(
             f"T&G: {len(actions)} Spezialaktionen erkannt; "
-            f"davon {priced_count} mit konkretem Aktionspreis."
+            f"davon {special_priced_count} mit konkretem Aktionspreis."
+        )
+        print(
+            f"T&G Gesamtbestand: {len(combined_products)} Einträge; "
+            f"davon {priced_count} mit erkanntem Preis."
         )
         print(f"T&G Gültigkeit: {valid_from or '—'} bis {valid_until or '—'}")
         print(f"T&G Osttirol-Flugblatt: {flyer.get('url') or 'Link nicht erkannt'}")

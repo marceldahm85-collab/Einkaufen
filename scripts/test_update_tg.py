@@ -132,3 +132,10 @@ assert multi_meta["validUntil"] == "2026-09-23"
 assert multi_meta["discoveredViewerCount"] == 2
 
 print("T&G multi-viewer period matching OK")
+
+# v11.4.3 counter regression: the importer source must distinguish
+# special-priced actions from the combined flyer+special dataset.
+source_text = Path(path).read_text(encoding="utf-8")
+assert "special_priced_count" in source_text
+assert 'f"davon {special_priced_count} mit konkretem Aktionspreis."' in source_text
+print("T&G Spezialaktions-Zähler getrennt OK")
