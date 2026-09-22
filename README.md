@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 11.4.3
+# PreisPilot Osttirol – Version 11.4.4
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -887,3 +887,19 @@ Der non-fast-forward Push-Fix aus v11.4.1 bleibt vollständig enthalten.
   dadurch nicht mehr entstehen.
 
 Die Aktions-, Gebinde- und Optimiererlogik aus v11.4/v11.4.2 bleibt unverändert.
+
+
+## Version 11.4.4 – Test-Harness-Fix
+
+v11.4.3 ergänzte `cleanComparisonAmount()` in der produktiven
+Artikelbearbeitung. Der ältere isolierte Test
+`test_product_edit_preservation.js` lud diese Hilfsfunktion jedoch nicht in
+seine VM-Testumgebung. Dadurch scheiterte ausschließlich der GitHub-Test mit
+`ReferenceError: cleanComparisonAmount is not defined`.
+
+Die produktive App war davon nicht betroffen; in `app.js` ist die Funktion
+vorhanden.
+
+Der Test lädt die Abhängigkeit nun korrekt und prüft zusätzlich, dass z. B.
+`9.998 l` beim Bearbeiten auf `10 l` normalisiert wird. Außerdem wird
+`test_amount_normalization.js` jetzt explizit im GitHub-Workflow ausgeführt.
