@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 11.4.2
+# PreisPilot Osttirol – Version 11.4.3
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -873,3 +873,17 @@ v11.4.2 trennt diese beiden Datenquellen vollständig:
    gespeichert werden.
 
 Der non-fast-forward Push-Fix aus v11.4.1 bleibt vollständig enthalten.
+
+
+## Version 11.4.3 – Mengenanzeige und T&G-Diagnose bereinigt
+
+- Vergleichsmengen mit kleinen Import-/Rundungsartefakten werden auf sinnvolle Werte
+  normalisiert. Beispiel: `9,998 l` wird als und rechnerisch als `10 l` verwendet.
+- Neu angelegte, bearbeitete und aus dem Händlerkatalog übernommene persönliche
+  Artikel verwenden dieselbe Normalisierung.
+- Der T&G-Spezialaktionsimport trennt nun in der Ausgabe sauber zwischen
+  Spezialaktionen und dem bereits zusammengeführten Flyerbestand.
+- Eine Ausgabe wie `4 Spezialaktionen erkannt; davon 70 mit Aktionspreis` kann
+  dadurch nicht mehr entstehen.
+
+Die Aktions-, Gebinde- und Optimiererlogik aus v11.4/v11.4.2 bleibt unverändert.

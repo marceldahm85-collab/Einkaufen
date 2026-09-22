@@ -1,4 +1,4 @@
-const CACHE = "preispilot-osttirol-v11-4-2";
+const CACHE = "preispilot-osttirol-v11-4-3";
 const ASSETS = [
   "./",
   "./index.html",

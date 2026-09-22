@@ -169,11 +169,21 @@
       products: Array.isArray(input.products) ? input.products : deepClone(initialState.products)
     };
 
-    migrated.products = migrated.products.map(product => ({
-      ...product,
-      liveLinks: product.liveLinks || {},
-      offers: (product.offers || []).map(offer => enrichOffer(product, offer))
-    }));
+    migrated.products = migrated.products.map(product => {
+      const cleanAmount = cleanComparisonAmount(product.amount, product.unit);
+      const migratedProduct = {
+        ...product,
+        amount: Number.isFinite(cleanAmount) && cleanAmount > 0 ? cleanAmount : product.amount,
+        unit: normalizeMeasureUnit(product.unit) || product.unit,
+        liveLinks: product.liveLinks || {}
+      };
+
+      migratedProduct.offers = (product.offers || []).map(offer =>
+        enrichOffer(migratedProduct, offer)
+      );
+
+      return migratedProduct;
+    });
 
     return migrated;
   }
@@ -244,14 +254,42 @@
     return new Intl.NumberFormat("de-AT", { style: "currency", currency: "EUR" }).format(Number(value));
   }
 
-  function fmtNumber(value) {
+  function fmtNumber(value, maximumFractionDigits = 3) {
     const n = Number(value);
     if (!Number.isFinite(n)) return String(value ?? "");
-    return new Intl.NumberFormat("de-AT", { maximumFractionDigits: 3 }).format(n);
+    return new Intl.NumberFormat("de-AT", { maximumFractionDigits }).format(n);
+  }
+
+  function cleanComparisonAmount(value, unit) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return n;
+
+    const normalizedUnit = normalizeMeasureUnit(unit);
+    if (!["l", "kg", "ml", "g", "Stk"].includes(normalizedUnit)) return n;
+
+    // Imported pack sizes can contain tiny reverse-calculation artefacts
+    // (e.g. 9.998 l although the intended pack/target is 10 l).
+    // Snap only values very close to a coarser, human-meaningful value.
+    const candidates = normalizedUnit === "Stk"
+      ? [1]
+      : [1, 0.5, 0.25, 0.1, 0.05, 0.01];
+
+    for (const step of candidates) {
+      const snapped = Math.round(n / step) * step;
+      const tolerance = Math.min(0.005, Math.max(0.0005, Math.abs(snapped) * 0.0005));
+      if (Math.abs(n - snapped) <= tolerance) {
+        return Number(snapped.toFixed(6));
+      }
+    }
+
+    return n;
   }
 
   function fmtAmount(p) {
-    return `${fmtNumber(p.amount)} ${p.unit}`;
+    const unit = normalizeMeasureUnit(p.unit);
+    const amount = cleanComparisonAmount(p.amount, unit);
+    const decimals = ["l", "kg"].includes(unit) && Math.abs(amount) >= 1 ? 2 : 3;
+    return `${fmtNumber(amount, decimals)} ${unit || p.unit}`;
   }
 
   function normalizeMeasureUnit(unit) {
@@ -1472,8 +1510,10 @@
       name: String(item.name || "Neuer Artikel").trim(),
       brand: "",
       category: "Sonstiges",
-      amount: Number.isFinite(amountValue) && amountValue > 0 ? amountValue : 1,
-      unit: item.unit || "Stk",
+      amount: Number.isFinite(amountValue) && amountValue > 0
+        ? cleanComparisonAmount(amountValue, item.unit || "Stk")
+        : 1,
+      unit: normalizeMeasureUnit(item.unit) || "Stk",
       favorite: false,
       offers: [],
       liveLinks: {}
@@ -3185,7 +3225,7 @@
     product.name = name;
     product.brand = brand;
     product.category = category;
-    product.amount = amount;
+    product.amount = cleanComparisonAmount(amount, unit);
     product.unit = unit;
 
     return true;
@@ -3278,7 +3318,7 @@
       return;
     }
 
-    product.amount = amount;
+    product.amount = cleanComparisonAmount(amount, unit);
     product.unit = unit;
     saveState();
     renderAll();
