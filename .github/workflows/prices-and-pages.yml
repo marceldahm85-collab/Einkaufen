@@ -49,6 +49,7 @@ jobs:
           node scripts/test_optimizer_promotions.js
           node scripts/test_search_aliases.js
           node scripts/test_catalog_browse.js
+          node scripts/test_auto_matching.js
           node scripts/test_product_edit_preservation.js
           node scripts/test_amount_normalization.js
           python scripts/test_update_tg.py
