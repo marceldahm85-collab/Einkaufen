@@ -70,7 +70,8 @@ async function verifyPromotionSafety() {
   for (const [file, globalName] of [
     ["live-mpreis.js", "MPreisLive"],
     ["live-spar.js", "SparLive"],
-    ["live-tg.js", "TgLive"]
+    ["live-tg.js", "TgLive"],
+    ["live-billa.js", "BillaLive"]
   ]) {
     const api = await loadModule(file, globalName, datedPayload);
     const promos = await api.promotions();
@@ -138,7 +139,8 @@ async function verifyPromotionSafety() {
   for (const [file, globalName] of [
     ["live-mpreis.js", "MPreisLive"],
     ["live-spar.js", "SparLive"],
-    ["live-tg.js", "TgLive"]
+    ["live-tg.js", "TgLive"],
+    ["live-billa.js", "BillaLive"]
   ]) {
     const api = await loadModule(file, globalName, payload);
 

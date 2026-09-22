@@ -49,7 +49,7 @@ const context = {
 
 vm.createContext(context);
 vm.runInContext(`
-const AUTO_MATCH_STORES = ["mpreis", "spar", "tg"];
+const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa"];
 const todayISO = () => "2026-09-21";
 ${names.map(extractFunction).join("\n")}
 this.api = { validOffers, pricedOfferForStore, cheapestPricedOffer, rankedAutoOptions };
@@ -115,6 +115,12 @@ const product = {
             paidQuantity: 1, freeQuantity: 1, label: "1+1 gratis"
           }
         })
+      ],
+      billa: [
+        candidate("billa", "b1", "BILLA Kiste", {
+          regularPrice: 17,
+          packageAmount: 10, packageUnit: "l", packageAmountKnown: true
+        })
       ]
     }
   }
@@ -133,6 +139,10 @@ close(p.pricing.lineTotal, 29.8);
 assert.strictEqual(p.pricing.packageCount, 2);
 assert.strictEqual(p.pricing.promotionApplied, true);
 
+p = pricedOfferForStore(product, "billa", 1);
+close(p.pricing.lineTotal, 17);
+assert.strictEqual(p.offer.retailerProductId, "b1");
+
 let cheapest = cheapestPricedOffer(product, 1);
 assert.strictEqual(cheapest.offer.store, "spar");
 close(cheapest.pricing.lineTotal, 16);
@@ -142,21 +152,24 @@ let top = rankedAutoOptions(product, 1, "all", 10);
 assert.strictEqual(top[0].id, "tg:t1");     // 29.80 / 20 l = 1.49 €/l
 assert.strictEqual(top[1].id, "spar:s-best"); // 16.00 / 10 l = 1.60 €/l
 assert.strictEqual(top[2].id, "spar:s-small"); // 20.00 / 12 l ≈ 1.67 €/l
-assert.strictEqual(top[3].id, "mpreis:m1");    // 18.00 / 10 l = 1.80 €/l
+assert.strictEqual(top[3].id, "billa:b1");     // 17.00 / 10 l = 1.70 €/l
+assert.strictEqual(top[4].id, "mpreis:m1");    // 18.00 / 10 l = 1.80 €/l
 
 // Cash-total view keeps the actual checkout amount as first criterion.
 top = rankedAutoOptions(product, 1, "all", 10, "total");
 assert.strictEqual(top[0].id, "spar:s-best");
-assert.strictEqual(top[1].id, "mpreis:m1");
-assert.strictEqual(top[2].id, "spar:s-small");
-assert.strictEqual(top[3].id, "tg:t1");
+assert.strictEqual(top[1].id, "billa:b1");
+assert.strictEqual(top[2].id, "mpreis:m1");
+assert.strictEqual(top[3].id, "spar:s-small");
+assert.strictEqual(top[4].id, "tg:t1");
 
 // Fit view prefers the lowest overbuy before price.
 top = rankedAutoOptions(product, 1, "all", 10, "fit");
 assert.strictEqual(top[0].id, "spar:s-best");
-assert.strictEqual(top[1].id, "mpreis:m1");
-assert.strictEqual(top[2].id, "tg:t1");
-assert.strictEqual(top[3].id, "spar:s-small");
+assert.strictEqual(top[1].id, "billa:b1");
+assert.strictEqual(top[2].id, "mpreis:m1");
+assert.strictEqual(top[3].id, "tg:t1");
+assert.strictEqual(top[4].id, "spar:s-small");
 
 
 // Unit-price view may deliberately buy the action minimum when that yields
@@ -198,8 +211,8 @@ product.matchingProfile.mode = "auto";
 product.matchingProfile.fixedCandidateId = null;
 product.matchingProfile.excludedIds = ["spar:s-best"];
 cheapest = cheapestPricedOffer(product, 1);
-assert.strictEqual(cheapest.offer.store, "mpreis");
-close(cheapest.pricing.lineTotal, 18);
+assert.strictEqual(cheapest.offer.store, "billa");
+close(cheapest.pricing.lineTotal, 17);
 
 // Quantity on the shopping list is still respected across automatic candidates.
 product.matchingProfile.excludedIds = [];
