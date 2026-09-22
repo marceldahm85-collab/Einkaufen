@@ -21,6 +21,7 @@ async function loadModule(file, globalName, payload) {
   const api = context.window[globalName];
   assert(api, `${globalName} export missing`);
   assert.strictEqual(typeof api.browse, "function", `${globalName}.browse missing`);
+  assert.strictEqual(typeof api.matchCandidates, "function", `${globalName}.matchCandidates missing`);
 
   return api;
 }

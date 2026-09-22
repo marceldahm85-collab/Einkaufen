@@ -28,7 +28,7 @@ const names = [
   "normalizeMeasureUnit", "normalizeMeasure", "packageMeasureForOffer",
   "promotionDateStatus", "normalizedOffer", "offerPricingForQuantity",
   "promotionCandidatePackageCounts", "offerPricingForTarget",
-  "validOffers", "offerForStore", "pricedOfferForStore", "cheapestPricedOffer",
+  "baseOffersForProduct", "validOffers", "offerForStore", "pricedOfferForStore", "cheapestPricedOffer",
   "optimizeShopping", "evaluateStoreSet", "finalizeOptimizationResult", "selectBestOptimization"
 ];
 
@@ -37,6 +37,8 @@ vm.createContext(context);
 vm.runInContext(`
 const todayISO = () => "2026-09-10";
 const retailers = { mpreis: {}, spar: {}, tg: {}, hofer: {}, lidl: {}, billa: {} };
+const AUTO_MATCH_STORES = ["mpreis", "spar", "tg"];
+function activeAutoCandidates() { return []; }
 ${names.map(extractFunction).join("\n")}
 this.api = { optimizeShopping };
 `, context);
