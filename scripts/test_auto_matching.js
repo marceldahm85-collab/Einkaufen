@@ -27,7 +27,7 @@ function extractFunction(name) {
 const names = [
   "normalizeMeasureUnit", "normalizeMeasure", "packageMeasureForOffer",
   "promotionDateStatus", "normalizedOffer", "offerPricingForQuantity",
-  "promotionCandidatePackageCounts", "offerPricingForTarget",
+  "promotionCandidatePackageCounts", "offerPricingForTarget", "offerPricingForTargetSortMode",
   "autoCandidateKey", "matchingProfile", "storedAutoCandidates",
   "activeAutoCandidates", "baseOffersForProduct", "validOffers",
   "pricedOfferForStore", "cheapestPricedOffer", "rankedAutoOptions"
@@ -137,9 +137,54 @@ let cheapest = cheapestPricedOffer(product, 1);
 assert.strictEqual(cheapest.offer.store, "spar");
 close(cheapest.pricing.lineTotal, 16);
 
+// The alternatives list defaults to effective unit price, not cash total.
 let top = rankedAutoOptions(product, 1, "all", 10);
+assert.strictEqual(top[0].id, "tg:t1");     // 29.80 / 20 l = 1.49 €/l
+assert.strictEqual(top[1].id, "spar:s-best"); // 16.00 / 10 l = 1.60 €/l
+assert.strictEqual(top[2].id, "spar:s-small"); // 20.00 / 12 l ≈ 1.67 €/l
+assert.strictEqual(top[3].id, "mpreis:m1");    // 18.00 / 10 l = 1.80 €/l
+
+// Cash-total view keeps the actual checkout amount as first criterion.
+top = rankedAutoOptions(product, 1, "all", 10, "total");
 assert.strictEqual(top[0].id, "spar:s-best");
 assert.strictEqual(top[1].id, "mpreis:m1");
+assert.strictEqual(top[2].id, "spar:s-small");
+assert.strictEqual(top[3].id, "tg:t1");
+
+// Fit view prefers the lowest overbuy before price.
+top = rankedAutoOptions(product, 1, "all", 10, "fit");
+assert.strictEqual(top[0].id, "spar:s-best");
+assert.strictEqual(top[1].id, "mpreis:m1");
+assert.strictEqual(top[2].id, "tg:t1");
+assert.strictEqual(top[3].id, "spar:s-small");
+
+
+// Unit-price view may deliberately buy the action minimum when that yields
+// the better €/l, while checkout-price view does not.
+const quantityProduct = {
+  id: "quantity-test",
+  name: "Testgetränk",
+  amount: 10,
+  unit: "l",
+  matchingProfile: { mode: "auto", query: "Testgetränk", fixedCandidateId: null, excludedIds: [] },
+  offers: [],
+  autoMatches: { stores: {
+    mpreis: [candidate("mpreis", "q1", "Mengenaktion", {
+      regularPrice: 10, salePrice: 6,
+      packageAmount: 10, packageUnit: "l", packageAmountKnown: true,
+      validFrom: "2026-09-01", validUntil: "2026-09-30",
+      promotion: { type: "quantity", requiredQuantity: 2, label: "ab 2 Stück" }
+    })]
+  }}
+};
+let qUnit = rankedAutoOptions(quantityProduct, 1, "all", 10, "unit")[0];
+assert.strictEqual(qUnit.pricing.packageCount, 2);
+close(qUnit.pricing.lineTotal, 12);
+close(qUnit.pricing.effectiveBaseUnitPrice, 0.6);
+let qTotal = rankedAutoOptions(quantityProduct, 1, "all", 10, "total")[0];
+assert.strictEqual(qTotal.pricing.packageCount, 1);
+close(qTotal.pricing.lineTotal, 10);
+close(qTotal.pricing.effectiveBaseUnitPrice, 1);
 
 // A user can lock one of the top candidates.
 product.matchingProfile.mode = "fixed";
