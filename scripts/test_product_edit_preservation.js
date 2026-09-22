@@ -18,6 +18,7 @@ const categories = [
 ];
 ${extract("normalizeMeasureUnit", "normalizeMeasure")}
 ${extract("normalizeMeasure", "measureToDisplay")}
+${extract("cleanComparisonAmount", "fmtAmount")}
 ${extract("updateProductCore", "saveEditedProduct")}
 this.result = { updateProductCore };
 `;
@@ -74,6 +75,16 @@ assert.strictEqual(product.name, "Märzen Bier");
 assert.strictEqual(product.brand, "verschiedene");
 assert.strictEqual(product.amount, 20);
 assert.strictEqual(product.unit, "l");
+
+// Imported/re-entered floating artefacts are normalized during editing.
+assert.strictEqual(updateProductCore(product, {
+  name: "Märzen Bier",
+  brand: "verschiedene",
+  category: "Getränke",
+  amount: 9.998,
+  unit: "l"
+}), true);
+assert.strictEqual(product.amount, 10);
 
 assert.strictEqual(updateProductCore(product, {
   name: "",
