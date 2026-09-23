@@ -253,7 +253,15 @@ jobs:
 
             echo "main wurde zwischenzeitlich aktualisiert – hole neuesten Stand und rebase ..."
             git fetch origin main
-            git rebase origin/main
+
+            echo "Arbeitsbaum vor dem Rebase:"
+            git status --short
+
+            # Ein paralleler/automatischer Schritt kann neben dem bereits
+            # committeten Daten-Commit noch lokale Änderungen hinterlassen.
+            # --autostash sichert solche Änderungen für die Dauer des Rebase,
+            # sodass ein transienter Dirty-Tree den Push nicht mehr blockiert.
+            git rebase --autostash origin/main
           done
 
       - name: GitHub Pages konfigurieren

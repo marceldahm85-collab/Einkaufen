@@ -1102,3 +1102,12 @@ Aktionsprodukte eingeschränkt werden.
 - Das offizielle BILLA-Flugblatt ist direkt aus `Mehr` erreichbar. Die BILLA-Seite unterstützt eine Bundeslandauswahl und regionale Angebote.
 - Die bestehende BILLA-Aktionslogik für `ab N`, `1+1`, `2+1`, `4+2` usw. bleibt unverändert.
 - Der Service-Worker verwendet einen neuen Cache-Namen, damit die neue BILLA-Oberfläche nach dem Deployment nicht aus dem alten v13.2-Cache geladen wird.
+
+
+## Version 13.3.1 – Workflow-Rebase-Fix
+
+Der Daten-Push verwendet beim Konflikt mit einem inzwischen aktualisierten
+`main`-Branch nun `git rebase --autostash`. Dadurch blockieren verbliebene
+unstaged Änderungen im Runner den Rebase nicht mehr. Vor dem Rebase wird der
+Arbeitsbaum zusätzlich protokolliert, um eventuelle lokale Änderungen sichtbar
+zu machen. Die bisherigen No-Force-Push-Regeln bleiben unverändert.
