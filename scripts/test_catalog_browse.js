@@ -173,9 +173,29 @@ async function verifyPromotionSafety() {
     );
   }
 
+
+  // Category-aware catalog search must not return products that only contain
+  // the query term incidentally (e.g. Butterkeks or Kaffee-Joghurt).
+  const billaPrecisionPayload = {
+    updatedAt: "2026-09-23T08:00:00Z",
+    products: [
+      { remoteObjectId: "b1", retailerProductId: "b1", name: "Schärdinger Fasslbutter", description: "", currentPrice: 2.66 },
+      { remoteObjectId: "b2", retailerProductId: "b2", name: "Leibniz Butterkeks", description: "", currentPrice: 2.49 },
+      { remoteObjectId: "b3", retailerProductId: "b3", name: "Ja! Natürlich Butterschmalz", description: "", currentPrice: 4.99 },
+      { remoteObjectId: "b4", retailerProductId: "b4", name: "Butter Laugen-Croissant", description: "", currentPrice: 0.89 },
+      { remoteObjectId: "k1", retailerProductId: "k1", name: "Lavazza Caffe Crema Bohnen", description: "", currentPrice: 15.99 },
+      { remoteObjectId: "k2", retailerProductId: "k2", name: "Kaffee Joghurt", description: "", currentPrice: 1.29 }
+    ]
+  };
+  const billaPrecision = await loadModule("live-billa.js", "BillaLive", billaPrecisionPayload);
+  const butterSearch = await billaPrecision.browse({ query: "Butter", limit: 20 });
+  assert.deepStrictEqual(Array.from(butterSearch.items, item => item.name), ["Schärdinger Fasslbutter"]);
+  const coffeeSearch = await billaPrecision.browse({ query: "Kaffee", limit: 20 });
+  assert.deepStrictEqual(Array.from(coffeeSearch.items, item => item.name), ["Lavazza Caffe Crema Bohnen"]);
+
   await verifyPromotionSafety();
 
-  console.log("Catalog browse/promotion safety tests OK");
+  console.log("Catalog browse/promotion/precision tests OK");
 })().catch(error => {
   console.error(error);
   process.exit(1);

@@ -19,6 +19,7 @@ DATA_PATH = ROOT / "data" / "billa.json"
 STATUS_PATH = ROOT / "data" / "update-status.json"
 
 ACTION_URL = "https://shop.billa.at/aktionen"
+ACTION_EXTRA_URLS = ["https://shop.billa.at/aktionen/multipacks"]
 SOURCE_HOST = "shop.billa.at"
 MIN_EXPECTED_PRODUCTS = 100
 MIN_EXPECTED_PROMOTIONS = 10
@@ -172,12 +173,24 @@ class BillaHtmlParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         node = Node(tag, attrs, self.stack[-1])
+        # BILLA renders action badges as images whose alt text contains the
+        # complete promotion label, e.g. "2+1 Aktion" / "4+2 Aktion".
+        # Keep meaningful accessibility labels in the card text so the parser
+        # can distinguish a true bundle from a generic "bei N" quantity price.
+        for key in ("alt", "aria-label", "title"):
+            value = node.attrs.get(key)
+            if value:
+                node.text_parts.append(str(value))
         self.stack[-1].add_child(node)
         if tag.lower() not in self.VOID_TAGS:
             self.stack.append(node)
 
     def handle_startendtag(self, tag, attrs):
         node = Node(tag, attrs, self.stack[-1])
+        for key in ("alt", "aria-label", "title"):
+            value = node.attrs.get(key)
+            if value:
+                node.text_parts.append(str(value))
         self.stack[-1].add_child(node)
 
     def handle_endtag(self, tag):
@@ -372,7 +385,7 @@ def extract_action_cards(html_text):
 
         chosen_text = None
         chosen_node = None
-        for ancestor in candidate_ancestors(anchor, 12):
+        for ancestor in candidate_ancestors(anchor, 24):
             if len(unique_product_hrefs(ancestor)) != 1:
                 continue
             text = ancestor.text()
@@ -422,29 +435,33 @@ def extract_action_cards(html_text):
 
 def fetch_all_actions():
     found = {}
-    no_progress = 0
 
-    for page in range(MAX_PAGES + 1):
-        url = ACTION_URL if page == 0 else f"{ACTION_URL}?page={page}"
-        print(f"BILLA-Aktionen: lade Seite {page}: {url}")
-        text = fetch_text(url)
-        page_rows = extract_action_cards(text)
+    source_urls = [(ACTION_URL, "Aktionen")]
+    source_urls.extend((url, "Multipack-Aktionen") for url in ACTION_EXTRA_URLS)
 
-        new_count = 0
-        for key, row in page_rows.items():
-            if key not in found:
-                found[key] = row
-                new_count += 1
+    for base_url, label in source_urls:
+        no_progress = 0
+        for page in range(MAX_PAGES + 1):
+            url = base_url if page == 0 else f"{base_url}?page={page}"
+            print(f"BILLA-{label}: lade Seite {page}: {url}")
+            text = fetch_text(url)
+            page_rows = extract_action_cards(text)
 
-        print(f"BILLA-Aktionen Seite {page}: {len(page_rows)} eindeutige Produktkarten, {new_count} neu")
+            new_count = 0
+            for key, row in page_rows.items():
+                if key not in found:
+                    found[key] = row
+                    new_count += 1
 
-        if new_count == 0:
-            no_progress += 1
-        else:
-            no_progress = 0
+            print(f"BILLA-{label} Seite {page}: {len(page_rows)} eindeutige Produktkarten, {new_count} neu")
 
-        if no_progress >= MAX_PAGE_NO_PROGRESS:
-            break
+            if new_count == 0:
+                no_progress += 1
+            else:
+                no_progress = 0
+
+            if no_progress >= MAX_PAGE_NO_PROGRESS:
+                break
 
     return found
 
@@ -634,7 +651,7 @@ def main():
     payload["promotionStale"] = False
     payload["promotionLastError"] = None
     payload["promotionObservedAt"] = observed_at
-    payload["promotionParserVersion"] = 1
+    payload["promotionParserVersion"] = 2
     payload["promotionPageLimit"] = MAX_PAGES
 
     write_payload(payload)

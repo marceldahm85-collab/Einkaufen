@@ -11,13 +11,13 @@ fixture = r'''
   <section class="product-card">
     <a href="/produkte/coca-cola-00770015"><span>Coca Cola</span></a>
     <div>aus Österreich</div>
-    <div>4+2 Aktion</div>
+    <img alt="4+2 Aktion">
     <div>Einzelpreis 2,49 € 1 Liter 1,66 €</div>
     <div>Bei 6 Flaschen je 1,66 € 1 Liter 1,11 €</div>
   </section>
   <section class="product-card">
-    <a href="/produkte/ja-natuerlich-butter-00765432">Ja! Natürlich Butter</a>
-    <div>2+1 Aktion</div>
+    <a href="/produkte/schaerdinger-fasslbutter-00408880">Schärdinger Fasslbutter</a>
+    <img alt="2+1 Aktion">
     <div>Einzelpreis 2,99 € 1 kg 11,96 €</div>
     <div>Bei 3 Packungen je 1,99 € 1 kg 7,96 €</div>
   </section>
@@ -56,7 +56,7 @@ assert coca["promotion"]["paidQuantity"] == 4
 assert coca["promotion"]["freeQuantity"] == 2
 assert coca["promotion"]["requiredQuantity"] == 6
 
-butter = next(v for v in cards.values() if v["name"] == "Ja! Natürlich Butter")
+butter = next(v for v in cards.values() if v["name"] == "Schärdinger Fasslbutter")
 assert butter["regularPrice"] == 2.99
 assert butter["salePrice"] == 1.99
 assert butter["promotion"]["type"] == "bundle"
@@ -82,7 +82,7 @@ assert "paidQuantity" not in plain["promotion"]
 
 products = [
     {"retailerProductId": "00-770015", "name": "Coca Cola"},
-    {"retailerProductId": "00-765432", "name": "Ja! Natürlich Butter"},
+    {"retailerProductId": "00-408880", "name": "Schärdinger Fasslbutter"},
 ]
 
 lookup = {}
@@ -93,6 +93,6 @@ for product in products:
 assert lookup["00770015"]["name"] == "Coca Cola"
 assert lookup["770015"]["name"] == "Coca Cola"
 assert lookup["00-770015"]["name"] == "Coca Cola"
-assert lookup["00-765432"]["name"] == "Ja! Natürlich Butter"
+assert lookup["00-408880"]["name"] == "Schärdinger Fasslbutter"
 
-print("BILLA action parser/mapping tests OK")
+print("BILLA action parser/mapping/alt-bundle tests OK")
