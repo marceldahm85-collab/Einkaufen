@@ -17,10 +17,14 @@ assert(index.includes('data-auto-match-store="billa"'), "BILLA fehlt im Trefferf
 assert(index.includes('id="billaLiveStatus"'), "BILLA-Statuskarte fehlt");
 assert(index.includes('<script src="live-billa.js"></script>'), "live-billa.js wird nicht geladen");
 
+assert(app.includes('const promotionsSupported = ["mpreis", "spar", "tg", "billa"].includes(currentCatalogRetailer)'), "BILLA-Aktionsfilter nicht aktiviert");
+
 assert(live.includes('const DATA_URL = "data/billa.json"'), "BILLA-Datenquelle falsch");
 assert(live.includes('window.BillaLive ='), "BillaLive Export fehlt");
 
 assert(workflow.includes('python scripts/update_billa.py'), "BILLA-Importer fehlt im Workflow");
+assert(workflow.includes('python scripts/update_billa_actions.py'), "BILLA-Aktionsimport fehlt im Workflow");
+assert(workflow.includes('python scripts/test_update_billa_actions.py'), "BILLA-Aktionstest fehlt im Workflow");
 assert(workflow.includes('node --check live-billa.js'), "BILLA-JS wird im Workflow nicht geprüft");
 assert(workflow.includes('live-billa.js manifest.webmanifest'), "live-billa.js wird nicht nach Pages kopiert");
 

@@ -17,6 +17,7 @@ FILES = {
     "mpreis": DATA_DIR / "mpreis.json",
     "spar": DATA_DIR / "spar.json",
     "tg": DATA_DIR / "tg.json",
+    "billa": DATA_DIR / "billa.json",
 }
 
 
