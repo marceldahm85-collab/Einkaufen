@@ -168,3 +168,8 @@ Zuordnungen werden weiterhin ausschließlich in `localStorage` gespeichert.
 Die Aktionsdaten werden aus der offiziellen BILLA-Aktionsseite gewonnen. Die
 Kondition eines Bundles wird nur übernommen, wenn die Seite sowohl die
 Bundle-Größe als auch den konkreten Mengenpreis ausweist.
+
+
+## v13.3 – BILLA Aktions-/Flugblattebene
+
+BILLA verwendet weiterhin `data/billa.json` als öffentlichen Produkt- und Aktionsbestand. Die Oberfläche unter `Mehr` stellt nun zusätzlich eine aktuelle Aktionsliste und den offiziellen BILLA-Flugblatt-Einstieg bereit. Persönliche Einkaufsdaten bleiben lokal.

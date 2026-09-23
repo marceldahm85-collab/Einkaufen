@@ -182,6 +182,15 @@
     }
 
     if (query) {
+      const tools = window.RetailerSearch;
+      const catalogProfile = tools?.catalogFilterProfile
+        ? tools.catalogFilterProfile(query)
+        : null;
+
+      if (catalogProfile && tools?.matchProfile) {
+        rows = rows.filter(entry => tools.matchProfile(entry, catalogProfile).matched);
+      }
+
       rows = rows
         .map(entry => ({
           entry,

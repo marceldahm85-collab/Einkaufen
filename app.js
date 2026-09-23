@@ -102,7 +102,8 @@
   let state = loadState();
   const OFFICIAL_FLYER_URLS = {
     mpreis: "https://www.mpreis.at/aktionen/flugblatt?region=osttirol",
-    spar: "https://www.interspar.at/aktionen/osttirol"
+    spar: "https://www.interspar.at/aktionen/osttirol",
+    billa: "https://www.billa.at/unsere-aktionen/flugblatt"
   };
 
   let currentView = "shopping";
@@ -3403,6 +3404,8 @@
     const linkedEl = $("#billaLinkedCount");
     const lastEl = $("#billaLastSync");
     const statusEl = $("#billaLiveStatus");
+    const promoBtn = $("#showBillaPromotionsBtn");
+    const flyerBtn = $("#openBillaFlyerBtn");
     if (!linkedEl || !lastEl || !statusEl) return;
 
     linkedEl.textContent = autoLinked
@@ -3431,6 +3434,84 @@
       })} · ${billaPublicStatus.productCount || 0} Produkte · ${promoText}`;
     } else {
       lastEl.textContent = "Noch keine importierten BILLA-Daten vorhanden";
+    }
+
+    if (promoBtn) {
+      const count = billaPublicStatus?.promotionCount || 0;
+      const stale = billaPublicStatus?.promotionStale === true;
+      promoBtn.disabled = stale || count === 0;
+      promoBtn.textContent = stale
+        ? "🔥 Aktionen derzeit nicht verfügbar"
+        : (count ? `🔥 ${count} BILLA-Aktionen anzeigen` : "🔥 BILLA-Aktionen anzeigen");
+    }
+
+    if (flyerBtn) {
+      const url = OFFICIAL_FLYER_URLS.billa;
+      flyerBtn.disabled = !url;
+      flyerBtn.dataset.flyerUrl = url || "";
+      flyerBtn.textContent = url ? "📄 Flugblatt" : "📄 Flugblatt nicht verfügbar";
+    }
+  }
+
+  async function openBillaPromotions() {
+    const stateEl = $("#billaPromotionsState");
+    const listEl = $("#billaPromotionsList");
+    if (!stateEl || !listEl) return;
+
+    openSheet("billaPromotionsSheet");
+    stateEl.textContent = "BILLA-Aktionen werden geladen …";
+    listEl.innerHTML = "";
+
+    if (!window.BillaLive?.promotions) {
+      stateEl.textContent = "Die BILLA-Aktionsansicht konnte nicht geladen werden.";
+      return;
+    }
+
+    try {
+      const items = await window.BillaLive.promotions();
+      const updated = billaPublicStatus?.promotionUpdatedAt
+        ? ` · Datenstand ${new Date(billaPublicStatus.promotionUpdatedAt).toLocaleString("de-AT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
+        : "";
+
+      stateEl.textContent = items.length
+        ? `${items.length} aktuelle BILLA-Aktionsartikel${updated}`
+        : "Aktuell wurden keine verifizierten BILLA-Aktionen gefunden.";
+
+      listEl.innerHTML = items.map(item => {
+        const promotion = item.promotion || {};
+        const condition = promotion.label || promotion.officialLabel || "Aktion";
+        const salePrice = item.salePrice ?? item.currentPrice;
+        const regularPrice = item.regularPrice;
+
+        return `
+          <article class="product-card billa-promo-card">
+            <div class="product-main billa-promo-main">
+              <div class="product-name">${escapeHtml(item.name)}</div>
+              <div class="product-meta">
+                <span>${escapeHtml(formatLiveAmount(item))}</span>
+                ${item.unitPrice ? `<span>·</span><span>${money(item.unitPrice)}/${escapeHtml(item.unitPriceUnit || "")}</span>` : ""}
+              </div>
+              <div class="offer-extra">
+                <span class="offer-badge condition">${escapeHtml(condition)}</span>
+                ${promotion.loyaltyRequired === true ? `<span class="offer-badge app-only">NUR MIT JÖ</span>` : ""}
+              </div>
+              ${item.promotionOfficialLabel && item.promotionOfficialLabel !== condition
+                ? `<div class="product-meta">${escapeHtml(item.promotionOfficialLabel)}</div>`
+                : ""}
+            </div>
+
+            <div class="product-price-wrap">
+              ${salePrice != null
+                ? `<div class="product-price sale">${money(salePrice)}</div>
+                   ${regularPrice != null && Number(regularPrice) !== Number(salePrice)
+                     ? `<div class="old-price">${money(regularPrice)}</div>` : ""}`
+                : `<div class="tg-no-price">ohne Fixpreis</div>`}
+            </div>
+          </article>`;
+      }).join("");
+    } catch (error) {
+      stateEl.textContent = `BILLA-Aktionen konnten nicht geladen werden: ${error.message}`;
+      listEl.innerHTML = "";
     }
   }
 
@@ -4522,6 +4603,9 @@
     const showTgPromotions = e.target.closest("#showTgPromotionsBtn");
     if (showTgPromotions) return openTgPromotions();
 
+    const showBillaPromotions = e.target.closest("#showBillaPromotionsBtn");
+    if (showBillaPromotions) return openBillaPromotions();
+
     const mpreisFlyer = e.target.closest("#openMpreisFlyerBtn");
     if (mpreisFlyer) return openOfficialFlyer("mpreis");
 
@@ -4530,6 +4614,9 @@
 
     const tgFlyer = e.target.closest("#openTgFlyerBtn");
     if (tgFlyer) return openTgFlyer();
+
+    const billaFlyer = e.target.closest("#openBillaFlyerBtn");
+    if (billaFlyer) return openOfficialFlyer("billa");
 
     const tgLink = e.target.closest("[data-link-tg]");
     if (tgLink) return openTgLink(tgLink.dataset.linkTg);

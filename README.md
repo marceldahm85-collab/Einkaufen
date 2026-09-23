@@ -1,4 +1,8 @@
-# PreisPilot Osttirol – Version 13.2
+# PreisPilot Osttirol – Version 13.3
+
+BILLA erhält in Mehr jetzt dieselbe sichtbare Aktions-/Flugblatt-Ebene wie die anderen integrierten Händler.
+
+
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -1089,3 +1093,12 @@ Aktionsprodukte eingeschränkt werden.
 - `2+1`, `4+2` und ähnliche Multipack-Aktionen werden dadurch als echte Bundles und nicht nur als `bei N`-Mengenaktion gespeichert.
 - Die offizielle BILLA-Multipack-Aktionsseite wird zusätzlich geprüft.
 - Die Katalogsuche verwendet bei bekannten Produkttypen dieselben Kategorie-/Ausschlussregeln wie das automatische Matching; reine Worttreffer in Produktnamen/Bestreibungen führen nicht mehr zu offensichtlich falschen Treffern.
+
+
+## Version 13.3 – BILLA Aktionen und Flugblatt sichtbar machen
+
+- In `Mehr` zeigt die BILLA-Karte jetzt die Zahl der aktuell importierten BILLA-Aktionsartikel.
+- Ein Button öffnet die verifizierte BILLA-Aktionsliste direkt innerhalb der App.
+- Das offizielle BILLA-Flugblatt ist direkt aus `Mehr` erreichbar. Die BILLA-Seite unterstützt eine Bundeslandauswahl und regionale Angebote.
+- Die bestehende BILLA-Aktionslogik für `ab N`, `1+1`, `2+1`, `4+2` usw. bleibt unverändert.
+- Der Service-Worker verwendet einen neuen Cache-Namen, damit die neue BILLA-Oberfläche nach dem Deployment nicht aus dem alten v13.2-Cache geladen wird.

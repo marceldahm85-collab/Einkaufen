@@ -283,8 +283,22 @@
             <button class="secondary-btn" id="syncBillaBtn">Neu laden</button>
           </div>
 
+          <div class="retailer-action-row">
+            <button class="secondary-btn billa-promo-btn" id="showBillaPromotionsBtn" type="button">
+              🔥 BILLA-Aktionen anzeigen
+            </button>
+            <button class="secondary-btn retailer-flyer-btn billa-flyer-btn" id="openBillaFlyerBtn" type="button">
+              📄 Flugblatt
+            </button>
+          </div>
+
+          <div class="flyer-source-line">
+            <span>Flugblatt: BILLA</span>
+            <span>Tirol / Regionenauswahl</span>
+          </div>
+
           <p class="muted small live-note">
-            BILLA-Grundpreise und Preisverläufe werden aus dem öffentlichen Heisse-Preise-Datensatz aktualisiert. Aktuelle BILLA-Aktionen einschließlich Mengen- und Multipack-Aktionen werden separat aus dem offiziellen BILLA Online Shop eingelesen und in Preisvergleich und Optimierer berücksichtigt.
+            BILLA-Grundpreise und Preisverläufe werden aus dem öffentlichen Heisse-Preise-Datensatz aktualisiert. Aktuelle BILLA-Aktionen einschließlich Mengen- und Multipack-Aktionen werden separat aus dem offiziellen BILLA Online Shop eingelesen. Das offizielle Flugblatt bietet eine Bundeslandauswahl und regionale Angebote.
           </p>
         </div>
 
@@ -727,6 +741,22 @@
       T&G-Aktionen werden geladen …
     </div>
     <div id="tgPromotionsList" class="stack live-result-list"></div>
+  </section>
+
+  <section class="bottom-sheet" id="billaPromotionsSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">BILLA AKTIONEN</div>
+        <h2>Aktuelle Aktionsartikel</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+
+    <div id="billaPromotionsState" class="muted small live-search-state">
+      BILLA-Aktionen werden geladen …
+    </div>
+    <div id="billaPromotionsList" class="stack live-result-list"></div>
   </section>
 
   <section class="bottom-sheet" id="catalogLinkSheet" aria-hidden="true">
