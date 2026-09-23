@@ -228,7 +228,12 @@
       const markerMatch = def.normalizedMarkers.some(marker =>
         nameHasMarker(name, marker)
       );
-      if (aliasMatch || markerMatch) result.push(def.id);
+      // Butter is frequently written as a German compound noun
+      // (Fasslbutter, Sommerbutter, Süßrahmbutter, ...). Treat the
+      // compound as product-type evidence; the exclusion rules still
+      // remove Butterkeks, Kräuterbutter, Butterschmalz, etc.
+      const compoundMatch = def.id === "butter" && name.includes("butter");
+      if (aliasMatch || markerMatch || compoundMatch) result.push(def.id);
     }
 
     result.push(...exactKnownBrandCategories(name));
@@ -392,6 +397,7 @@
     if (categoryIds.includes("butter")) {
       exclusions.push(
         "croissant", "toast", "zopf", "stollen", "brioche", "breze",
+        "butterkeks", "butterplätzchen", "butterplaetzchen", "butterzopf",
         "brezel", "laugenspitz", "pinze", "keks", "kekse", "gebäck", "geback",
         "popcorn", "strudel", "nusskrone", "krone", "marillenspitz",
         "baguette", "flutes", "schnecke", "brille", "kipferl",
@@ -433,6 +439,28 @@
     }
 
     return [...new Set(exclusions.map(normalize).filter(Boolean))];
+  }
+
+  function catalogFilterProfile(query) {
+    const normalizedQuery = normalize(query);
+    if (!normalizedQuery) return null;
+
+    // For short, well-known category/product-type queries, the catalog should
+    // behave like the automatic matcher instead of returning every product
+    // that merely contains the word in its description/name. This fixes cases
+    // such as searching "Butter" returning Butterkeks or "Kaffee" returning
+    // coffee-flavoured yoghurt/sugar. Free-form searches remain unchanged.
+    const categoryIds = categoryIdsForText(normalizedQuery);
+    if (!categoryIds.length || normalizedQuery.split(/\s+/).length > 5) return null;
+
+    const profile = profileForProduct({
+      name: normalizedQuery,
+      brand: "",
+      matchingProfile: {}
+    });
+
+    if (!profile.categoryIds.length) return null;
+    return profile;
   }
 
   function profileForProduct(product) {
@@ -562,6 +590,7 @@
     directCategories,
     categoryIdsForText,
     profileForProduct,
+    catalogFilterProfile,
     matchProfile
   };
 })();

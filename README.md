@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 13.0
+# PreisPilot Osttirol – Version 13.2
 
 Erste lauffähige Gesamtversion der privaten mobilen Einkaufs-/Preisvergleichs-App.
 
@@ -1081,3 +1081,11 @@ normalisiert. Eine Namenszuordnung erfolgt nur bei einem eindeutigen Treffer.
 
 Der BILLA-Katalog kann jetzt auch mit dem Filter `🔥 Aktionen` auf aktuelle
 Aktionsprodukte eingeschränkt werden.
+
+
+## Version 13.2 – BILLA-Aktionen und Katalogsuche präzisiert
+
+- BILLA-Aktionsbadges werden auch aus Bild-/Accessibility-Attributen wie `alt="2+1 Aktion"` erkannt; dadurch bleiben `2+1`/`4+2` echte Bundles.
+- `2+1`, `4+2` und ähnliche Multipack-Aktionen werden dadurch als echte Bundles und nicht nur als `bei N`-Mengenaktion gespeichert.
+- Die offizielle BILLA-Multipack-Aktionsseite wird zusätzlich geprüft.
+- Die Katalogsuche verwendet bei bekannten Produkttypen dieselben Kategorie-/Ausschlussregeln wie das automatische Matching; reine Worttreffer in Produktnamen/Bestreibungen führen nicht mehr zu offensichtlich falschen Treffern.
