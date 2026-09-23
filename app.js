@@ -1438,13 +1438,13 @@
 
     const promoButton = $("#catalogPromotionFilter");
     if (promoButton) {
-      const promotionsSupported = currentCatalogRetailer !== "billa";
+      const promotionsSupported = ["mpreis", "spar", "tg", "billa"].includes(currentCatalogRetailer);
       if (!promotionsSupported) catalogPromotionsOnly = false;
       promoButton.disabled = !promotionsSupported;
-      promoButton.textContent = promotionsSupported ? "🔥 Aktionen" : "🔥 Aktionen folgen";
+      promoButton.textContent = "🔥 Aktionen";
       promoButton.classList.toggle("is-active", promotionsSupported && catalogPromotionsOnly);
       promoButton.setAttribute("aria-pressed", promotionsSupported && catalogPromotionsOnly ? "true" : "false");
-      promoButton.title = promotionsSupported ? "" : "BILLA-Aktionsimport folgt im nächsten Schritt.";
+      promoButton.title = promotionsSupported ? "" : "Aktionsfilter nicht verfügbar.";
     }
   }
 
@@ -3422,10 +3422,13 @@
 
     if (billaPublicStatus?.updatedAt) {
       const date = new Date(billaPublicStatus.updatedAt);
+      const promoText = billaPublicStatus.promotionStale
+        ? "Aktionsdaten veraltet"
+        : `${billaPublicStatus.promotionCount || 0} Aktionen`;
       lastEl.textContent = `GitHub-Datenstand: ${date.toLocaleString("de-AT", {
         day: "2-digit", month: "2-digit", year: "numeric",
         hour: "2-digit", minute: "2-digit"
-      })} · ${billaPublicStatus.productCount || 0} Produkte`;
+      })} · ${billaPublicStatus.productCount || 0} Produkte · ${promoText}`;
     } else {
       lastEl.textContent = "Noch keine importierten BILLA-Daten vorhanden";
     }

@@ -93,8 +93,8 @@
       ...item,
       inactivePromotion: item.promotion || null,
       salePrice: null,
-      currentPrice: item.regularPrice ?? null,
-      displayPrice: item.regularPrice ?? null,
+      currentPrice: item.regularPrice ?? item.currentPrice ?? null,
+      displayPrice: item.regularPrice ?? item.currentPrice ?? null,
       promotion: null,
       promotionVerified: false,
       promotionInactiveReason: item.validUntil && localTodayISO() > String(item.validUntil).slice(0, 10)

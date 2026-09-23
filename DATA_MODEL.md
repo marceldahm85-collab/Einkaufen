@@ -149,3 +149,22 @@ Mehrdeutige Kandidaten werden konservativ verworfen.
 Kandidaten besitzen dasselbe kompakte Format wie bei MPREIS, SPAR und T&G.
 Der öffentliche BILLA-Datensatz liegt in `data/billa.json`; persönliche
 Zuordnungen werden weiterhin ausschließlich in `localStorage` gespeichert.
+
+## BILLA-Aktionen (v13.1)
+
+`data/billa.json` kann zusätzlich folgende öffentliche Aktionsfelder enthalten:
+
+- `promotionCount`
+- `promotionUpdatedAt`
+- `promotionObservedAt`
+- `promotionSource`
+- `promotionStale`
+- `promotionLastError`
+- `promotionParserVersion`
+- pro Produkt `regularPrice`, `salePrice`, `promotion`,
+  `promotionVerified`, `promotionObservedAt`, `promotionProductUrl`,
+  `promotionSource` und optional `promotionOfficialLabel`
+
+Die Aktionsdaten werden aus der offiziellen BILLA-Aktionsseite gewonnen. Die
+Kondition eines Bundles wird nur übernommen, wenn die Seite sowohl die
+Bundle-Größe als auch den konkreten Mengenpreis ausweist.

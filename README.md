@@ -1040,3 +1040,44 @@ Der offizielle BILLA-Aktionsimport wird separat ergänzt, damit Mengenaktionen
 und Bundles erst dann in den Optimierer gelangen, wenn ihre Bedingungen sicher
 strukturiert erkannt werden. Bis dahin werden keine Aktionen aus bloßen
 Preisunterschieden erraten.
+
+## Version 13.1 – BILLA-Aktionen
+
+Der BILLA-Grundbestand aus v13.0 wird jetzt um die aktuell auf der offiziellen
+BILLA-Aktionsseite veröffentlichten Produktaktionen ergänzt.
+
+### Quelle und Verhalten
+
+- offizielle Quelle: `https://shop.billa.at/aktionen`
+- der Import folgt der aktuellen Aktionsseite und ersetzt nach einem erfolgreichen
+  Lauf den bisherigen BILLA-Aktionsbestand vollständig
+- bei einem technischen Abruffehler bleibt der bisherige Bestand erhalten und
+  wird mit `promotionStale=true` vorsorglich vom Optimierer deaktiviert
+- ein Lauf mit ungewöhnlich wenigen sicher erkannten Aktionen gilt nicht als
+  erfolgreich und überschreibt keine funktionierenden Aktionsdaten
+
+### Sichere Aktionsarten
+
+- `ab N` / `Bei N`: Mengenaktion mit der ausdrücklich auf der BILLA-Seite
+  angegebenen Stückzahl und dem dort genannten Preis
+- `N+M Aktion`: Bundle-Aktion mit `paidQuantity`, `freeQuantity` und
+  `requiredQuantity`
+- einfache `in Aktion`-Kennzeichnung mit dem explizit angegebenen Preis
+- reine Rabattprozente erzeugen keine erfundene `1+1`- oder Bundle-Struktur
+
+BILLA listet auf der offiziellen Aktionsseite beispielsweise `4+2 Aktion`,
+`2+1 Aktion` und `ab N`-Angebote mit Einzelpreis und Mengenpreis. Die App
+übernimmt diese expliziten Bedingungen in die vorhandene Gebinde- und
+Aktionsberechnung.
+
+### Produktzuordnung
+
+Die Aktionskarten werden vorrangig über die BILLA-Artikelnummer aus der
+Produkt-URL dem öffentlichen BILLA-Bestand zugeordnet. Unterschiedliche
+Darstellungen derselben Nummer (`00-123456`, `00123456`, `123456`) werden
+normalisiert. Eine Namenszuordnung erfolgt nur bei einem eindeutigen Treffer.
+
+### Katalog
+
+Der BILLA-Katalog kann jetzt auch mit dem Filter `🔥 Aktionen` auf aktuelle
+Aktionsprodukte eingeschränkt werden.
