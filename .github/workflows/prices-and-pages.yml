@@ -55,6 +55,7 @@ jobs:
           node scripts/test_product_edit_preservation.js
           node scripts/test_amount_normalization.js
           python scripts/test_update_billa.py
+          python scripts/test_update_billa_actions.py
           python scripts/test_update_tg.py
           python scripts/test_update_tg_flyer.py
 
@@ -129,6 +130,31 @@ jobs:
           if count < 100:
               raise SystemExit(
                   "BILLA-Datenbestand ist leer oder unplausibel klein. "
+                  "Deployment wird abgebrochen."
+              )
+          PY
+
+      - name: BILLA-Aktionen aktualisieren
+        run: python scripts/update_billa_actions.py
+
+      - name: BILLA-Aktionsbestand prüfen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/billa.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          count = int(data.get("promotionCount") or 0)
+          stale = bool(data.get("promotionStale"))
+
+          print(f"BILLA-Aktionsprodukte: {count}")
+          print(f"BILLA-Aktionsdaten stale: {'ja' if stale else 'nein'}")
+
+          if not stale and count < 10:
+              raise SystemExit(
+                  "Unplausibel wenige aktuelle BILLA-Aktionsprodukte. "
                   "Deployment wird abgebrochen."
               )
           PY
