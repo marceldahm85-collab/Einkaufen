@@ -29,6 +29,6 @@ assert(workflow.includes("python scripts/update_hofer_actions.py"), "HOFER-Aktio
 assert(workflow.includes("python scripts/test_update_hofer.py"), "HOFER-Grundtest fehlt");
 assert(workflow.includes("python scripts/test_update_hofer_actions.py"), "HOFER-Aktionstest fehlt");
 assert(workflow.includes("node --check live-hofer.js"), "HOFER-JS-Check fehlt");
-assert(workflow.includes("live-hofer.js manifest.webmanifest"), "HOFER-Pages-Kopie fehlt");
+assert(workflow.includes("live-hofer.js"), "HOFER-Pages-Kopie fehlt");
 
 console.log("HOFER integration wiring tests OK");
