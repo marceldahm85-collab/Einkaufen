@@ -1759,3 +1759,47 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
   line-height: 1.22;
 }
 
+
+
+/* Version 14.0 – HOFER Preise, Aktionen und Flugblatt */
+.hofer-live-card::before {
+  background: linear-gradient(#0057a8, #4d91ce);
+}
+
+.hofer-promo-btn,
+.hofer-flyer-btn {
+  width: 100%;
+  margin-top: 11px;
+}
+
+.hofer-promo-btn {
+  border-color: color-mix(in srgb, #0057a8 25%, var(--line));
+  background: color-mix(in srgb, #0057a8 9%, var(--surface-2));
+}
+
+.hofer-flyer-btn {
+  margin-top: 8px;
+}
+
+.hofer-promo-card {
+  align-items: start;
+}
+
+.hofer-promo-main {
+  cursor: default;
+}
+
+.hofer-promo-card .product-price {
+  color: #0057a8;
+}
+
+#hoferPromotionsSheet .live-result-list {
+  padding-bottom: 10px;
+}
+
+#hoferPromotionsSheet .product-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.22;
+}
