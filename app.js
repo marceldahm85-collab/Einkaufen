@@ -32,7 +32,8 @@
       mpreis: { enabled: true, lastSync: null, lastError: null },
       spar: { enabled: true, lastSync: null, lastError: null },
       tg: { enabled: true, lastSync: null, lastError: null },
-      billa: { enabled: true, lastSync: null, lastError: null }
+      billa: { enabled: true, lastSync: null, lastError: null },
+      hofer: { enabled: true, lastSync: null, lastError: null }
     },
     shopping: [
       { id: "s1", productId: "p_milk", quantity: 2, checked: false, preferredStore: "auto", addedAt: 1 },
@@ -103,7 +104,8 @@
   const OFFICIAL_FLYER_URLS = {
     mpreis: "https://www.mpreis.at/aktionen/flugblatt?region=osttirol",
     spar: "https://www.interspar.at/aktionen/osttirol",
-    billa: "https://www.billa.at/unsere-aktionen/flugblatt"
+    billa: "https://www.billa.at/unsere-aktionen/flugblatt",
+    hofer: "https://www.hofer.at/flugblatt"
   };
 
   let currentView = "shopping";
@@ -121,8 +123,8 @@
   let catalogLoading = false;
   let selectedCatalogItem = null;
   const CATALOG_PAGE_SIZE = 50;
-  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa"];
-  const AUTO_MATCH_ENGINE_VERSION = 3;
+  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa", "hofer"];
+  const AUTO_MATCH_ENGINE_VERSION = 4;
   const AUTO_MATCH_LIMIT_PER_STORE = 40;
   const AUTO_MATCH_SEARCH_LIMIT = 400;
   const AUTO_MATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -145,6 +147,7 @@
   let sparPublicStatus = null;
   let tgPublicStatus = null;
   let billaPublicStatus = null;
+  let hoferPublicStatus = null;
 
   const $ = (sel, root=document) => root.querySelector(sel);
   const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
@@ -181,6 +184,10 @@
         billa: {
           ...initialState.live.billa,
           ...(input.live?.billa || {})
+        },
+        hofer: {
+          ...initialState.live.hofer,
+          ...(input.live?.hofer || {})
         }
       },
       shopping: Array.isArray(input.shopping) ? input.shopping : [],
@@ -665,6 +672,7 @@
     if (store === "spar") return window.SparLive;
     if (store === "tg") return window.TgLive;
     if (store === "billa") return window.BillaLive;
+    if (store === "hofer") return window.HoferLive;
     return null;
   }
 
@@ -1418,6 +1426,7 @@
     if (store === "spar") return window.SparLive;
     if (store === "tg") return window.TgLive;
     if (store === "billa") return window.BillaLive;
+    if (store === "hofer") return window.HoferLive;
     return null;
   }
 
@@ -1439,7 +1448,7 @@
 
     const promoButton = $("#catalogPromotionFilter");
     if (promoButton) {
-      const promotionsSupported = ["mpreis", "spar", "tg", "billa"].includes(currentCatalogRetailer);
+      const promotionsSupported = ["mpreis", "spar", "tg", "billa", "hofer"].includes(currentCatalogRetailer);
       if (!promotionsSupported) catalogPromotionsOnly = false;
       promoButton.disabled = !promotionsSupported;
       promoButton.textContent = "🔥 Aktionen";
@@ -1450,7 +1459,7 @@
   }
 
   function setCatalogRetailer(store) {
-    if (!["mpreis", "spar", "tg", "billa"].includes(store)) return;
+    if (!["mpreis", "spar", "tg", "billa", "hofer"].includes(store)) return;
     if (currentCatalogRetailer === store) return;
 
     currentCatalogRetailer = store;
@@ -3715,6 +3724,88 @@
     return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
   }
 
+  function renderHoferLiveStatus() {
+    const live = state.live?.hofer || {};
+    const autoLinked = state.products.filter(p => Array.isArray(p.autoMatches?.stores?.hofer) && p.autoMatches.stores.hofer.length).length;
+    const linkedEl = $("#hoferLinkedCount");
+    const lastEl = $("#hoferLastSync");
+    const statusEl = $("#hoferLiveStatus");
+    const promoBtn = $("#showHoferPromotionsBtn");
+    const flyerBtn = $("#openHoferFlyerBtn");
+    if (!linkedEl || !lastEl || !statusEl) return;
+    linkedEl.textContent = autoLinked + " Artikel automatisch";
+    statusEl.className = "status-badge";
+    if (live.lastError) { statusEl.textContent = "Fehler"; statusEl.classList.add("live-error"); }
+    else if (hoferPublicStatus?.promotionStale) { statusEl.textContent = "Preisstand ok · Aktionen pausiert"; statusEl.classList.add("live-error"); }
+    else if (hoferPublicStatus?.updatedAt) { statusEl.textContent = "Aktuell"; statusEl.classList.add("live-ok"); }
+    else { statusEl.textContent = "Bereit"; }
+    if (hoferPublicStatus?.updatedAt) {
+      const date = new Date(hoferPublicStatus.updatedAt);
+      const promoText = hoferPublicStatus.promotionStale ? "Aktionsdaten veraltet" : String(hoferPublicStatus.promotionCount || 0) + " Aktionen";
+      lastEl.textContent = "GitHub-Datenstand: " + date.toLocaleString("de-AT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) + " · " + String(hoferPublicStatus.productCount || 0) + " Produkte · " + promoText;
+    } else { lastEl.textContent = "Noch keine importierten HOFER-Daten vorhanden"; }
+    if (promoBtn) {
+      const count = hoferPublicStatus?.promotionCount || 0;
+      const stale = hoferPublicStatus?.promotionStale === true;
+      promoBtn.disabled = stale || count === 0;
+      promoBtn.textContent = stale ? "🔥 Aktionen derzeit nicht verfügbar" : (count ? "🔥 " + count + " HOFER-Aktionen anzeigen" : "🔥 HOFER-Aktionen anzeigen");
+    }
+    if (flyerBtn) {
+      const url = OFFICIAL_FLYER_URLS.hofer;
+      flyerBtn.disabled = !url;
+      flyerBtn.dataset.flyerUrl = url || "";
+      flyerBtn.textContent = url ? "📄 Flugblatt" : "📄 Flugblatt nicht verfügbar";
+    }
+  }
+
+  async function openHoferPromotions() {
+    const stateEl = $("#hoferPromotionsState");
+    const listEl = $("#hoferPromotionsList");
+    if (!stateEl || !listEl) return;
+    openSheet("hoferPromotionsSheet");
+    stateEl.textContent = "HOFER-Aktionen werden geladen …";
+    listEl.innerHTML = "";
+    if (!window.HoferLive?.promotions) { stateEl.textContent = "Die HOFER-Aktionsansicht konnte nicht geladen werden."; return; }
+    try {
+      const items = await window.HoferLive.promotions();
+      const updated = hoferPublicStatus?.promotionUpdatedAt ? " · Datenstand " + new Date(hoferPublicStatus.promotionUpdatedAt).toLocaleString("de-AT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+      stateEl.textContent = items.length ? items.length + " aktuelle HOFER-Aktionsartikel" + updated : "Aktuell wurden keine verifizierten HOFER-Aktionen gefunden.";
+      listEl.innerHTML = items.map(item => {
+        const promotion = item.promotion || {};
+        const condition = promotion.label || promotion.officialLabel || "Aktionsartikel";
+        const displayPrice = item.salePrice ?? item.currentPrice ?? item.regularPrice ?? null;
+        const regularPrice = item.regularPrice;
+        return '<article class="product-card hofer-promo-card"><div class="product-main hofer-promo-main">' +
+          '<div class="product-name">' + escapeHtml(item.name) + '</div>' +
+          '<div class="product-meta"><span>' + escapeHtml(formatLiveAmount(item)) + '</span>' + (item.unitPrice ? '<span>·</span><span>' + money(item.unitPrice) + '/' + escapeHtml(item.unitPriceUnit || "") + '</span>' : "") + '</div>' +
+          '<div class="offer-extra"><span class="offer-badge condition">' + escapeHtml(condition) + '</span></div>' +
+          (item.validFrom ? '<div class="product-meta">Verfügbar seit ' + formatDate(String(item.validFrom).slice(0,10)) + '</div>' : "") +
+          '</div><div class="product-price-wrap">' +
+          (displayPrice != null ? '<div class="product-price ' + (item.salePrice != null ? "sale" : "") + '">' + money(displayPrice) + '</div>' + (item.salePrice != null && regularPrice != null && Number(regularPrice) !== Number(item.salePrice) ? '<div class="old-price">' + money(regularPrice) + '</div>' : "") : '<div class="product-price">—</div>') +
+          '</div></article>';
+      }).join("");
+    } catch (error) { stateEl.textContent = "HOFER-Aktionen konnten nicht geladen werden: " + error.message; listEl.innerHTML = ""; }
+  }
+
+  async function refreshHoferPublicStatus(force = false) {
+    try { if (!window.HoferLive?.status) throw new Error("HOFER-Datenmodul fehlt"); hoferPublicStatus = await window.HoferLive.status(force); state.live.hofer.lastError = null; }
+    catch (error) { hoferPublicStatus = null; state.live.hofer.lastError = error.message; }
+    saveState(); renderHoferLiveStatus();
+  }
+
+  async function reloadAndSyncHofer() {
+    const button = $("#syncHoferBtn");
+    if (button) { button.disabled = true; button.textContent = "Lädt …"; }
+    try {
+      if (!window.HoferLive?.reload) throw new Error("HOFER-Datenmodul fehlt");
+      hoferPublicStatus = await window.HoferLive.reload();
+      state.live.hofer.lastError = null; saveState(); renderHoferLiveStatus();
+      await refreshAllAutoMatches({force:true,silent:true});
+      showToast("HOFER-Daten und Auto-Treffer aktualisiert");
+    } catch (error) {
+      state.live.hofer.lastError = error.message; saveState(); renderHoferLiveStatus(); showToast("HOFER-Daten konnten nicht neu geladen werden");
+    } finally { if (button) { button.disabled = false; button.textContent = "Neu laden"; } }
+  }
   function openOfficialFlyer(store) {
     const url = OFFICIAL_FLYER_URLS[store];
 
@@ -3776,6 +3867,7 @@
         <span><i style="background:${retailer("spar").color}"></i>SPAR ${counts.spar || 0}</span>
         <span><i style="background:${retailer("tg").color}"></i>T&G ${counts.tg || 0}</span>
         <span><i style="background:${retailer("billa").color}"></i>BILLA ${counts.billa || 0}</span>
+        <span><i style="background:${retailer("hofer").color}"></i>HOFER ${counts.hofer || 0}</span>
       </div>
       ${fixed ? `<div class="auto-fixed-note">Fest gewählt: <strong>${escapeHtml(fixed.name)}</strong> · ${retailer(fixed.store).name}</div>` : ""}
     `;
@@ -3981,6 +4073,7 @@
             <span>SPAR ${counts.spar || 0}</span>
             <span>T&G ${counts.tg || 0}</span>
             <span>BILLA ${counts.billa || 0}</span>
+            <span>HOFER ${counts.hofer || 0}</span>
           </div>
           <div class="muted small">${total} passende Kandidaten · ${autoState}</div>
         </div>
@@ -4010,6 +4103,7 @@
     renderSparLiveStatus();
     renderTgLiveStatus();
     renderBillaLiveStatus();
+    renderHoferLiveStatus();
 
     $$("#themeSegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.themeValue === state.settings.theme));
     $$("#shoppingStrategySegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.strategyValue === state.settings.shoppingStrategy));
@@ -4606,6 +4700,9 @@
     const showBillaPromotions = e.target.closest("#showBillaPromotionsBtn");
     if (showBillaPromotions) return openBillaPromotions();
 
+    const showHoferPromotions = e.target.closest("#showHoferPromotionsBtn");
+    if (showHoferPromotions) return openHoferPromotions();
+
     const mpreisFlyer = e.target.closest("#openMpreisFlyerBtn");
     if (mpreisFlyer) return openOfficialFlyer("mpreis");
 
@@ -4617,6 +4714,9 @@
 
     const billaFlyer = e.target.closest("#openBillaFlyerBtn");
     if (billaFlyer) return openOfficialFlyer("billa");
+
+    const hoferFlyer = e.target.closest("#openHoferFlyerBtn");
+    if (hoferFlyer) return openOfficialFlyer("hofer");
 
     const tgLink = e.target.closest("[data-link-tg]");
     if (tgLink) return openTgLink(tgLink.dataset.linkTg);
@@ -4718,6 +4818,7 @@
   $("#syncSparBtn").addEventListener("click", reloadAndSyncSpar);
   $("#syncTgBtn").addEventListener("click", reloadAndSyncTg);
   $("#syncBillaBtn").addEventListener("click", reloadAndSyncBilla);
+  $("#syncHoferBtn").addEventListener("click", reloadAndSyncHofer);
   $("#shoppingSort").addEventListener("change", (e) => {
     state.settings.shoppingSort = e.target.value;
     saveState(); renderShopping();
@@ -4811,6 +4912,8 @@
       setTimeout(() => syncLinkedBilla({ silent: true }).catch(() => {}), 850);
     }
   });
+
+  refreshHoferPublicStatus();
 
   // Automatic candidate pools are local/private and refreshed independently
   // from the old 1:1 live links. Existing cached candidates render instantly;
