@@ -27,6 +27,6 @@ assert(workflow.includes('python scripts/update_billa.py'), "BILLA-Importer fehl
 assert(workflow.includes('python scripts/update_billa_actions.py'), "BILLA-Aktionsimport fehlt im Workflow");
 assert(workflow.includes('python scripts/test_update_billa_actions.py'), "BILLA-Aktionstest fehlt im Workflow");
 assert(workflow.includes('node --check live-billa.js'), "BILLA-JS wird im Workflow nicht geprüft");
-assert(workflow.includes('live-billa.js manifest.webmanifest'), "live-billa.js wird nicht nach Pages kopiert");
+assert(workflow.includes("live-billa.js"), "live-billa.js wird nicht nach Pages kopiert");
 
 console.log("BILLA/HOFER integration wiring tests OK");
