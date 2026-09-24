@@ -42,3 +42,8 @@ GitHub enthält weiterhin nur die öffentlichen Händlerdaten und den App-Code.
 `data/billa.json` enthält ausschließlich öffentliche Händlerdaten. Persönliche
 BILLA-Kandidaten, feste Auswahlen und manuelle Verknüpfungen bleiben wie bei den
 anderen Händlern lokal im Browser und werden nicht nach GitHub geschrieben.
+
+HOFER-Preise und Aktionsmetadaten sind öffentliche Händlerdaten. Persönliche
+Matchingprofile, Kandidatenwahl und Ausblendungen bleiben ausschließlich im
+localStorage.
+
