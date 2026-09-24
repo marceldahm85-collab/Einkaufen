@@ -1111,3 +1111,18 @@ Der Daten-Push verwendet beim Konflikt mit einem inzwischen aktualisierten
 unstaged Änderungen im Runner den Rebase nicht mehr. Vor dem Rebase wird der
 Arbeitsbaum zusätzlich protokolliert, um eventuelle lokale Änderungen sichtbar
 zu machen. Die bisherigen No-Force-Push-Regeln bleiben unverändert.
+
+## Version 14.0 – HOFER integriert
+
+HOFER ist als zusätzlicher Händler in Grundpreise, Händlerkatalog, automatische
+Produktzuordnung, Aktionsansicht und Flugblatt-Link integriert.
+
+Der Grundbestand wird aus dem öffentlichen Heisse-Preise-Datensatz für HOFER
+erzeugt. Die offizielle HOFER-Angebots-/Produktseite liefert aktuelle
+Aktionskarten. Ausdrückliche Preisreduzierungen werden als verifizierte
+`price_drop`-Angebote übernommen; reine Aktionskarten ohne sicheren
+Vergleichspreis bleiben Anzeige und werden nicht als Rabatt erfunden.
+
+Das offizielle HOFER-Flugblatt ist unter `Mehr` verknüpft. HOFER weist auf
+mögliche regionale Abweichungen bei Sortiment und Aktionsangeboten hin.
+
