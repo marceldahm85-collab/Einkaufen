@@ -32,7 +32,7 @@ ACTION_WINDOW_DAYS = 7
 FETCH_TIMEOUT = 90
 USER_AGENT = "Mozilla/5.0 PreisPilot-Osttirol-GitHubAction/1.0"
 
-PRICE_RE = re.compile(r"(?<!\d)(\d{1,4}(?:[,.]\d{2}))(?:\s*€)?")
+EURO_PRICE_RE = re.compile(r"(?:€\s*(\d{1,4}(?:[,.]\d{2}))|(\d{1,4}(?:[,.]\d{2}))\s*€)")
 AVAILABLE_RE = re.compile(r"\bVerfügbar\s+(?:seit|ab)\s+(\d{2}\.\d{2}\.\d{4})\b", re.I)
 ACTION_LABEL_RE = re.compile(r"\bTiefpreisaktion\b", re.I)
 DATE_MARKER_RE = re.compile(r"\bVerfügbar\s+(?:seit|ab)\b", re.I)
@@ -218,18 +218,30 @@ def strip_unit_price_parentheses(text):
     return re.sub(r"\([^)]*€[^)]*\)", " ", text)
 
 
+def extract_euro_prices(text):
+    prices = []
+    for match in EURO_PRICE_RE.finditer(text):
+        value = number(match.group(1) or match.group(2))
+        if value is not None:
+            prices.append(value)
+    return prices
+
+
 def extract_name(text):
     cleaned = strip_unit_price_parentheses(text)
-    price = PRICE_RE.search(cleaned)
-    if price:
-        cleaned = cleaned[:price.start()]
     cleaned = AVAILABLE_RE.sub(" ", cleaned)
     cleaned = ACTION_LABEL_RE.sub(" ", cleaned)
+
+    # Only an explicitly marked euro price ends the visible product name.
+    # Dates and package amounts must never be treated as selling prices.
+    price = EURO_PRICE_RE.search(cleaned)
+    if price:
+        cleaned = cleaned[:price.start()]
+
     cleaned = re.sub(r"\b(?:ONLINESHOP|Kühlung|Vegan|Regional)\b", " ", cleaned, flags=re.I)
+    cleaned = re.sub(r"\b(?:nur|jetzt)\b\s*$", " ", cleaned, flags=re.I)
     cleaned = re.sub(r"[¹²³*~]+", " ", cleaned)
     return normalize_space(cleaned).strip(" -·|:")
-
-
 def parse_card_text(text):
     text = normalize_space(text)
     if not text or ONLINE_RE.search(text) or not DATE_MARKER_RE.search(text):
@@ -247,12 +259,9 @@ def parse_card_text(text):
 
     price_text = strip_unit_price_parentheses(text)
     prices = [
-        number(m.group(1))
-        for m in PRICE_RE.finditer(price_text)
+        p for p in extract_euro_prices(price_text)
+        if p is not None and p > 0
     ]
-    prices = [p for p in prices if p is not None and p > 0]
-    if not prices:
-        return None
 
     current = prices[0]
     regular = None
