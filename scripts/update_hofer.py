@@ -306,7 +306,12 @@ def clean_product_name(text):
     cleaned = AVAILABLE_RE.sub(" ", cleaned)
     cleaned = EURO_RE.sub(" ", cleaned)
     cleaned = re.sub(r"[¹²³⁴⁵⁶⁷⁸⁹]+", " ", cleaned)
+    # Pack-/Gebindegrößen gehören zur strukturierten Mengenangabe und nicht
+    # in den sichtbaren Produktnamen.
+    cleaned = MULTIPACK_RE.sub(" ", cleaned)
+    cleaned = AMOUNT_RE.sub(" ", cleaned)
     cleaned = re.sub(r"\s*/\s*(?:1\s*)?(?:kg|g|l|ml)\b", " ", cleaned, flags=re.I)
+    cleaned = re.sub(r"\b(?:ungefähr|ca\.)\b", " ", cleaned, flags=re.I)
     cleaned = re.sub(r"^\s*(?:Vegan|Regional|Kühlung|Neu|Tiefpreisaktion)\s+", "", cleaned, flags=re.I)
     return normalize_space(cleaned).strip(" -·|:")
 
