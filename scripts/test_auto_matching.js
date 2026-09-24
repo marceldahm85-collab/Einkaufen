@@ -163,23 +163,23 @@ assert.strictEqual(top[0].id, "tg:t1");     // 29.80 / 20 l = 1.49 €/l
 assert.strictEqual(top[1].id, "spar:s-best"); // 16.00 / 10 l = 1.60 €/l
 assert.strictEqual(top[2].id, "spar:s-small"); // 20.00 / 12 l ≈ 1.67 €/l
 assert.strictEqual(top[3].id, "billa:b1");     // 17.00 / 10 l = 1.70 €/l
-assert.strictEqual(top[4].id, "mpreis:m1");    // 18.00 / 10 l = 1.80 €/l
+assert.strictEqual(top[4].id, "hofer:h1");     // 17.50 / 10 l = 1.75 €/l
 
 // Cash-total view keeps the actual checkout amount as first criterion.
 top = rankedAutoOptions(product, 1, "all", 10, "total");
 assert.strictEqual(top[0].id, "spar:s-best");
 assert.strictEqual(top[1].id, "billa:b1");
-assert.strictEqual(top[2].id, "mpreis:m1");
-assert.strictEqual(top[3].id, "spar:s-small");
-assert.strictEqual(top[4].id, "tg:t1");
+assert.strictEqual(top[2].id, "hofer:h1");
+assert.strictEqual(top[3].id, "mpreis:m1");
+assert.strictEqual(top[4].id, "spar:s-small");
 
 // Fit view prefers the lowest overbuy before price.
 top = rankedAutoOptions(product, 1, "all", 10, "fit");
 assert.strictEqual(top[0].id, "spar:s-best");
 assert.strictEqual(top[1].id, "billa:b1");
-assert.strictEqual(top[2].id, "mpreis:m1");
-assert.strictEqual(top[3].id, "tg:t1");
-assert.strictEqual(top[4].id, "spar:s-small");
+assert.strictEqual(top[2].id, "hofer:h1");
+assert.strictEqual(top[3].id, "mpreis:m1");
+assert.strictEqual(top[4].id, "tg:t1");
 
 
 // Unit-price view may deliberately buy the action minimum when that yields
