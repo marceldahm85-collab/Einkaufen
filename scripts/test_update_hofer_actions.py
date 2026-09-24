@@ -40,8 +40,9 @@ fixture = f"""
 cards = mod.extract_action_cards(fixture)
 assert len(cards) == 2, cards
 
-butter = next(v for v in cards.values() if "Butter" in v["name"])
-assert butter["articleNumber"] == "000000000000107104"
+print("HOFER fixture cards:", cards)
+butter = next(v for v in cards.values() if v["articleNumber"] == "000000000000107104")
+assert "Butter" in butter["name"], butter["name"]
 assert butter["regularPrice"] == 2.49
 assert butter["salePrice"] == 1.99
 assert butter["promotion"]["type"] == "price_drop"
