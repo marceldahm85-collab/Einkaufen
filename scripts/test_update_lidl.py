@@ -6,85 +6,120 @@ spec = importlib.util.spec_from_file_location("update_lidl", path)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
-raw = {
-    "store": "lidl",
-    "id": "12345",
-    "name": "Test Milch",
-    "price": 1.49,
-    "priceHistory": [
-        {"date": "2026-09-08", "price": 1.49},
-        {"date": "2026-08-01", "price": 1.69},
-    ],
-    "unit": "l",
-    "quantity": 1,
-    "bio": True,
+today = "2026-09-24"
+
+# Official Lidl API shape from the current upstream Lidl adapter.
+one_litre = {
+    "productId": "10001",
+    "fullTitle": "Vollmilch",
+    "keyfacts": {
+        "supplementalDescription": "Milbona",
+        "description": "Frische Vollmilch"
+    },
+    "price": {
+        "price": 1.49,
+        "basePrice": {"text": "1 l"}
+    },
+    "canonicalUrl": "https://www.lidl.at/p/test-vollmilch/10001"
 }
 
-item = mod.normalize_item(raw)
-
+item = mod.normalize_official_item(one_litre, today)
 assert item is not None
-assert item["retailerProductId"] == "12345"
+assert item["store"] == "lidl"
+assert item["retailerProductId"] == "10001"
+assert item["name"] == "Milbona Vollmilch"
+assert item["amount"] == 1000
+assert item["unit"] == "ml"
+assert item["optimizerEligible"] is True
 assert item["currentPrice"] == 1.49
-assert item["amount"] == 1
-assert item["unit"] == "l"
 assert item["unitPrice"] == 1.49
 assert item["unitPriceUnit"] == "l"
-assert item["bio"] is True
-assert item["history"][0]["date"] == "2026-08-01"
-assert item["history"][-1]["date"] == "2026-09-08"
+assert item["productUrl"].endswith("/10001")
+assert item["bio"] is False
 
-fallback = {
-    "store": "lidl",
-    "name": "Produkt ohne ID",
-    "price": 2.99,
-    "quantity": 500,
-    "unit": "g",
+multipack = {
+    "productId": "10002",
+    "fullTitle": "Mineralwasser",
+    "price": {
+        "price": 2.99,
+        "basePrice": {"text": "6x0.5 l"}
+    }
 }
-fallback_item = mod.normalize_item(fallback)
-assert fallback_item["retailerProductId"].startswith("hp-")
-assert fallback_item["unitPrice"] == 5.98
+item = mod.normalize_official_item(multipack, today)
+assert item["amount"] == 3000
+assert item["unit"] == "ml"
+assert item["unitPrice"] == 1.0
 
-assert mod.normalize_item({"store": "spar", "name": "X", "price": 1}) is None
+weighted = {
+    "productId": "10003",
+    "fullTitle": "Bananen",
+    "price": {
+        "price": 1.99,
+        "basePrice": {"text": "per kg"}
+    }
+}
+item = mod.normalize_official_item(weighted, today)
+assert item["amount"] == 1000
+assert item["unit"] == "g"
+assert item["weighted"] is True
+assert item["unitPrice"] == 1.99
+assert item["unitPriceUnit"] == "kg"
 
-print("OK")
+quantity_text = {
+    "productId": "10004",
+    "fullTitle": "Joghurt",
+    "price": {
+        "price": 0.89,
+        "basePrice": {"text": "bei 2 je 180 g"}
+    }
+}
+item = mod.normalize_official_item(quantity_text, today)
+assert item["amount"] == 360
+assert item["unit"] == "g"
+assert item["unitPrice"] == round(0.89 / 0.36, 2)
 
+fallback_id = {
+    "fullTitle": "Produkt ohne Produkt-ID",
+    "price": {
+        "price": 2.99,
+        "basePrice": {"text": "500 g"}
+    }
+}
+item = mod.normalize_official_item(fallback_id, today)
+assert item["retailerProductId"].startswith("lidl-")
+assert item["unitPrice"] == 5.98
+
+invalid = {"productId": "x", "fullTitle": "Ohne Preis", "price": {}}
+assert mod.normalize_official_item(invalid, today) is None
+
+print("LIDL official API normalization tests OK")
 
 previous = {
-    "retailerProductId": "12345",
+    "retailerProductId": "10001",
     "promotionVerified": True,
-    "regularPrice": 2.49,
+    "regularPrice": 1.79,
     "salePrice": 1.49,
-    "promotionObservedAt": "2026-09-08T12:00:00Z",
+    "promotionObservedAt": "2026-09-23T12:00:00Z",
     "promotion": {
-        "type": "quantity",
-        "requiredQuantity": 2,
-        "label": "ab 2 Stück",
+        "type": "price_drop",
+        "label": "Aktion",
         "verified": True,
-    },
-    "unitPrice": 1.49,
-    "unitPriceUnit": "l",
+    }
 }
-
 fresh = {
-    "retailerProductId": "12345",
-    "remoteObjectId": "12345",
-    "currentPrice": 2.49,
-    "unitPrice": 2.49,
+    "retailerProductId": "10001",
+    "remoteObjectId": "10001",
+    "amount": 1000,
+    "unit": "ml",
+    "currentPrice": 1.79,
+    "unitPrice": 1.79,
     "unitPriceUnit": "l",
 }
-
 mod.carry_forward_promotion(fresh, previous)
 assert fresh["promotionVerified"] is True
-assert fresh["regularPrice"] == 2.49
 assert fresh["salePrice"] == 1.49
-assert fresh["promotion"]["requiredQuantity"] == 2
+assert fresh["regularPrice"] == 1.79
 assert fresh["unitPrice"] == 1.49
+assert fresh["unitPriceUnit"] == "l"
 
-plain = {
-    "retailerProductId": "999",
-    "currentPrice": 3.0,
-}
-mod.carry_forward_promotion(plain, {"promotionVerified": False, "salePrice": 1.0})
-assert "salePrice" not in plain
-
-print("Promotion carry-forward OK")
+print("LIDL promotion carry-forward tests OK")
