@@ -78,3 +78,9 @@ vergleichbare BILLA-Kandidat für die verlangte Menge bewertet. `cheapest`,
 Solange der verifizierte BILLA-Aktionsadapter noch nicht aktiv ist, werden nur
 die öffentlichen Grundpreise verwendet; Aktionsbedingungen werden nicht
 geschätzt.
+
+## HOFER
+
+HOFER-Kandidaten verwenden unverändert die bestehende Gebinde-, Mengen-,
+Einheitspreis- und Aktionsberechnung.
+
