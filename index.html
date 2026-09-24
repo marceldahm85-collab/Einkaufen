@@ -79,6 +79,7 @@
             <button data-catalog-store="spar" style="--catalog-store:#00843d">SPAR</button>
             <button data-catalog-store="tg" style="--catalog-store:#ef7d00">T&G</button>
             <button data-catalog-store="billa" style="--catalog-store:#e30613">BILLA</button>
+            <button data-catalog-store="hofer" style="--catalog-store:#0057a8">HOFER</button>
           </div>
 
           <div class="search-wrap catalog-search-wrap">
@@ -299,6 +300,42 @@
 
           <p class="muted small live-note">
             BILLA-Grundpreise und Preisverläufe werden aus dem öffentlichen Heisse-Preise-Datensatz aktualisiert. Aktuelle BILLA-Aktionen einschließlich Mengen- und Multipack-Aktionen werden separat aus dem offiziellen BILLA Online Shop eingelesen. Das offizielle Flugblatt bietet eine Bundeslandauswahl und regionale Angebote.
+          </p>
+        </div>
+
+        <div class="settings-card hofer-live-card">
+          <div class="section-head compact">
+            <div>
+              <div class="eyebrow">GITHUB-PREISDATEN</div>
+              <h2>HOFER</h2>
+            </div>
+            <span class="status-badge" id="hoferLiveStatus">Bereit</span>
+          </div>
+
+          <div class="live-sync-summary">
+            <div>
+              <strong id="hoferLinkedCount">0 Artikel automatisch</strong>
+              <div class="muted small" id="hoferLastSync">Datenstand wird geladen …</div>
+            </div>
+            <button class="secondary-btn" id="syncHoferBtn">Neu laden</button>
+          </div>
+
+          <div class="retailer-action-row">
+            <button class="secondary-btn hofer-promo-btn" id="showHoferPromotionsBtn" type="button">
+              🔥 HOFER-Aktionen anzeigen
+            </button>
+            <button class="secondary-btn retailer-flyer-btn hofer-flyer-btn" id="openHoferFlyerBtn" type="button">
+              📄 Flugblatt
+            </button>
+          </div>
+
+          <div class="flyer-source-line">
+            <span>Flugblatt: HOFER</span>
+            <span>offiziell</span>
+          </div>
+
+          <p class="muted small live-note">
+            HOFER-Grundpreise und Preisverläufe werden aus dem öffentlichen Heisse-Preise-Datensatz aktualisiert. Aktuelle Angebote und Tiefpreisaktionen werden zusätzlich von der offiziellen HOFER-Angebots-/Produktseite eingelesen. Das Flugblatt öffnet die offizielle HOFER-Flugblattseite; regionale Abweichungen sind möglich.
           </p>
         </div>
 
@@ -545,6 +582,7 @@
       <button class="chip" data-auto-match-store="spar">SPAR</button>
       <button class="chip" data-auto-match-store="tg">T&G</button>
       <button class="chip" data-auto-match-store="billa">BILLA</button>
+      <button class="chip" data-auto-match-store="hofer">HOFER</button>
     </div>
 
     <div class="auto-match-sort-block">
@@ -759,6 +797,21 @@
     <div id="billaPromotionsList" class="stack live-result-list"></div>
   </section>
 
+  <section class="bottom-sheet" id="hoferPromotionsSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">HOFER AKTIONEN</div>
+        <h2>Aktuelle Aktionsartikel</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+    <div id="hoferPromotionsState" class="muted small live-search-state">
+      HOFER-Aktionen werden geladen …
+    </div>
+    <div id="hoferPromotionsList" class="stack live-result-list"></div>
+  </section>
+
   <section class="bottom-sheet" id="catalogLinkSheet" aria-hidden="true">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
@@ -794,6 +847,7 @@
   <script src="live-spar.js"></script>
   <script src="live-tg.js"></script>
   <script src="live-billa.js"></script>
+  <script src="live-hofer.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

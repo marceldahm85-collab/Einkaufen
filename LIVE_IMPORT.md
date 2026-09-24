@@ -70,3 +70,9 @@ Die offizielle BILLA-Aktionsseite ist **noch nicht** als verifizierte
 Aktionsquelle freigeschaltet. Insbesondere `ab N`, `N+M`, jö-/Treuebedingungen
 und Gültigkeitszeiträume werden erst in einer separaten Aktionsstufe verwendet,
 wenn sie strukturiert und eindeutig einem Produkt zugeordnet werden können.
+
+## HOFER
+
+`live-hofer.js` stellt Grundpreise, Katalog-Browsing, automatische Zuordnung,
+verifizierte Aktionsmetadaten und den offiziellen Flugblatt-Link bereit.
+

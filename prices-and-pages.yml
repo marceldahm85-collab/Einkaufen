@@ -45,6 +45,7 @@ jobs:
           node --check live-spar.js
           node --check live-tg.js
           node --check live-billa.js
+          node --check live-hofer.js
           node scripts/test_optimizer_quantity.js
           node scripts/test_package_comparison.js
           node scripts/test_optimizer_promotions.js
@@ -52,10 +53,13 @@ jobs:
           node scripts/test_catalog_browse.js
           node scripts/test_auto_matching.js
           node scripts/test_billa_integration.js
+          node scripts/test_hofer_integration.js
           node scripts/test_product_edit_preservation.js
           node scripts/test_amount_normalization.js
           python scripts/test_update_billa.py
           python scripts/test_update_billa_actions.py
+          python scripts/test_update_hofer.py
+          python scripts/test_update_hofer_actions.py
           python scripts/test_update_tg.py
           python scripts/test_update_tg_flyer.py
 
@@ -155,6 +159,53 @@ jobs:
           if not stale and count < 10:
               raise SystemExit(
                   "Unplausibel wenige aktuelle BILLA-Aktionsprodukte. "
+                  "Deployment wird abgebrochen."
+              )
+          PY
+
+      - name: HOFER-Daten aktualisieren
+        run: python scripts/update_hofer.py
+
+      - name: HOFER-Datenbestand prüfen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/hofer.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          count = len(data.get("products") or [])
+          print(f"HOFER-Produkte in data/hofer.json: {count}")
+
+          if count < 100:
+              raise SystemExit(
+                  "HOFER-Datenbestand ist leer oder unplausibel klein. "
+                  "Deployment wird abgebrochen."
+              )
+          PY
+
+      - name: HOFER-Aktionen aktualisieren
+        run: python scripts/update_hofer_actions.py
+
+      - name: HOFER-Aktionsbestand prüfen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/hofer.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          count = int(data.get("promotionCount") or 0)
+          stale = bool(data.get("promotionStale"))
+
+          print(f"HOFER-Aktionsprodukte: {count}")
+          print(f"HOFER-Aktionsdaten stale: {'ja' if stale else 'nein'}")
+
+          if not stale and count < 10:
+              raise SystemExit(
+                  "Unplausibel wenige aktuelle HOFER-Aktionsprodukte. "
                   "Deployment wird abgebrochen."
               )
           PY
@@ -272,7 +323,7 @@ jobs:
         run: |
           rm -rf _site
           mkdir -p _site
-          cp index.html styles.css app.js live-search.js live-mpreis.js live-spar.js live-tg.js live-billa.js manifest.webmanifest sw.js _site/
+          cp index.html styles.css app.js live-search.js live-mpreis.js live-spar.js live-tg.js live-billa.js live-hofer.js manifest.webmanifest sw.js _site/
           cp -R assets _site/assets
           cp -R data _site/data
           touch _site/.nojekyll
