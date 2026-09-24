@@ -49,7 +49,7 @@ const context = {
 
 vm.createContext(context);
 vm.runInContext(`
-const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa"];
+const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa", "hofer"];
 const todayISO = () => "2026-09-21";
 ${names.map(extractFunction).join("\n")}
 this.api = { validOffers, pricedOfferForStore, cheapestPricedOffer, rankedAutoOptions };
@@ -121,6 +121,12 @@ const product = {
           regularPrice: 17,
           packageAmount: 10, packageUnit: "l", packageAmountKnown: true
         })
+      ],
+      hofer: [
+        candidate("hofer", "h1", "HOFER Kiste", {
+          regularPrice: 17.5,
+          packageAmount: 10, packageUnit: "l", packageAmountKnown: true
+        })
       ]
     }
   }
@@ -142,6 +148,10 @@ assert.strictEqual(p.pricing.promotionApplied, true);
 p = pricedOfferForStore(product, "billa", 1);
 close(p.pricing.lineTotal, 17);
 assert.strictEqual(p.offer.retailerProductId, "b1");
+
+p = pricedOfferForStore(product, "hofer", 1);
+close(p.pricing.lineTotal, 17.5);
+assert.strictEqual(p.offer.retailerProductId, "h1");
 
 let cheapest = cheapestPricedOffer(product, 1);
 assert.strictEqual(cheapest.offer.store, "spar");
