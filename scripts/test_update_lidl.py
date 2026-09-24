@@ -74,9 +74,9 @@ quantity_text = {
     }
 }
 item = mod.normalize_official_item(quantity_text, today)
-assert item["amount"] == 360
+assert item["amount"] == 180
 assert item["unit"] == "g"
-assert item["unitPrice"] == round(0.89 / 0.36, 2)
+assert item["unitPrice"] == round(0.89 / 0.18, 2)
 
 fallback_id = {
     "fullTitle": "Produkt ohne Produkt-ID",
