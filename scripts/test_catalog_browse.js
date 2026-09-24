@@ -71,7 +71,8 @@ async function verifyPromotionSafety() {
     ["live-mpreis.js", "MPreisLive"],
     ["live-spar.js", "SparLive"],
     ["live-tg.js", "TgLive"],
-    ["live-billa.js", "BillaLive"]
+    ["live-billa.js", "BillaLive"],
+    ["live-hofer.js", "HoferLive"]
   ]) {
     const api = await loadModule(file, globalName, datedPayload);
     const promos = await api.promotions();
@@ -140,7 +141,8 @@ async function verifyPromotionSafety() {
     ["live-mpreis.js", "MPreisLive"],
     ["live-spar.js", "SparLive"],
     ["live-tg.js", "TgLive"],
-    ["live-billa.js", "BillaLive"]
+    ["live-billa.js", "BillaLive"],
+    ["live-hofer.js", "HoferLive"]
   ]) {
     const api = await loadModule(file, globalName, payload);
 
