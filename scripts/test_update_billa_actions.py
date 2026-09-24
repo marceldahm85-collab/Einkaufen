@@ -33,6 +33,12 @@ fixture = r'''
     <div>3,52 € 1 Liter 4,40 €</div>
   </section>
   <section class="product-card">
+    <a href="/produkte/test-ab-eins-00760004">Testprodukt Ab Eins</a>
+    <div>in Aktion</div>
+    <div>Einzelpreis 2,99 € 1 Packung 2,99 €</div>
+    <div>ab 1 Packung 2,49 €</div>
+  </section>
+  <section class="product-card">
     <a href="/produkte/test-kein-bundle-00760002">Testprodukt</a>
     <div>-50% Aktion</div>
     <div>2,00 € 1 kg 4,00 €</div>
@@ -45,7 +51,7 @@ fixture = r'''
 '''
 
 cards = mod.extract_action_cards(fixture)
-assert len(cards) == 5, cards
+assert len(cards) == 6, cards
 
 coca = next(v for v in cards.values() if v["name"] == "Coca Cola")
 assert coca["articleNumber"] == "00-770015"
@@ -75,6 +81,12 @@ assert finish["salePrice"] == 3.52
 assert finish["regularPrice"] is None
 assert finish["promotion"]["type"] == "price_drop"
 
+ab_one = next(v for v in cards.values() if v["name"] == "Testprodukt Ab Eins")
+assert ab_one["salePrice"] == 2.49
+assert ab_one["regularPrice"] == 2.99
+assert ab_one["promotion"]["type"] == "price_drop"
+assert "requiredQuantity" not in ab_one["promotion"]
+
 plain = next(v for v in cards.values() if v["name"] == "Testprodukt")
 assert plain["salePrice"] == 2.00
 assert plain["promotion"]["type"] == "price_drop"
@@ -95,4 +107,4 @@ assert lookup["770015"]["name"] == "Coca Cola"
 assert lookup["00-770015"]["name"] == "Coca Cola"
 assert lookup["00-408880"]["name"] == "Schärdinger Fasslbutter"
 
-print("BILLA action parser/mapping/alt-bundle tests OK")
+print("BILLA action parser/mapping/alt-bundle/ab1 tests OK")

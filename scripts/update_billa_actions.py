@@ -261,6 +261,29 @@ def parse_card_text(text):
         if sale is None or sale <= 0:
             return None
 
+        # BILLA can expose a current action card with wording such as
+        # "ab 1 Stück/Packung". This is not a conditional quantity action:
+        # buying one item is the normal case. Never store it as a quantity
+        # promotion because requiredQuantity=1 violates the shared action
+        # schema and would make the workflow fail its integrity gate.
+        if required < 2 and not bundle:
+            promotion = {
+                "type": "price_drop",
+                "verified": True,
+                "source": ACTION_URL,
+                "loyaltyRequired": False,
+                "label": "Aktion",
+                "officialLabel": action_label(text),
+            }
+            if regular is not None and regular > sale:
+                promotion["discountPercent"] = round((1 - sale / regular) * 100)
+            return {
+                "regularPrice": regular,
+                "salePrice": sale,
+                "promotion": promotion,
+                "actionLabel": action_label(text),
+            }
+
         if bundle:
             paid = int(bundle.group(1))
             free = int(bundle.group(2))
@@ -651,7 +674,7 @@ def main():
     payload["promotionStale"] = False
     payload["promotionLastError"] = None
     payload["promotionObservedAt"] = observed_at
-    payload["promotionParserVersion"] = 2
+    payload["promotionParserVersion"] = 3
     payload["promotionPageLimit"] = MAX_PAGES
 
     write_payload(payload)
