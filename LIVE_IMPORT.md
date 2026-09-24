@@ -76,3 +76,11 @@ wenn sie strukturiert und eindeutig einem Produkt zugeordnet werden können.
 `live-hofer.js` stellt Grundpreise, Katalog-Browsing, automatische Zuordnung,
 verifizierte Aktionsmetadaten und den offiziellen Flugblatt-Link bereit.
 
+
+
+## Lidl
+
+`scripts/update_lidl.py` übernimmt den Lidl-Bestand aus dem öffentlichen
+Heisse-Preise-Datensatz. `live-lidl.js` stellt Laden, Suchen, Katalog-Browsing,
+automatische Zuordnung und Preisstatus bereit. Der offizielle Lidl-Flugblatt-Link
+wird über die Oberfläche bereitgestellt.

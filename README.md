@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 13.3
+# PreisPilot Osttirol – Version 15.0
 
 BILLA erhält in Mehr jetzt dieselbe sichtbare Aktions-/Flugblatt-Ebene wie die anderen integrierten Händler.
 
@@ -1126,3 +1126,18 @@ Vergleichspreis bleiben Anzeige und werden nicht als Rabatt erfunden.
 Das offizielle HOFER-Flugblatt ist unter `Mehr` verknüpft. HOFER weist auf
 mögliche regionale Abweichungen bei Sortiment und Aktionsangeboten hin.
 
+
+
+## Version 15.0 – Lidl-Grundintegration
+
+Lidl ist als weiterer automatischer Händler in den bestehenden Kandidatenpool
+integriert.
+
+Enthalten:
+- öffentlicher Lidl-Grundbestand als `data/lidl.json`
+- Lidl im Händlerkatalog und in der automatischen Produktzuordnung
+- Lidl im Preisvergleich, in der Einkaufsliste und im Optimierer
+- offizieller Lidl-Flugblatteinstieg unter „Mehr“
+- persönliche Kandidaten, feste Auswahl und Ausblendungen bleiben ausschließlich lokal
+
+Die verifizierte Lidl-Aktionsstufe wird separat ergänzt.

@@ -181,3 +181,10 @@ automatisch integrierten Märkte. Grundpreise stammen aus Heisse Preise;
 aktuelle Angebotsmetadaten werden separat aus der offiziellen HOFER-Seite
 ergänzt.
 
+
+
+## Version 15.0 – Lidl
+
+`autoMatches.stores.lidl` erweitert den privaten Kandidatenpool um Lidl.
+Der öffentliche Produktbestand liegt in `data/lidl.json`. Persönliche
+Matchingprofile, feste Auswahl und Ausblendungen bleiben im localStorage.

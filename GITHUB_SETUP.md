@@ -22,3 +22,10 @@ und wird vom Pages-Schritt nach `_site/` kopiert.
 Beim manuellen Komplett-Upload gilt weiterhin: den vorhandenen Ordner `data/`
 nicht überschreiben. Der GitHub-Workflow aktualisiert die öffentlichen Datendateien
 selbst und ergänzt `billa.json` beim nächsten erfolgreichen Lauf.
+
+
+## Lidl ab v15.0
+
+Der Workflow erzeugt zusätzlich `data/lidl.json` über
+`scripts/update_lidl.py`. `live-lidl.js` wird nach GitHub Pages kopiert.
+Das offizielle Lidl-Flugblatt ist in „Mehr“ direkt erreichbar.

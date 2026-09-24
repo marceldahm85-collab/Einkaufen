@@ -47,3 +47,10 @@ HOFER-Preise und Aktionsmetadaten sind öffentliche Händlerdaten. Persönliche
 Matchingprofile, Kandidatenwahl und Ausblendungen bleiben ausschließlich im
 localStorage.
 
+
+
+## Lidl (v15.0)
+
+`data/lidl.json` enthält ausschließlich öffentliche Lidl-Händlerdaten.
+Persönliche Lidl-Kandidaten, Suchprofile, feste Auswahlen und Ausblendungen bleiben
+ausschließlich im Browser-localStorage.

@@ -80,6 +80,7 @@
             <button data-catalog-store="tg" style="--catalog-store:#ef7d00">T&G</button>
             <button data-catalog-store="billa" style="--catalog-store:#e30613">BILLA</button>
             <button data-catalog-store="hofer" style="--catalog-store:#0057a8">HOFER</button>
+            <button data-catalog-store="lidl" style="--catalog-store:#0050aa">Lidl</button>
           </div>
 
           <div class="search-wrap catalog-search-wrap">
@@ -339,6 +340,40 @@
           </p>
         </div>
 
+
+        <div class="settings-card lidl-live-card">
+          <div class="section-head compact">
+            <div>
+              <div class="eyebrow">GITHUB-PREISDATEN</div>
+              <h2>Lidl</h2>
+            </div>
+            <span class="status-badge" id="lidlLiveStatus">Bereit</span>
+          </div>
+
+          <div class="live-sync-summary">
+            <div>
+              <strong id="lidlLinkedCount">0 Artikel automatisch</strong>
+              <div class="muted small" id="lidlLastSync">Datenstand wird geladen …</div>
+            </div>
+            <button class="secondary-btn" id="syncLidlBtn">Neu laden</button>
+          </div>
+
+          <div class="retailer-action-row">
+            <button class="secondary-btn retailer-flyer-btn lidl-flyer-btn" id="openLidlFlyerBtn" type="button">
+              📄 Flugblatt
+            </button>
+          </div>
+
+          <div class="flyer-source-line">
+            <span>Flugblatt: Lidl Österreich</span>
+            <span>offiziell</span>
+          </div>
+
+          <p class="muted small live-note">
+            Lidl-Grundpreise und Preisverläufe werden aus dem öffentlichen Heisse-Preise-Datensatz aktualisiert. Das offizielle Lidl-Flugblatt öffnet die aktuelle Angebotsseite. Verifizierte Lidl-Aktionsdaten werden in einer separaten Aktionsstufe ergänzt.
+          </p>
+        </div>
+
         <div class="settings-card danger-zone">
           <div>
             <strong>Demo-Daten zurücksetzen</strong>
@@ -583,6 +618,7 @@
       <button class="chip" data-auto-match-store="tg">T&G</button>
       <button class="chip" data-auto-match-store="billa">BILLA</button>
       <button class="chip" data-auto-match-store="hofer">HOFER</button>
+      <button class="chip" data-auto-match-store="lidl">Lidl</button>
     </div>
 
     <div class="auto-match-sort-block">
@@ -848,6 +884,7 @@
   <script src="live-tg.js"></script>
   <script src="live-billa.js"></script>
   <script src="live-hofer.js"></script>
+  <script src="live-lidl.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
