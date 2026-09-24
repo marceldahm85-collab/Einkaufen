@@ -176,7 +176,7 @@ jobs:
           path = Path("data/hofer.json")
           data = json.loads(path.read_text(encoding="utf-8"))
           count = len(data.get("products") or [])
-          print(f"HOFER-Produkte in data/hofer.json: {count}")
+          print(f"HOFER-Produkte aus offizieller HOFER-Quelle: {count}")
 
           if count < 100:
               raise SystemExit(
