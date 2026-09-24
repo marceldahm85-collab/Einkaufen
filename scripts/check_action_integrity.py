@@ -71,7 +71,7 @@ def check_store(store, path):
         name = str(item.get("name") or "").strip()
         label = name or f"#{index}"
 
-        for field in ("regularPrice", "salePrice", "displayPrice", "unitPrice"):
+        for field in ("currentPrice", "regularPrice", "salePrice", "displayPrice", "unitPrice"):
             value = item.get(field)
             if value is None:
                 continue
@@ -148,10 +148,21 @@ def check_store(store, path):
 
         if item.get("optimizerEligible") is True:
             optimizer_eligible += 1
-            if sale is None:
+
+            # optimizerEligible bedeutet: Das Produkt ist für eine reale
+            # Preisberechnung geeignet. Dafür genügt ein verifizierter
+            # regulärer/aktueller Preis; ein salePrice ist nicht zwingend
+            # erforderlich. HOFER nutzt dieses Flag auch für reguläre
+            # Katalogprodukte mit currentPrice ohne aktive Aktion.
+            has_optimizer_price = any(
+                finite_number(item.get(field)) is not None
+                for field in ("currentPrice", "regularPrice", "salePrice", "displayPrice")
+            )
+            if not has_optimizer_price:
                 errors.append(
-                    f"{store} {label}: optimizerEligible=true ohne salePrice"
+                    f"{store} {label}: optimizerEligible=true ohne verwendbaren Preis"
                 )
+
             if promotion and promotion.get("type") in {"flyer", "category"}:
                 errors.append(
                     f"{store} {label}: unsicherer Aktionstyp darf nicht optimizerEligible sein"
