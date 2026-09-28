@@ -46,7 +46,6 @@ jobs:
           node --check live-tg.js
           node --check live-billa.js
           node --check live-hofer.js
-          node --check live-lidl.js
           node scripts/test_optimizer_quantity.js
           node scripts/test_package_comparison.js
           node scripts/test_optimizer_promotions.js
@@ -55,14 +54,12 @@ jobs:
           node scripts/test_auto_matching.js
           node scripts/test_billa_integration.js
           node scripts/test_hofer_integration.js
-          node scripts/test_lidl_integration.js
           node scripts/test_product_edit_preservation.js
           node scripts/test_amount_normalization.js
           python scripts/test_update_billa.py
           python scripts/test_update_billa_actions.py
           python scripts/test_update_hofer.py
           python scripts/test_update_hofer_actions.py
-          python scripts/test_update_lidl.py
           python scripts/test_update_tg.py
           python scripts/test_update_tg_flyer.py
 
@@ -209,28 +206,6 @@ jobs:
           if not stale and count < 10:
               raise SystemExit(
                   "Unplausibel wenige aktuelle HOFER-Aktionsprodukte. "
-                  "Deployment wird abgebrochen."
-              )
-          PY
-
-      - name: LIDL-Daten aktualisieren
-        run: python scripts/update_lidl.py
-
-      - name: LIDL-Datenbestand prüfen
-        shell: bash
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          path = Path("data/lidl.json")
-          data = json.loads(path.read_text(encoding="utf-8"))
-          count = len(data.get("products") or [])
-          print(f"LIDL-Produkte in data/lidl.json: {count}")
-
-          if count < 100:
-              raise SystemExit(
-                  "Unplausibel wenige LIDL-Produkte. "
                   "Deployment wird abgebrochen."
               )
           PY
