@@ -123,3 +123,27 @@ assert fresh["unitPrice"] == 1.49
 assert fresh["unitPriceUnit"] == "l"
 
 print("LIDL promotion carry-forward tests OK")
+
+
+# Heisse-Preise canonical fallback normalization.
+internal = {
+    "productId": "hp10001",
+    "name": "Milbona Vollmilch",
+    "description": "Vollmilch 3,5 %",
+    "price": {"price": 1.49},
+    "canonicalUrl": "https://heisse-preise.io/test/hp10001",
+    "_canonicalQuantity": 1,
+    "_canonicalUnit": "l",
+    "_canonicalBio": False,
+    "_canonicalHistory": [{"date": "2026-09-23", "price": 1.49}],
+}
+item = mod.normalize_canonical_fallback_item(internal, today)
+assert item["store"] == "lidl"
+assert item["retailerProductId"] == "hp10001"
+assert item["amount"] == 1000
+assert item["unit"] == "ml"
+assert item["unitPrice"] == 1.49
+assert item["optimizerEligible"] is True
+assert item["source"].startswith("heisse-preise.io")
+
+print("LIDL Heisse-Preise fallback normalization tests OK")
