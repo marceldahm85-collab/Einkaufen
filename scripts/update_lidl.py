@@ -19,6 +19,7 @@ STATUS = ROOT / "data" / "update-status.json"
 # the upstream Heisse-Preise Lidl adapter.
 SOURCE_BASE_URL = "https://www.lidl.at/p/api/gridboxes/AT/de/"
 SOURCE_URL = SOURCE_BASE_URL + "?max=31000"
+HEISSE_PREISE_URL = "https://heisse-preise.io/data/latest-canonical.json"
 MIN_EXPECTED_PRODUCTS = 100
 
 
@@ -92,6 +93,121 @@ GLOBAL_UNITS = {
 STORE_UNITS = {
     "": ("Stk", 1),
 }
+
+
+def fetch_canonical_lidl_fallback(attempts: int = 3):
+    raw = fetch_json(HEISSE_PREISE_URL, attempts=attempts)
+    if not isinstance(raw, list):
+        if isinstance(raw, dict) and isinstance(raw.get("products"), list):
+            raw = raw["products"]
+        else:
+            raise RuntimeError("Heisse-Preise-Kanonaldaten haben nicht das erwartete Array-Format.")
+
+    rows = []
+    for item in raw:
+        if not isinstance(item, dict) or str(item.get("store") or "").lower() != "lidl":
+            continue
+
+        price = number(item.get("price") if item.get("price") is not None else item.get("currentPrice"))
+        if price is None or price < 0:
+            continue
+
+        product_id = str(
+            item.get("id")
+            or item.get("productId")
+            or item.get("retailerProductId")
+            or ""
+        ).strip()
+        name = str(item.get("name") or item.get("fullTitle") or "").strip()
+        if not product_id or not name:
+            continue
+
+        quantity = number(
+            item.get("quantity") if item.get("quantity") is not None else item.get("amount")
+        )
+        unit = str(item.get("unit") or "").strip()
+        history = item.get("priceHistory") if isinstance(item.get("priceHistory"), list) else []
+
+        rows.append({
+            "productId": product_id,
+            "name": name,
+            "description": item.get("description") or "",
+            "price": {"price": price},
+            "canonicalUrl": item.get("url") or item.get("productUrl") or None,
+            "_canonicalQuantity": quantity,
+            "_canonicalUnit": unit,
+            "_canonicalBio": bool(item.get("bio")),
+            "_canonicalHistory": history,
+        })
+
+    if len(rows) < MIN_EXPECTED_PRODUCTS:
+        raise RuntimeError(
+            f"Heisse-Preise-LIDL-Fallback lieferte nur {len(rows)} Produkte."
+        )
+
+    return rows
+
+
+def normalize_canonical_fallback_item(item: dict, today: str):
+    if not isinstance(item, dict):
+        return None
+
+    price_obj = item.get("price")
+    if not isinstance(price_obj, dict):
+        return None
+
+    current_price = number(price_obj.get("price"))
+    if current_price is None or current_price < 0:
+        return None
+
+    name = str(item.get("name") or "").strip()
+    if not name:
+        return None
+
+    quantity = number(item.get("_canonicalQuantity"))
+    raw_unit = str(item.get("_canonicalUnit") or "").strip()
+
+    if quantity is not None and quantity > 0 and raw_unit:
+        quantity, unit = convert_unit(quantity, raw_unit)
+    else:
+        quantity, unit = 1.0, "Stk"
+
+    known_measure = (
+        quantity is not None
+        and quantity > 0
+        and unit in {"Stk", "g", "kg", "ml", "l"}
+        and bool(raw_unit)
+    )
+
+    if not known_measure:
+        quantity, unit = 1.0, "Stk"
+
+    product = {
+        "store": "lidl",
+        "remoteObjectId": str(item.get("productId")),
+        "retailerProductId": str(item.get("productId")),
+        "name": name,
+        "description": str(item.get("description") or ""),
+        "amount": int(quantity) if float(quantity).is_integer() else round(quantity, 6),
+        "unit": unit,
+        "amountKnown": known_measure,
+        "optimizerEligible": known_measure,
+        "currentPrice": round(current_price, 2),
+        "unitPrice": calc_unit_price(current_price, quantity, unit),
+        "unitPriceUnit": base_unit(unit),
+        "weighted": unit in {"g", "kg"},
+        "bio": bool(item.get("_canonicalBio")),
+        "productUrl": str(item.get("canonicalUrl") or "").strip() or None,
+        "source": "heisse-preise.io/data/latest-canonical.json",
+        "history": normalize_history(item.get("_canonicalHistory")),
+    }
+
+    if not product["history"]:
+        product["history"] = [{"date": today, "price": round(current_price, 2)}]
+    else:
+        product["history"] = product["history"][-250:]
+
+    return product
 
 
 def parse_base_price_text(base_price_text):
@@ -411,17 +527,29 @@ def main() -> int:
     existing_count = load_existing_count()
 
     try:
-        raw = fetch_json(SOURCE_URL)
+        try:
+            raw = fetch_json(SOURCE_URL)
+            source_mode = "official"
 
-        if not isinstance(raw, list):
-            raise RuntimeError("LIDL-Rohdaten haben nicht das erwartete Array-Format.")
+            if not isinstance(raw, list):
+                raise RuntimeError("LIDL-Rohdaten haben nicht das erwartete Array-Format.")
+        except Exception as official_error:
+            print(
+                f"WARNUNG: Offizieller LIDL-Endpoint nicht verfügbar ({official_error}); "
+                "verwende Heisse-Preise-Kanonaldaten als Fallback.",
+                file=sys.stderr,
+            )
+            raw = fetch_canonical_lidl_fallback()
+            source_mode = "heisse-preise-fallback"
 
         products = []
         skipped = 0
 
         for item in raw:
-            normalized = normalize_official_item(
-                item, updated_at[:10]
+            normalized = (
+                normalize_official_item(item, updated_at[:10])
+                if source_mode == "official"
+                else normalize_canonical_fallback_item(item, updated_at[:10])
             )
             if normalized is None:
                 skipped += 1
@@ -465,6 +593,8 @@ def main() -> int:
             "scope": "LIDL-Produktkatalog aus offizieller Lidl-API",
             "provider": "lidl.at",
             "providerUrl": SOURCE_URL,
+            "fallbackProviderUrl": HEISSE_PREISE_URL,
+            "dataSourceMode": source_mode,
             "updatedAt": updated_at,
             "productCount": len(products),
             "skippedCount": skipped,
@@ -497,7 +627,7 @@ def main() -> int:
         print(
             f"LIDL: {len(products)} Produkte importiert; "
             f"{eligible} mit sicher erkannter Gebindemenge; "
-            f"{skipped} Einträge übersprungen."
+            f"{skipped} Einträge übersprungen; Quelle: {source_mode}."
         )
         return 0
 
