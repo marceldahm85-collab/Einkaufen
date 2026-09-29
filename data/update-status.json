@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-24T07:35:39Z",
+  "updatedAt": "2026-09-29T06:27:52Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -10,9 +10,9 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 742,
-        "pagesChecked": 29,
-        "updatedAt": "2026-09-24T07:33:45Z",
+        "verifiedCount": 728,
+        "pagesChecked": 28,
+        "updatedAt": "2026-09-29T06:25:15Z",
         "error": null,
         "source": "mpreis.at"
       }
@@ -25,54 +25,54 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 465,
+        "verifiedCount": 460,
         "rawProductsScanned": 22364,
-        "updatedAt": "2026-09-24T07:34:31Z",
+        "updatedAt": "2026-09-29T06:26:34Z",
         "error": null,
         "source": "spar.at / FactFinder",
         "breakdown": {
-          "Aktion": 456,
+          "Aktion": 451,
           "ab 2 Stück": 9
         }
       }
     },
     "tg": {
-      "status": "stale",
-      "productCount": 70,
-      "promotionCount": 72,
-      "stale": true,
-      "error": "Unplausibel wenige T&G-Aktionen (0). Vorhandene Daten werden nicht überschrieben.",
+      "status": "ok",
+      "productCount": 56,
+      "promotionCount": 56,
+      "stale": false,
+      "error": null,
       "provider": "tundg.at",
       "scope": "Spezialaktionen + Osttirol-Flugblatt",
       "flyer": {
         "status": "ok",
         "productCount": 53,
         "linkableCount": 23,
-        "updatedAt": "2026-09-24T07:35:53Z",
+        "updatedAt": "2026-09-29T06:28:07Z",
         "error": null,
         "source": "T&G Osttirol Flugblatt"
       }
     },
     "billa": {
       "status": "ok",
-      "productCount": 19774,
+      "productCount": 19793,
       "stale": false,
       "error": null,
       "provider": "heisse-preise.io",
       "promotionStale": false,
       "promotionSource": "https://shop.billa.at/aktionen",
-      "promotionCount": 330,
+      "promotionCount": 333,
       "promotionError": null
     },
     "hofer": {
       "status": "ok",
-      "productCount": 1000,
+      "productCount": 1080,
       "stale": false,
       "error": null,
       "provider": "hofer.at",
       "promotionStale": false,
       "promotionSource": "https://www.hofer.at/angebote, https://www.hofer.at/produkte",
-      "promotionCount": 36,
+      "promotionCount": 28,
       "promotionError": null
     }
   }
