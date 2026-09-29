@@ -43,14 +43,6 @@ GitHub enthält weiterhin nur die öffentlichen Händlerdaten und den App-Code.
 BILLA-Kandidaten, feste Auswahlen und manuelle Verknüpfungen bleiben wie bei den
 anderen Händlern lokal im Browser und werden nicht nach GitHub geschrieben.
 
-HOFER-Preise und Aktionsmetadaten sind öffentliche Händlerdaten. Persönliche
-Matchingprofile, Kandidatenwahl und Ausblendungen bleiben ausschließlich im
-localStorage.
 
-
-
-## Lidl (v15.0)
-
-`data/lidl.json` enthält ausschließlich öffentliche Lidl-Händlerdaten.
-Persönliche Lidl-Kandidaten, Suchprofile, feste Auswahlen und Ausblendungen bleiben
-ausschließlich im Browser-localStorage.
+### LIDL
+Die öffentlichen LIDL-Grundpreise in `data/lidl.json` sind Händlerdaten und enthalten keine persönlichen Einkaufslisten, Einstellungen oder privaten Zuordnungen. Automatische Kandidatenpools und persönliche Auswahlentscheidungen bleiben lokal im Browser.

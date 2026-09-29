@@ -173,18 +173,3 @@ Bundle-Größe als auch den konkreten Mengenpreis ausweist.
 ## v13.3 – BILLA Aktions-/Flugblattebene
 
 BILLA verwendet weiterhin `data/billa.json` als öffentlichen Produkt- und Aktionsbestand. Die Oberfläche unter `Mehr` stellt nun zusätzlich eine aktuelle Aktionsliste und den offiziellen BILLA-Flugblatt-Einstieg bereit. Persönliche Einkaufsdaten bleiben lokal.
-
-## Version 14.0 – HOFER
-
-HOFER-Produkte verwenden dieselbe öffentliche Händlerstruktur wie die anderen
-automatisch integrierten Märkte. Grundpreise stammen aus Heisse Preise;
-aktuelle Angebotsmetadaten werden separat aus der offiziellen HOFER-Seite
-ergänzt.
-
-
-
-## Version 15.0 – Lidl
-
-`autoMatches.stores.lidl` erweitert den privaten Kandidatenpool um Lidl.
-Der öffentliche Produktbestand liegt in `data/lidl.json`. Persönliche
-Matchingprofile, feste Auswahl und Ausblendungen bleiben im localStorage.

@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 15.0
+# PreisPilot Osttirol – Version 13.3
 
 BILLA erhält in Mehr jetzt dieselbe sichtbare Aktions-/Flugblatt-Ebene wie die anderen integrierten Händler.
 
@@ -1112,32 +1112,9 @@ unstaged Änderungen im Runner den Rebase nicht mehr. Vor dem Rebase wird der
 Arbeitsbaum zusätzlich protokolliert, um eventuelle lokale Änderungen sichtbar
 zu machen. Die bisherigen No-Force-Push-Regeln bleiben unverändert.
 
-## Version 14.0 – HOFER integriert
 
-HOFER ist als zusätzlicher Händler in Grundpreise, Händlerkatalog, automatische
-Produktzuordnung, Aktionsansicht und Flugblatt-Link integriert.
+## Version 14.0 – Lidl-Grundintegration
 
-Der Grundbestand wird aus dem öffentlichen Heisse-Preise-Datensatz für HOFER
-erzeugt. Die offizielle HOFER-Angebots-/Produktseite liefert aktuelle
-Aktionskarten. Ausdrückliche Preisreduzierungen werden als verifizierte
-`price_drop`-Angebote übernommen; reine Aktionskarten ohne sicheren
-Vergleichspreis bleiben Anzeige und werden nicht als Rabatt erfunden.
+Lidl ist jetzt vollständig in den öffentlichen Grundpreis-/Produktbestand integriert. Der Händlerkatalog, die automatische Produktzuordnung und der bestehende Optimierer können Lidl-Kandidaten verwenden. Persönliche Verknüpfungen bleiben lokal. Lidl-Aktionsdaten und das regionale Flugblatt folgen separat.
 
-Das offizielle HOFER-Flugblatt ist unter `Mehr` verknüpft. HOFER weist auf
-mögliche regionale Abweichungen bei Sortiment und Aktionsangeboten hin.
-
-
-
-## Version 15.0 – Lidl-Grundintegration
-
-Lidl ist als weiterer automatischer Händler in den bestehenden Kandidatenpool
-integriert.
-
-Enthalten:
-- öffentlicher Lidl-Grundbestand als `data/lidl.json`
-- Lidl im Händlerkatalog und in der automatischen Produktzuordnung
-- Lidl im Preisvergleich, in der Einkaufsliste und im Optimierer
-- offizieller Lidl-Flugblatteinstieg unter „Mehr“
-- persönliche Kandidaten, feste Auswahl und Ausblendungen bleiben ausschließlich lokal
-
-Die verifizierte Lidl-Aktionsstufe wird separat ergänzt.
+Quelle des Grundbestands ist der öffentliche Heisse-Preise-Datensatz, der Lidl als eigenen österreichischen Händler führt. Der offizielle Lidl-Auftritt stellt zusätzlich aktuelle Angebote und regionale Flugblätter bereit; diese werden in einem separaten Schritt angebunden.

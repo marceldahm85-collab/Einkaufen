@@ -1,4 +1,4 @@
-const CACHE = "preispilot-osttirol-v15-0";
+const CACHE = "preispilot-osttirol-v14-0";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,7 +9,6 @@ const ASSETS = [
   "./live-spar.js",
   "./live-tg.js",
   "./live-billa.js",
-  "./live-hofer.js",
   "./live-lidl.js",
   "./manifest.webmanifest",
   "./assets/icon.svg"
@@ -31,9 +30,7 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
-
   const url = new URL(event.request.url);
-
   if (url.pathname.includes("/data/")) {
     event.respondWith(
       fetch(event.request, { cache: "no-store" })
@@ -46,7 +43,6 @@ self.addEventListener("fetch", event => {
     );
     return;
   }
-
   event.respondWith(
     caches.match(event.request).then(cached =>
       cached || fetch(event.request).then(response => {

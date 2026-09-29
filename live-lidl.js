@@ -15,11 +15,11 @@
 
     loadPromise = fetch(url, { cache: force ? "reload" : "default" })
       .then(async response => {
-        if (!response.ok) throw new Error(`LIDL-Daten nicht verfügbar (${response.status})`);
+        if (!response.ok) throw new Error(`Lidl-Daten nicht verfügbar (${response.status})`);
 
         const payload = await response.json();
         if (!payload || !Array.isArray(payload.products)) {
-          throw new Error("Ungültiges LIDL-Datenformat.");
+          throw new Error("Ungültiges Lidl-Datenformat.");
         }
 
         payloadCache = payload;
@@ -60,10 +60,10 @@
   }
 
   async function getObject(id) {
-    if (!id) throw new Error("LIDL-Produkt-ID fehlt.");
+    if (!id) throw new Error("Lidl-Produkt-ID fehlt.");
     const payload = await load(false);
     const item = lookup?.get(String(id));
-    if (!item) throw new Error("LIDL-Produkt im aktuellen Datenstand nicht gefunden.");
+    if (!item) throw new Error("Lidl-Produkt im aktuellen Datenstand nicht gefunden.");
     return enrich(item, payload);
   }
 
@@ -295,7 +295,7 @@
     const live = currentItem(item);
     return {
       ...live,
-      source: live.source || "lidl.at",
+      source: live.source || "heisse-preise.io (Lidl)",
       retrievedAt: payload.updatedAt || new Date().toISOString()
     };
   }

@@ -33,7 +33,6 @@
       spar: { enabled: true, lastSync: null, lastError: null },
       tg: { enabled: true, lastSync: null, lastError: null },
       billa: { enabled: true, lastSync: null, lastError: null },
-      hofer: { enabled: true, lastSync: null, lastError: null },
       lidl: { enabled: true, lastSync: null, lastError: null }
     },
     shopping: [
@@ -105,9 +104,7 @@
   const OFFICIAL_FLYER_URLS = {
     mpreis: "https://www.mpreis.at/aktionen/flugblatt?region=osttirol",
     spar: "https://www.interspar.at/aktionen/osttirol",
-    billa: "https://www.billa.at/unsere-aktionen/flugblatt",
-    hofer: "https://www.hofer.at/flugblatt",
-    lidl: "https://www.lidl.at/c/flugblatt/s10012330"
+    billa: "https://www.billa.at/unsere-aktionen/flugblatt"
   };
 
   let currentView = "shopping";
@@ -125,8 +122,8 @@
   let catalogLoading = false;
   let selectedCatalogItem = null;
   const CATALOG_PAGE_SIZE = 50;
-  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa", "hofer", "lidl"];
-  const AUTO_MATCH_ENGINE_VERSION = 5;
+  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa", "lidl"];
+  const AUTO_MATCH_ENGINE_VERSION = 4;
   const AUTO_MATCH_LIMIT_PER_STORE = 40;
   const AUTO_MATCH_SEARCH_LIMIT = 400;
   const AUTO_MATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -149,7 +146,6 @@
   let sparPublicStatus = null;
   let tgPublicStatus = null;
   let billaPublicStatus = null;
-  let hoferPublicStatus = null;
   let lidlPublicStatus = null;
 
   const $ = (sel, root=document) => root.querySelector(sel);
@@ -187,10 +183,6 @@
         billa: {
           ...initialState.live.billa,
           ...(input.live?.billa || {})
-        },
-        hofer: {
-          ...initialState.live.hofer,
-          ...(input.live?.hofer || {})
         },
         lidl: {
           ...initialState.live.lidl,
@@ -679,7 +671,6 @@
     if (store === "spar") return window.SparLive;
     if (store === "tg") return window.TgLive;
     if (store === "billa") return window.BillaLive;
-    if (store === "hofer") return window.HoferLive;
     if (store === "lidl") return window.LidlLive;
     return null;
   }
@@ -1434,7 +1425,6 @@
     if (store === "spar") return window.SparLive;
     if (store === "tg") return window.TgLive;
     if (store === "billa") return window.BillaLive;
-    if (store === "hofer") return window.HoferLive;
     if (store === "lidl") return window.LidlLive;
     return null;
   }
@@ -1457,7 +1447,7 @@
 
     const promoButton = $("#catalogPromotionFilter");
     if (promoButton) {
-      const promotionsSupported = ["mpreis", "spar", "tg", "billa", "hofer", "lidl"].includes(currentCatalogRetailer);
+      const promotionsSupported = ["mpreis", "spar", "tg", "billa"].includes(currentCatalogRetailer);
       if (!promotionsSupported) catalogPromotionsOnly = false;
       promoButton.disabled = !promotionsSupported;
       promoButton.textContent = "🔥 Aktionen";
@@ -1468,7 +1458,7 @@
   }
 
   function setCatalogRetailer(store) {
-    if (!["mpreis", "spar", "tg", "billa", "hofer", "lidl"].includes(store)) return;
+    if (!["mpreis", "spar", "tg", "billa", "lidl"].includes(store)) return;
     if (currentCatalogRetailer === store) return;
 
     currentCatalogRetailer = store;
@@ -1827,6 +1817,7 @@
     else if (store === "spar") linkSparResult(productId, item);
     else if (store === "tg") linkTgResult(productId, item);
     else if (store === "billa") linkBillaResult(productId, item);
+    else if (store === "lidl") linkLidlResult(productId, item);
     else return;
 
     selectedCatalogItem = null;
@@ -1871,6 +1862,7 @@
     else if (store === "spar") linkSparResult(product.id, item);
     else if (store === "tg") linkTgResult(product.id, item);
     else if (store === "billa") linkBillaResult(product.id, item);
+    else if (store === "lidl") linkLidlResult(product.id, item);
 
     selectedCatalogItem = null;
     showToast("Persönlicher Artikel übernommen und verknüpft");
@@ -3733,104 +3725,20 @@
     return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
   }
 
-  function renderHoferLiveStatus() {
-    const live = state.live?.hofer || {};
-    const autoLinked = state.products.filter(p => Array.isArray(p.autoMatches?.stores?.hofer) && p.autoMatches.stores.hofer.length).length;
-    const linkedEl = $("#hoferLinkedCount");
-    const lastEl = $("#hoferLastSync");
-    const statusEl = $("#hoferLiveStatus");
-    const promoBtn = $("#showHoferPromotionsBtn");
-    const flyerBtn = $("#openHoferFlyerBtn");
-    if (!linkedEl || !lastEl || !statusEl) return;
-    linkedEl.textContent = autoLinked + " Artikel automatisch";
-    statusEl.className = "status-badge";
-    if (live.lastError) { statusEl.textContent = "Fehler"; statusEl.classList.add("live-error"); }
-    else if (hoferPublicStatus?.promotionStale) { statusEl.textContent = "Preisstand ok · Aktionen pausiert"; statusEl.classList.add("live-error"); }
-    else if (hoferPublicStatus?.updatedAt) { statusEl.textContent = "Aktuell"; statusEl.classList.add("live-ok"); }
-    else { statusEl.textContent = "Bereit"; }
-    if (hoferPublicStatus?.updatedAt) {
-      const date = new Date(hoferPublicStatus.updatedAt);
-      const promoText = hoferPublicStatus.promotionStale ? "Aktionsdaten veraltet" : String(hoferPublicStatus.promotionCount || 0) + " Aktionen";
-      lastEl.textContent = "GitHub-Datenstand: " + date.toLocaleString("de-AT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) + " · " + String(hoferPublicStatus.productCount || 0) + " Produkte · " + promoText;
-    } else { lastEl.textContent = "Noch keine importierten HOFER-Daten vorhanden"; }
-    if (promoBtn) {
-      const count = hoferPublicStatus?.promotionCount || 0;
-      const stale = hoferPublicStatus?.promotionStale === true;
-      promoBtn.disabled = stale || count === 0;
-      promoBtn.textContent = stale ? "🔥 Aktionen derzeit nicht verfügbar" : (count ? "🔥 " + count + " HOFER-Aktionen anzeigen" : "🔥 HOFER-Aktionen anzeigen");
-    }
-    if (flyerBtn) {
-      const url = OFFICIAL_FLYER_URLS.hofer;
-      flyerBtn.disabled = !url;
-      flyerBtn.dataset.flyerUrl = url || "";
-      flyerBtn.textContent = url ? "📄 Flugblatt" : "📄 Flugblatt nicht verfügbar";
-    }
-  }
-
-  async function openHoferPromotions() {
-    const stateEl = $("#hoferPromotionsState");
-    const listEl = $("#hoferPromotionsList");
-    if (!stateEl || !listEl) return;
-    openSheet("hoferPromotionsSheet");
-    stateEl.textContent = "HOFER-Aktionen werden geladen …";
-    listEl.innerHTML = "";
-    if (!window.HoferLive?.promotions) { stateEl.textContent = "Die HOFER-Aktionsansicht konnte nicht geladen werden."; return; }
-    try {
-      const items = await window.HoferLive.promotions();
-      const updated = hoferPublicStatus?.promotionUpdatedAt ? " · Datenstand " + new Date(hoferPublicStatus.promotionUpdatedAt).toLocaleString("de-AT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
-      stateEl.textContent = items.length ? items.length + " aktuelle HOFER-Aktionsartikel" + updated : "Aktuell wurden keine verifizierten HOFER-Aktionen gefunden.";
-      listEl.innerHTML = items.map(item => {
-        const promotion = item.promotion || {};
-        const condition = promotion.label || promotion.officialLabel || "Aktionsartikel";
-        const displayPrice = item.salePrice ?? item.currentPrice ?? item.regularPrice ?? null;
-        const regularPrice = item.regularPrice;
-        return '<article class="product-card hofer-promo-card"><div class="product-main hofer-promo-main">' +
-          '<div class="product-name">' + escapeHtml(item.name) + '</div>' +
-          '<div class="product-meta"><span>' + escapeHtml(formatLiveAmount(item)) + '</span>' + (item.unitPrice ? '<span>·</span><span>' + money(item.unitPrice) + '/' + escapeHtml(item.unitPriceUnit || "") + '</span>' : "") + '</div>' +
-          '<div class="offer-extra"><span class="offer-badge condition">' + escapeHtml(condition) + '</span></div>' +
-          (item.validFrom ? '<div class="product-meta">Verfügbar seit ' + formatDate(String(item.validFrom).slice(0,10)) + '</div>' : "") +
-          '</div><div class="product-price-wrap">' +
-          (displayPrice != null ? '<div class="product-price ' + (item.salePrice != null ? "sale" : "") + '">' + money(displayPrice) + '</div>' + (item.salePrice != null && regularPrice != null && Number(regularPrice) !== Number(item.salePrice) ? '<div class="old-price">' + money(regularPrice) + '</div>' : "") : '<div class="product-price">—</div>') +
-          '</div></article>';
-      }).join("");
-    } catch (error) { stateEl.textContent = "HOFER-Aktionen konnten nicht geladen werden: " + error.message; listEl.innerHTML = ""; }
-  }
-
-  async function refreshHoferPublicStatus(force = false) {
-    try { if (!window.HoferLive?.status) throw new Error("HOFER-Datenmodul fehlt"); hoferPublicStatus = await window.HoferLive.status(force); state.live.hofer.lastError = null; }
-    catch (error) { hoferPublicStatus = null; state.live.hofer.lastError = error.message; }
-    saveState(); renderHoferLiveStatus();
-  }
-
-  async function reloadAndSyncHofer() {
-    const button = $("#syncHoferBtn");
-    if (button) { button.disabled = true; button.textContent = "Lädt …"; }
-    try {
-      if (!window.HoferLive?.reload) throw new Error("HOFER-Datenmodul fehlt");
-      hoferPublicStatus = await window.HoferLive.reload();
-      state.live.hofer.lastError = null; saveState(); renderHoferLiveStatus();
-      await refreshAllAutoMatches({force:true,silent:true});
-      showToast("HOFER-Daten und Auto-Treffer aktualisiert");
-    } catch (error) {
-      state.live.hofer.lastError = error.message; saveState(); renderHoferLiveStatus(); showToast("HOFER-Daten konnten nicht neu geladen werden");
-    } finally { if (button) { button.disabled = false; button.textContent = "Neu laden"; } }
-  }
 
   function renderLidlLiveStatus() {
     const live = state.live?.lidl || {};
-    const autoLinked = state.products.filter(p =>
-      Array.isArray(p.autoMatches?.stores?.lidl) &&
-      p.autoMatches.stores.lidl.length
-    ).length;
+    const linked = state.products.filter(p => p.liveLinks?.lidl).length;
+    const autoLinked = state.products.filter(p => Array.isArray(p.autoMatches?.stores?.lidl) && p.autoMatches.stores.lidl.length).length;
     const linkedEl = $("#lidlLinkedCount");
     const lastEl = $("#lidlLastSync");
     const statusEl = $("#lidlLiveStatus");
-    const flyerBtn = $("#openLidlFlyerBtn");
     if (!linkedEl || !lastEl || !statusEl) return;
 
-    linkedEl.textContent = autoLinked + " Artikel automatisch";
+    linkedEl.textContent = autoLinked
+      ? `${autoLinked} Artikel automatisch${linked ? ` · ${linked} manuell` : ""}`
+      : `${linked} Artikel manuell verknüpft`;
     statusEl.className = "status-badge";
-
     if (live.lastError) {
       statusEl.textContent = "Fehler";
       statusEl.classList.add("live-error");
@@ -3843,19 +3751,9 @@
 
     if (lidlPublicStatus?.updatedAt) {
       const date = new Date(lidlPublicStatus.updatedAt);
-      lastEl.textContent = "GitHub-Datenstand: " + date.toLocaleString("de-AT", {
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit"
-      }) + " · " + String(lidlPublicStatus.productCount || 0) + " Produkte";
+      lastEl.textContent = `GitHub-Datenstand: ${date.toLocaleString("de-AT", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})} · ${lidlPublicStatus.productCount || 0} Produkte`;
     } else {
       lastEl.textContent = "Noch keine importierten Lidl-Daten vorhanden";
-    }
-
-    if (flyerBtn) {
-      const url = OFFICIAL_FLYER_URLS.lidl;
-      flyerBtn.disabled = !url;
-      flyerBtn.dataset.flyerUrl = url || "";
-      flyerBtn.textContent = url ? "📄 Flugblatt" : "📄 Flugblatt nicht verfügbar";
     }
   }
 
@@ -3868,37 +3766,119 @@
       lidlPublicStatus = null;
       state.live.lidl.lastError = error.message;
     }
-
     saveState();
     renderLidlLiveStatus();
   }
 
-  async function reloadAndSyncLidl() {
-    const button = $("#syncLidlBtn");
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Lädt …";
-    }
+  function linkLidlResult(productId, liveItem) {
+    const product = productById(productId);
+    if (!product || !liveItem) return;
+    product.liveLinks = product.liveLinks || {};
+    product.liveLinks.lidl = {
+      remoteObjectId: liveItem.remoteObjectId,
+      retailerProductId: liveItem.retailerProductId,
+      name: liveItem.name,
+      amount: Array.isArray(liveItem.amount) ? null : (Number(liveItem.amount) || null),
+      unit: liveItem.unit || null,
+      linkedAt: new Date().toISOString()
+    };
+    applyLidlLivePrice(product, liveItem);
+    state.live.lidl.lastSync = new Date().toISOString();
+    state.live.lidl.lastError = null;
+    saveState();
+    renderAll();
+    showToast("Lidl-Produkt verknüpft");
+    closeSheets();
+  }
 
-    try {
-      if (!window.LidlLive?.reload) throw new Error("Lidl-Datenmodul fehlt");
-      lidlPublicStatus = await window.LidlLive.reload();
-      state.live.lidl.lastError = null;
-      saveState();
-      renderLidlLiveStatus();
-      await refreshAllAutoMatches({ force: true, silent: true });
-      showToast("Lidl-Daten und Auto-Treffer aktualisiert");
-    } catch (error) {
-      state.live.lidl.lastError = error.message;
-      saveState();
-      renderLidlLiveStatus();
-      showToast("Lidl-Daten konnten nicht neu geladen werden");
-    } finally {
-      if (button) {
-        button.disabled = false;
-        button.textContent = "Neu laden";
-      }
+  function applyLidlLivePrice(product, liveItem) {
+    const now = liveItem.retrievedAt || new Date().toISOString();
+    const date = now.slice(0,10);
+    let offer = (product.offers || []).find(o => o.store === "lidl");
+    if (!offer) {
+      offer = {store:"lidl",history:[]};
+      product.offers = product.offers || [];
+      product.offers.push(offer);
     }
+    const historyMap = new Map();
+    (Array.isArray(offer.history) ? offer.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) historyMap.set(h.date,{date:h.date,price:Number(h.price)});
+    });
+    (Array.isArray(liveItem.history) ? liveItem.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) historyMap.set(h.date,{date:h.date,price:Number(h.price)});
+    });
+    const currentPrice = liveItem.currentPrice ?? liveItem.displayPrice ?? liveItem.regularPrice ?? liveItem.salePrice;
+    if (Number.isFinite(Number(currentPrice))) historyMap.set(date,{date,price:Number(currentPrice)});
+    const history=[...historyMap.values()].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,250);
+    Object.assign(offer,{
+      retailerProductId:liveItem.retailerProductId, remoteObjectId:liveItem.remoteObjectId,
+      ...livePackageFields(liveItem), regularPrice:liveItem.regularPrice ?? liveItem.currentPrice,
+      salePrice:liveItem.salePrice ?? null, unitPrice:liveItem.unitPrice, unitPriceUnit:liveItem.unitPriceUnit,
+      validFrom:liveItem.validFrom ?? null, validUntil:liveItem.validUntil ?? null, updatedAt:date,
+      source:liveItem.source || "heisse-preise.io (Lidl)", retrievedAt:now,
+      promotion:liveItem.promotion ?? null, promotionVerified:Boolean(liveItem.promotionVerified), history
+    });
+  }
+
+
+  async function syncLinkedLidl({silent=false} = {}) {
+    const linkedProducts = state.products.filter(p => p.liveLinks?.lidl);
+    if (!linkedProducts.length) {
+      if (!silent) showToast("Noch keine Lidl-Produkte manuell verknüpft");
+      return;
+    }
+    if (!window.LidlLive) {
+      state.live.lidl.lastError = "Live-Modul fehlt";
+      saveState(); renderLidlLiveStatus();
+      if (!silent) showToast("Lidl-Datenmodul fehlt");
+      return;
+    }
+    const button=$("#syncLidlBtn");
+    if(button){button.disabled=true;button.textContent="Lädt …";}
+    let updated=0; const errors=[];
+    for(let i=0;i<linkedProducts.length;i+=4){
+      const batch=linkedProducts.slice(i,i+4);
+      const results=await Promise.allSettled(batch.map(async product=>{
+        const link=product.liveLinks.lidl; let item;
+        try { item=await window.LidlLive.getObject(link.remoteObjectId||link.retailerProductId); }
+        catch {
+          const candidates=await window.LidlLive.search(link.name||product.name,10);
+          item=candidates.find(c=>c.remoteObjectId===link.remoteObjectId||c.retailerProductId===link.retailerProductId);
+          if(!item) throw new Error(`${product.name}: Produkt nicht mehr gefunden`);
+        }
+        applyLidlLivePrice(product,item);
+        product.liveLinks.lidl={...product.liveLinks.lidl,remoteObjectId:item.remoteObjectId,retailerProductId:item.retailerProductId,name:item.name};
+      }));
+      results.forEach(r=>{if(r.status==="fulfilled") updated+=1; else errors.push(String(r.reason?.message||r.reason||"Unbekannter Fehler"));});
+    }
+    state.live.lidl.lastSync=new Date().toISOString();
+    state.live.lidl.lastError=errors.length?errors.join(" | "):null;
+    saveState(); renderAll();
+    if(button){button.disabled=false;button.textContent="Neu laden";}
+    if(!silent) showToast(errors.length?`${updated} aktualisiert · ${errors.length} Fehler`:`${updated} Lidl-Preise aktualisiert`);
+  }
+
+  async function reloadAndSyncLidl() {
+    const button=$("#syncLidlBtn");
+    if(button){button.disabled=true;button.textContent="Lädt …";}
+    try {
+      if(!window.LidlLive?.reload) throw new Error("Lidl-Datenmodul fehlt");
+      lidlPublicStatus=await window.LidlLive.reload();
+      state.live.lidl.lastError=null; saveState(); renderLidlLiveStatus();
+      await syncLinkedLidl({silent:true});
+      await refreshAllAutoMatches({force:true,silent:true});
+      showToast("Lidl-Daten und Auto-Treffer aktualisiert");
+    } catch(error) {
+      state.live.lidl.lastError=error.message; saveState(); renderLidlLiveStatus(); showToast("Lidl-Daten konnten nicht neu geladen werden");
+    } finally { if(button){button.disabled=false;button.textContent="Neu laden";} }
+  }
+
+  function shouldAutoSyncLidl() {
+    const linked=state.products.some(p=>p.liveLinks?.lidl);
+    if(!linked||!navigator.onLine) return false;
+    const last=state.live?.lidl?.lastSync;
+    if(!last) return true;
+    return (Date.now()-new Date(last).getTime())>6*60*60*1000;
   }
 
   function openOfficialFlyer(store) {
@@ -3962,8 +3942,6 @@
         <span><i style="background:${retailer("spar").color}"></i>SPAR ${counts.spar || 0}</span>
         <span><i style="background:${retailer("tg").color}"></i>T&G ${counts.tg || 0}</span>
         <span><i style="background:${retailer("billa").color}"></i>BILLA ${counts.billa || 0}</span>
-        <span><i style="background:${retailer("hofer").color}"></i>HOFER ${counts.hofer || 0}</span>
-        <span><i style="background:${retailer("lidl").color}"></i>Lidl ${counts.lidl || 0}</span>
       </div>
       ${fixed ? `<div class="auto-fixed-note">Fest gewählt: <strong>${escapeHtml(fixed.name)}</strong> · ${retailer(fixed.store).name}</div>` : ""}
     `;
@@ -4169,8 +4147,7 @@
             <span>SPAR ${counts.spar || 0}</span>
             <span>T&G ${counts.tg || 0}</span>
             <span>BILLA ${counts.billa || 0}</span>
-            <span>HOFER ${counts.hofer || 0}</span>
-            <span>Lidl ${counts.lidl || 0}</span>
+            <span>LIDL ${counts.lidl || 0}</span>
           </div>
           <div class="muted small">${total} passende Kandidaten · ${autoState}</div>
         </div>
@@ -4200,7 +4177,6 @@
     renderSparLiveStatus();
     renderTgLiveStatus();
     renderBillaLiveStatus();
-    renderHoferLiveStatus();
     renderLidlLiveStatus();
 
     $$("#themeSegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.themeValue === state.settings.theme));
@@ -4780,6 +4756,9 @@
     const addDb = e.target.closest('[data-action="open-add-product"]');
     if (addDb) return openSheet("addProductSheet");
 
+    const syncLidl = e.target.closest("#syncLidlBtn");
+    if (syncLidl) return reloadAndSyncLidl();
+
     const showPromotions = e.target.closest("#showMpreisPromotionsBtn");
     if (showPromotions) return openMpreisPromotions();
 
@@ -4798,9 +4777,6 @@
     const showBillaPromotions = e.target.closest("#showBillaPromotionsBtn");
     if (showBillaPromotions) return openBillaPromotions();
 
-    const showHoferPromotions = e.target.closest("#showHoferPromotionsBtn");
-    if (showHoferPromotions) return openHoferPromotions();
-
     const mpreisFlyer = e.target.closest("#openMpreisFlyerBtn");
     if (mpreisFlyer) return openOfficialFlyer("mpreis");
 
@@ -4812,12 +4788,6 @@
 
     const billaFlyer = e.target.closest("#openBillaFlyerBtn");
     if (billaFlyer) return openOfficialFlyer("billa");
-
-    const hoferFlyer = e.target.closest("#openHoferFlyerBtn");
-    if (hoferFlyer) return openOfficialFlyer("hofer");
-
-    const lidlFlyer = e.target.closest("#openLidlFlyerBtn");
-    if (lidlFlyer) return openOfficialFlyer("lidl");
 
     const tgLink = e.target.closest("[data-link-tg]");
     if (tgLink) return openTgLink(tgLink.dataset.linkTg);
@@ -4919,8 +4889,6 @@
   $("#syncSparBtn").addEventListener("click", reloadAndSyncSpar);
   $("#syncTgBtn").addEventListener("click", reloadAndSyncTg);
   $("#syncBillaBtn").addEventListener("click", reloadAndSyncBilla);
-  $("#syncHoferBtn").addEventListener("click", reloadAndSyncHofer);
-  $("#syncLidlBtn").addEventListener("click", reloadAndSyncLidl);
   $("#shoppingSort").addEventListener("change", (e) => {
     state.settings.shoppingSort = e.target.value;
     saveState(); renderShopping();
@@ -5015,8 +4983,11 @@
     }
   });
 
-  refreshHoferPublicStatus();
-  refreshLidlPublicStatus();
+  refreshLidlPublicStatus().then(() => {
+    if (shouldAutoSyncLidl()) {
+      setTimeout(() => syncLinkedLidl({ silent: true }).catch(() => {}), 1000);
+    }
+  });
 
   // Automatic candidate pools are local/private and refreshed independently
   // from the old 1:1 live links. Existing cached candidates render instantly;
