@@ -19,7 +19,6 @@ FILES = {
     "tg": DATA_DIR / "tg.json",
     "billa": DATA_DIR / "billa.json",
     "hofer": DATA_DIR / "hofer.json",
-    "lidl": DATA_DIR / "lidl.json",
 }
 
 
