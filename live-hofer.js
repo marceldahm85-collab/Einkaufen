@@ -309,5 +309,5 @@
       .trim();
   }
 
-  window.HOFERLive = { search, browse, matchCandidates, getObject, promotions, status, reload };
+  window.HoferLive = { search, browse, matchCandidates, getObject, promotions, status, reload };
 })();
