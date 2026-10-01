@@ -17,7 +17,7 @@ assert(index.includes('data-auto-match-store="billa"'), "BILLA fehlt im Trefferf
 assert(index.includes('id="billaLiveStatus"'), "BILLA-Statuskarte fehlt");
 assert(index.includes('<script src="live-billa.js"></script>'), "live-billa.js wird nicht geladen");
 
-assert(app.includes('const promotionsSupported = ["mpreis", "spar", "tg", "billa"].includes(currentCatalogRetailer)'), "BILLA-Aktionsfilter nicht aktiviert");
+assert(app.includes('const promotionsSupported = ["mpreis", "spar", "tg", "billa", "hofer"].includes(currentCatalogRetailer)'), "BILLA-/HOFER-Aktionsfilter nicht aktiviert");
 
 assert(live.includes('const DATA_URL = "data/billa.json"'), "BILLA-Datenquelle falsch");
 assert(live.includes('window.BillaLive ='), "BillaLive Export fehlt");
