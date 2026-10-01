@@ -16,7 +16,7 @@ assert(app.includes('function renderHoferLiveStatus('), "HOFER-Status fehlt");
 assert(app.includes('function openHoferPromotions('), "HOFER-Aktionsansicht fehlt");
 assert(app.includes('refreshHoferPublicStatus().then'), "HOFER-Status wird beim Start nicht geladen");
 assert(app.includes('openOfficialFlyer("hofer")'), "HOFER-Flugblatt-Handler fehlt");
-assert(app.includes('const promotionsSupported = ["mpreis", "spar", "tg", "billa", "hofer"].includes(currentCatalogRetailer)'), "HOFER-Aktionsfilter nicht aktiviert");
+assert(app.includes('const promotionsSupported = ["mpreis", "spar", "tg", "billa", "hofer", "lidl"].includes(currentCatalogRetailer)'), "HOFER-Aktionsfilter nicht aktiviert");
 
 assert(index.includes('data-catalog-store="hofer"'), "HOFER fehlt im Händlerkatalog");
 assert(index.includes('data-auto-match-store="hofer"'), "HOFER fehlt im Trefferfilter");
