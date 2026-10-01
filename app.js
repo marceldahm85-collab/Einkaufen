@@ -106,7 +106,8 @@
     mpreis: "https://www.mpreis.at/aktionen/flugblatt?region=osttirol",
     spar: "https://www.interspar.at/aktionen/osttirol",
     billa: "https://www.billa.at/unsere-aktionen/flugblatt",
-    hofer: "https://www.hofer.at/flugblatt"
+    hofer: "https://www.hofer.at/flugblatt",
+    lidl: "https://www.lidl.at/c/flugblatt/s10012330"
   };
 
   let currentView = "shopping";
@@ -1456,7 +1457,7 @@
 
     const promoButton = $("#catalogPromotionFilter");
     if (promoButton) {
-      const promotionsSupported = ["mpreis", "spar", "tg", "billa", "hofer"].includes(currentCatalogRetailer);
+      const promotionsSupported = ["mpreis", "spar", "tg", "billa", "hofer", "lidl"].includes(currentCatalogRetailer);
       if (!promotionsSupported) catalogPromotionsOnly = false;
       promoButton.disabled = !promotionsSupported;
       promoButton.textContent = "🔥 Aktionen";
@@ -4052,11 +4053,14 @@
     const linkedEl = $("#lidlLinkedCount");
     const lastEl = $("#lidlLastSync");
     const statusEl = $("#lidlLiveStatus");
+    const promoBtn = $("#showLidlPromotionsBtn");
+    const flyerBtn = $("#openLidlFlyerBtn");
     if (!linkedEl || !lastEl || !statusEl) return;
 
     linkedEl.textContent = autoLinked
       ? `${autoLinked} Artikel automatisch${linked ? ` · ${linked} manuell` : ""}`
       : `${linked} Artikel manuell verknüpft`;
+
     statusEl.className = "status-badge";
     if (live.lastError) {
       statusEl.textContent = "Fehler";
@@ -4070,23 +4074,87 @@
 
     if (lidlPublicStatus?.updatedAt) {
       const date = new Date(lidlPublicStatus.updatedAt);
-      lastEl.textContent = `GitHub-Datenstand: ${date.toLocaleString("de-AT", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})} · ${lidlPublicStatus.productCount || 0} Produkte`;
+      const promoText = lidlPublicStatus.promotionStale
+        ? "Aktionsdaten veraltet"
+        : `${lidlPublicStatus.promotionCount || 0} Aktionen`;
+      lastEl.textContent = `GitHub-Datenstand: ${date.toLocaleString("de-AT", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})} · ${lidlPublicStatus.productCount || 0} Produkte · ${promoText}`;
     } else {
       lastEl.textContent = "Noch keine importierten Lidl-Daten vorhanden";
     }
+
+    if (promoBtn) {
+      const count = lidlPublicStatus?.promotionCount || 0;
+      const stale = lidlPublicStatus?.promotionStale === true;
+      promoBtn.disabled = stale || count === 0;
+      promoBtn.textContent = stale
+        ? "🔥 Aktionen derzeit nicht verfügbar"
+        : (count ? `🔥 ${count} Lidl-Aktionen anzeigen` : "🔥 Lidl-Aktionen anzeigen");
+    }
+
+    if (flyerBtn) {
+      const url = OFFICIAL_FLYER_URLS.lidl;
+      flyerBtn.disabled = !url;
+      flyerBtn.dataset.flyerUrl = url || "";
+      flyerBtn.textContent = url ? "📄 Flugblatt" : "📄 Flugblatt nicht verfügbar";
+    }
   }
 
-  async function refreshLidlPublicStatus(force = false) {
-    try {
-      if (!window.LidlLive?.status) throw new Error("Lidl-Datenmodul fehlt");
-      lidlPublicStatus = await window.LidlLive.status(force);
-      state.live.lidl.lastError = null;
-    } catch (error) {
-      lidlPublicStatus = null;
-      state.live.lidl.lastError = error.message;
+  async function openLidlPromotions() {
+    const stateEl = $("#lidlPromotionsState");
+    const listEl = $("#lidlPromotionsList");
+    if (!stateEl || !listEl) return;
+
+    openSheet("lidlPromotionsSheet");
+    stateEl.textContent = "Lidl-Aktionen werden geladen …";
+    listEl.innerHTML = "";
+
+    if (!window.LidlLive?.promotions) {
+      stateEl.textContent = "Die Lidl-Aktionsansicht konnte nicht geladen werden.";
+      return;
     }
-    saveState();
-    renderLidlLiveStatus();
+
+    try {
+      const items = await window.LidlLive.promotions();
+      const updated = lidlPublicStatus?.promotionUpdatedAt
+        ? ` · Datenstand ${new Date(lidlPublicStatus.promotionUpdatedAt).toLocaleString("de-AT", {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}`
+        : "";
+
+      stateEl.textContent = items.length
+        ? `${items.length} aktuelle Lidl-Aktionsartikel${updated}`
+        : "Aktuell wurden keine verifizierten Lidl-Aktionen gefunden.";
+
+      listEl.innerHTML = items.map(item => {
+        const promotion = item.promotion || {};
+        const condition = promotion.label || promotion.officialLabel || "Aktion";
+        const salePrice = item.salePrice ?? item.currentPrice;
+        const regularPrice = item.regularPrice;
+
+        return `
+          <article class="product-card lidl-promo-card">
+            <div class="product-main">
+              <div class="product-name">${escapeHtml(item.name)}</div>
+              <div class="product-meta">
+                <span>${escapeHtml(formatLiveAmount(item))}</span>
+                ${item.unitPrice ? `<span>·</span><span>${money(item.unitPrice)}/${escapeHtml(item.unitPriceUnit || "")}</span>` : ""}
+              </div>
+              <div class="offer-extra">
+                <span class="offer-badge condition">${escapeHtml(condition)}</span>
+                ${promotion.loyaltyRequired === true ? '<span class="offer-badge app-only">NUR MIT LIDL PLUS</span>' : ""}
+              </div>
+            </div>
+            <div class="product-price-wrap">
+              ${salePrice != null
+                ? `<div class="product-price sale">${money(salePrice)}</div>
+                   ${regularPrice != null && Number(regularPrice) !== Number(salePrice)
+                     ? `<div class="old-price">${money(regularPrice)}</div>` : ""}`
+                : '<div class="tg-no-price">ohne Fixpreis</div>'}
+            </div>
+          </article>`;
+      }).join("");
+    } catch (error) {
+      stateEl.textContent = `Lidl-Aktionen konnten nicht geladen werden: ${error.message}`;
+      listEl.innerHTML = "";
+    }
   }
 
   function linkLidlResult(productId, liveItem) {
@@ -5085,6 +5153,11 @@
 
     const syncLidl = e.target.closest("#syncLidlBtn");
     if (syncLidl) return reloadAndSyncLidl();
+    const showLidlPromotions = e.target.closest("#showLidlPromotionsBtn");
+    if (showLidlPromotions) return openLidlPromotions();
+
+    const lidlFlyer = e.target.closest("#openLidlFlyerBtn");
+    if (lidlFlyer) return openOfficialFlyer("lidl");
 
     const showPromotions = e.target.closest("#showMpreisPromotionsBtn");
     if (showPromotions) return openMpreisPromotions();
