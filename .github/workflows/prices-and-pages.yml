@@ -217,6 +217,30 @@ jobs:
       - name: Lidl-Daten aktualisieren
         run: python scripts/update_lidl.py
 
+      - name: Lidl-Aktionen aktualisieren
+        run: python scripts/update_lidl_actions.py
+
+      - name: Lidl-Aktionsbestand prüfen
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("data/lidl.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          count = int(data.get("promotionCount") or 0)
+          stale = bool(data.get("promotionStale"))
+
+          print(f"Lidl-Aktionsprodukte: {count}")
+          print(f"Lidl-Aktionsdaten stale: {'ja' if stale else 'nein'}")
+
+          if not stale and count < 20:
+              raise SystemExit(
+                  "Unplausibel wenige Lidl-Aktionsprodukte. Deployment wird abgebrochen."
+              )
+          PY
+
       - name: Lidl-Datenbestand prüfen
         shell: bash
         run: |
