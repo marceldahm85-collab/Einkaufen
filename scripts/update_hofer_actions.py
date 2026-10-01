@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import hashlib
 import html
 import json
 import math
@@ -17,661 +16,332 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "hofer.json"
-STATUS_PATH = ROOT / "data" / "update-status.json"
-
-# Official HOFER pages. The current offers page is the primary source;
-# the products page catches current seasonal/offer cards that are also
-# rendered in the public assortment.
-ACTION_URLS = [
-    "https://www.hofer.at/angebote",
-    "https://www.hofer.at/produkte",
-]
-MIN_EXPECTED_PRODUCTS = 100
-MIN_EXPECTED_PROMOTIONS = 10
-ACTION_WINDOW_DAYS = 7
-FETCH_TIMEOUT = 90
+ACTION_URL = "https://www.hofer.at/angebote"
+SOURCE_HOST = "www.hofer.at"
 USER_AGENT = "Mozilla/5.0 PreisPilot-Osttirol-GitHubAction/1.0"
+MIN_EXPECTED_PRODUCTS = 100
+MIN_EXPECTED_ACTIONS = 20
+MAX_ACTION_AGE_DAYS = 21
 
-EURO_PRICE_RE = re.compile(r"(?:€\s*(\d{1,4}(?:[,.]\d{2}))|(\d{1,4}(?:[,.]\d{2}))\s*€)")
-AVAILABLE_RE = re.compile(r"\bVerfügbar\s+(?:seit|ab)\s+(\d{2}\.\d{2}\.\d{4})\b", re.I)
-ACTION_LABEL_RE = re.compile(r"\bTiefpreisaktion\b", re.I)
-DATE_MARKER_RE = re.compile(r"\bVerfügbar\s+(?:seit|ab)\b", re.I)
-ONLINE_RE = re.compile(r"\bONLINESHOP\b|shop\.hofer\.at", re.I)
-
-
-def now_iso() -> str:
+def now_iso():
     return datetime.now(ZoneInfo("Europe/Vienna")).replace(microsecond=0).isoformat()
 
-
-def today_date():
+def today_local():
     return datetime.now(ZoneInfo("Europe/Vienna")).date()
-
 
 def number(value):
     try:
-        if value is None or value == "":
-            return None
-        n = float(
-            str(value)
-            .replace("€", "")
-            .replace(" ", "")
-            .replace("\xa0", "")
-            .replace(",", ".")
-        )
-        return n if math.isfinite(n) else None
-    except (TypeError, ValueError):
+        if value is None: return None
+        value=float(str(value).replace("€","").replace(" ","").replace("\xa0","").replace(",","."))
+        return value if math.isfinite(value) else None
+    except (TypeError,ValueError):
         return None
 
-
 def normalize_space(value):
-    text = html.unescape(str(value or "")).replace("\xa0", " ")
-    return re.sub(r"\s+", " ", text).strip()
+    return re.sub(r"\s+"," ",html.unescape(str(value or "")).replace("\xa0"," ")).strip()
 
+def normalize_name(value):
+    return normalize_space(value).casefold()
 
-def fetch_text(url, attempts=4):
-    headers = {
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "de-AT,de;q=0.9,en;q=0.7",
-        "Cache-Control": "no-cache",
-        "Accept-Encoding": "identity",
-        "User-Agent": USER_AGENT,
+def id_variants(value):
+    text=str(value or "").strip()
+    if not text: return set()
+    digits=re.sub(r"\D+","",text)
+    out={text.casefold()}
+    if digits:
+        out.update({digits,digits.lstrip("0") or "0"})
+        if len(digits)>=6: out.update({digits[-6:],"00-"+digits[-6:]})
+        if len(digits)>=8: out.add(digits[-10:])
+    return out
+
+def fetch_html(url, attempts=4):
+    headers={
+        "Accept":"text/html,application/xhtml+xml",
+        "Accept-Language":"de-AT,de;q=0.9,en;q=0.7",
+        "Accept-Encoding":"identity",
+        "Cache-Control":"no-cache",
+        "Referer":"https://www.hofer.at/",
+        "User-Agent":USER_AGENT,
     }
-    last_error = None
+    last=None
     for attempt in range(attempts):
         try:
-            request = Request(url, headers=headers)
-            with urlopen(request, timeout=FETCH_TIMEOUT) as response:
-                data = response.read()
-                charset = response.headers.get_content_charset() or "utf-8"
-                text = data.decode(charset, errors="replace")
-                if len(text) < 10_000:
-                    raise RuntimeError(
-                        f"HOFER-Seite ist unplausibel klein ({len(text)} Zeichen)"
-                    )
+            req=Request(url,headers=headers)
+            with urlopen(req,timeout=90) as response:
+                raw=response.read()
+                encoding=response.headers.get_content_charset() or "utf-8"
+                text=raw.decode(encoding,errors="replace")
+                if len(text)<10000:
+                    raise RuntimeError(f"HOFER-Angebotsseite ist unplausibel klein ({len(text)} Zeichen)")
                 return text
         except Exception as exc:
-            last_error = exc
-            if attempt + 1 < attempts:
-                time.sleep(2 ** attempt)
-    raise RuntimeError(f"HOFER-Seite konnte nicht abgerufen werden: {last_error}")
-
+            last=exc
+            if attempt+1<attempts: time.sleep(2**attempt)
+    raise RuntimeError(f"HOFER-Angebotsseite konnte nicht abgerufen werden: {last}")
 
 class Node:
-    __slots__ = ("tag", "attrs", "parent", "children", "text_parts", "text_cache")
-
-    def __init__(self, tag="document", attrs=None, parent=None):
-        self.tag = tag
-        self.attrs = dict(attrs or [])
-        self.parent = parent
-        self.children = []
-        self.text_parts = []
-        self.text_cache = None
-
-    def add_child(self, node):
-        self.children.append(node)
-        self.text_cache = None
-
+    __slots__=("tag","attrs","parent","children","text_parts","deleted_parts","deleted")
+    def __init__(self,tag="document",attrs=None,parent=None,deleted=False):
+        self.tag=tag; self.attrs=dict(attrs or []); self.parent=parent
+        self.children=[]; self.text_parts=[]; self.deleted_parts=[]; self.deleted=deleted
     def text(self):
-        if self.text_cache is not None:
-            return self.text_cache
-        parts = list(self.text_parts)
-        for child in self.children:
-            parts.append(child.text())
-        self.text_cache = normalize_space(" ".join(parts))
-        return self.text_cache
+        parts=list(self.text_parts)
+        for child in self.children: parts.append(child.text())
+        return normalize_space(" ".join(parts))
+    def deleted_text(self):
+        parts=list(self.deleted_parts)
+        for child in self.children: parts.append(child.deleted_text())
+        return normalize_space(" ".join(parts))
 
-
-class HoferHtmlParser(HTMLParser):
-    VOID_TAGS = {
-        "area", "base", "br", "col", "embed", "hr", "img", "input",
-        "link", "meta", "param", "source", "track", "wbr"
-    }
-
+class HoferHTMLParser(HTMLParser):
+    VOID_TAGS={"area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"}
+    DELETED_TAGS={"del","s","strike"}
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.root = Node()
-        self.stack = [self.root]
-
-    def handle_starttag(self, tag, attrs):
-        node = Node(tag, attrs, self.stack[-1])
-        for key in ("alt", "aria-label", "title"):
-            value = node.attrs.get(key)
+        self.root=Node()
+        self.stack=[self.root]
+    def handle_starttag(self,tag,attrs):
+        parent=self.stack[-1]
+        deleted=parent.deleted or tag.lower() in self.DELETED_TAGS
+        node=Node(tag,attrs,parent,deleted)
+        for key in ("alt","aria-label","title"):
+            value=node.attrs.get(key)
             if value:
-                node.text_parts.append(str(value))
-        self.stack[-1].add_child(node)
-        if tag.lower() not in self.VOID_TAGS:
-            self.stack.append(node)
-
-    def handle_startendtag(self, tag, attrs):
-        node = Node(tag, attrs, self.stack[-1])
-        for key in ("alt", "aria-label", "title"):
-            value = node.attrs.get(key)
+                (node.deleted_parts if deleted else node.text_parts).append(str(value))
+        parent.children.append(node)
+        if tag.lower() not in self.VOID_TAGS: self.stack.append(node)
+    def handle_startendtag(self,tag,attrs):
+        parent=self.stack[-1]
+        deleted=parent.deleted or tag.lower() in self.DELETED_TAGS
+        node=Node(tag,attrs,parent,deleted)
+        for key in ("alt","aria-label","title"):
+            value=node.attrs.get(key)
             if value:
-                node.text_parts.append(str(value))
-        self.stack[-1].add_child(node)
-
-    def handle_endtag(self, tag):
-        tag = tag.lower()
-        for i in range(len(self.stack) - 1, 0, -1):
-            if self.stack[i].tag.lower() == tag:
-                del self.stack[i:]
-                return
-
-    def handle_data(self, data):
-        if data:
-            self.stack[-1].text_parts.append(data)
-            self.stack[-1].text_cache = None
-
+                (node.deleted_parts if deleted else node.text_parts).append(str(value))
+        parent.children.append(node)
+    def handle_endtag(self,tag):
+        tag=tag.lower()
+        for idx in range(len(self.stack)-1,0,-1):
+            if self.stack[idx].tag.lower()==tag:
+                del self.stack[idx:]; return
+    def handle_data(self,data):
+        if not data: return
+        (self.stack[-1].deleted_parts if self.stack[-1].deleted else self.stack[-1].text_parts).append(data)
 
 def iter_nodes(node):
     for child in node.children:
         yield child
         yield from iter_nodes(child)
 
+def absolute_url(href):
+    return urljoin(ACTION_URL,html.unescape(str(href or "").strip()))
 
-def absolute_product_url(href):
-    if not href:
-        return None
-    absolute = urljoin(
-        "https://www.hofer.at/angebote",
-        html.unescape(str(href).strip())
-    )
-    parsed = urlparse(absolute)
-    if parsed.netloc not in {"www.hofer.at", "hofer.at"}:
-        return None
-    if "/produkt/" not in parsed.path.lower():
-        return None
-    return absolute.split("#", 1)[0].split("?", 1)[0]
-
-
-def unique_product_hrefs(node):
-    hrefs = set()
-    for descendant in iter_nodes(node):
-        if descendant.tag.lower() != "a":
-            continue
-        absolute = absolute_product_url(descendant.attrs.get("href"))
-        if absolute:
-            hrefs.add(absolute)
-    return hrefs
-
-
-def extract_identifier(url):
-    segment = urlparse(url).path.rsplit("/", 1)[-1]
-    matches = re.findall(r"\d{8,}", segment)
+def product_id_from_url(url):
+    matches=re.findall(r"(?:^|/)(\d{6,})(?:$|/)",urlparse(url).path)
     return matches[-1] if matches else None
 
+def unit_from_text(text):
+    m=re.search(r"(\d+(?:[.,]\d+)?)\s*(kg|g|l|ml)\b",text,re.I)
+    return (number(m.group(1)),m.group(2).lower()) if m else (None,None)
 
-def normalize_identifier(value):
-    text = str(value or "").strip().lower()
-    if not text:
-        return set()
-    variants = {text}
-    digits = re.sub(r"\D+", "", text)
-    if digits:
-        variants.add(digits)
-        variants.add(digits.lstrip("0") or "0")
-    return variants
+def unit_price_from_text(text):
+    m=re.search(r"€\s*(\d{1,4}(?:[.,]\d{2}))\s*/\s*(?:(\d+(?:[.,]\d+)?)\s*)?(kg|g|l|ml|stk|stück|pro\s+stück)\b",text,re.I)
+    if not m: return None,None
+    price=number(m.group(1)); base=number(m.group(2)) or 1.0
+    unit=m.group(3).lower().replace("pro ","")
+    if price is None: return None,None
+    if unit=="g": return round(price*(1000/base),2),"kg"
+    if unit=="ml": return round(price*(1000/base),2),"l"
+    return round(price/base,2),("Stk" if unit in {"stk","stück"} else unit)
 
+def visible_prices(text):
+    out=[]
+    for m in re.finditer(r"€\s*(\d{1,4}(?:[.,]\d{2}))",text):
+        value=number(m.group(1))
+        if value is not None: out.append(value)
+    return out
 
-def strip_unit_price_parentheses(text):
-    # e.g. "(€ 6,04/1 kg)" must not be mistaken for the selling price.
-    return re.sub(r"\([^)]*€[^)]*\)", " ", text)
+def clean_offer_name(body):
+    body=re.sub(r"\([^)]*€/[^)]*\)","",body)
+    body=re.sub(r"\bTiefpreisaktion\b","",body,flags=re.I)
+    body=re.sub(r"€\s*\d{1,4}(?:[.,]\d{2}).*$","",body).strip()
+    amount_match=re.search(r"\b\d+(?:[.,]\d+)?\s*(?:kg|g|l|ml)\b",body,re.I)
+    if amount_match: body=body[:amount_match.start()].strip()
+    body=re.sub(r"[¹²³⁴⁵⁶⁷⁸⁹˒]+"," ",body)
+    return normalize_space(body).strip(" -–")
 
-
-def extract_euro_prices(text):
-    prices = []
-    for match in EURO_PRICE_RE.finditer(text):
-        value = number(match.group(1) or match.group(2))
-        if value is not None:
-            prices.append(value)
-    return prices
-
-
-def extract_name(text):
-    cleaned = strip_unit_price_parentheses(text)
-    cleaned = AVAILABLE_RE.sub(" ", cleaned)
-    cleaned = ACTION_LABEL_RE.sub(" ", cleaned)
-
-    # Only an explicitly marked euro price ends the visible product name.
-    # Dates and package amounts must never be treated as selling prices.
-    price = EURO_PRICE_RE.search(cleaned)
-    if price:
-        cleaned = cleaned[:price.start()]
-
-    cleaned = re.sub(r"\b(?:ONLINESHOP|Kühlung|Vegan|Regional)\b", " ", cleaned, flags=re.I)
-    cleaned = re.sub(r"\b(?:nur|jetzt)\b\s*$", " ", cleaned, flags=re.I)
-    cleaned = re.sub(r"[¹²³*~]+", " ", cleaned)
-    return normalize_space(cleaned).strip(" -·|:")
-def parse_card_text(text):
-    text = normalize_space(text)
-    if not text or ONLINE_RE.search(text) or not DATE_MARKER_RE.search(text):
-        return None
-
-    date_match = AVAILABLE_RE.search(text)
-    valid_from = None
-    if date_match:
-        try:
-            valid_from = datetime.strptime(
-                date_match.group(1), "%d.%m.%Y"
-            ).date().isoformat()
-        except ValueError:
-            valid_from = None
-
-    price_text = strip_unit_price_parentheses(text)
-    prices = [
-        p for p in extract_euro_prices(price_text)
-        if p is not None and p > 0
-    ]
-
-    current = prices[0]
-    regular = None
-    sale = None
-
-    # HOFER uses the current price first and the struck-through "statt" price
-    # second on current product/offer pages.
-    if len(prices) >= 2 and prices[1] > current:
-        regular = prices[1]
-        sale = current
-
-    label = "Tiefpreisaktion" if ACTION_LABEL_RE.search(text) else "Aktionsartikel"
-
-    if sale is not None:
-        promotion = {
-            "type": "price_drop",
-            "label": label,
-            "officialLabel": label,
-            "verified": True,
-            "source": ACTION_URLS[0],
-            "loyaltyRequired": False,
-            "discountPercent": round((1 - sale / regular) * 100),
-        }
-    else:
-        promotion = {
-            "type": "action_article",
-            "label": label,
-            "officialLabel": label,
-            "verified": True,
-            "source": ACTION_URLS[0],
-            "loyaltyRequired": False,
-        }
-
-    return {
-        "name": extract_name(text),
-        "regularPrice": regular if regular is not None else current,
-        "salePrice": sale,
-        "promotion": promotion,
-        "actionLabel": label,
-        "validFrom": valid_from,
+def parse_action_card(text,today=None):
+    text=normalize_space(text)
+    if not text: return None
+    today=today or today_local()
+    m=re.search(r"Verfügbar\s+(?:seit|ab)\s+(\d{2})\.(\d{2})\.(\d{4})",text,re.I)
+    if not m: return None
+    try: start=datetime(int(m.group(3)),int(m.group(2)),int(m.group(1))).date()
+    except ValueError: return None
+    if start>today or start<today-timedelta(days=MAX_ACTION_AGE_DAYS): return None
+    if re.search(r"\bONLINESHOP\b",text[:140],re.I): return None
+    body=text[m.end():].strip()
+    price_text=re.sub(r"\([^)]*€/[^)]*\)","",body)
+    prices=visible_prices(price_text)
+    if not prices: return None
+    sale=prices[0]
+    if sale<=0: return None
+    amount,unit=unit_from_text(body)
+    unit_price,unit_price_unit=unit_price_from_text(body)
+    name=clean_offer_name(body)
+    if not name: return None
+    is_tiefpreis=bool(re.search(r"\bTiefpreisaktion\b",text,re.I))
+    bundle=re.search(r"\b(\d+)\s*\+\s*(\d+)\b",name)
+    promotion={
+        "type":"price_drop",
+        "label":"Tiefpreisaktion" if is_tiefpreis else "HOFER Aktion",
+        "officialLabel":"Tiefpreisaktion" if is_tiefpreis else "HOFER Aktion",
+        "verified":True,"source":ACTION_URL,"loyaltyRequired":False
     }
+    if bundle:
+        paid,free=int(bundle.group(1)),int(bundle.group(2))
+        if paid>=1 and free>=1:
+            promotion={
+                "type":"bundle","paidQuantity":paid,"freeQuantity":free,
+                "requiredQuantity":paid+free,"label":f"{paid}+{free} gratis",
+                "officialLabel":f"{paid}+{free} Aktion","verified":True,
+                "source":ACTION_URL,"loyaltyRequired":False
+            }
+    return {"name":name,"amount":amount,"unit":unit,"salePrice":round(sale,2),
+            "unitPrice":unit_price,"unitPriceUnit":unit_price_unit,
+            "promotion":promotion,"validFrom":start.isoformat()}
 
+def ancestors(node,depth=12):
+    out=[]; cur=node.parent
+    for _ in range(depth):
+        if cur is None: break
+        out.append(cur); cur=cur.parent
+    return out
 
-def extract_action_cards(html_text):
-    parser = HoferHtmlParser()
-    parser.feed(html_text)
-    parser.close()
+def unique_product_links(node):
+    result=set()
+    for d in iter_nodes(node):
+        if d.tag.lower()!="a": continue
+        href=absolute_url(d.attrs.get("href"))
+        if href and "/produkt/" in urlparse(href).path.lower():
+            result.add(href.split("?",1)[0])
+    return result
 
-    anchors = [
-        node for node in iter_nodes(parser.root)
-        if node.tag.lower() == "a" and node.attrs.get("href")
-    ]
+def candidate_nodes(html_text):
+    parser=HoferHTMLParser(); parser.feed(html_text); parser.close()
+    for anchor in iter_nodes(parser.root):
+        if anchor.tag.lower()!="a": continue
+        href=absolute_url(anchor.attrs.get("href"))
+        if not href or SOURCE_HOST not in urlparse(href).netloc: continue
+        if "/produkt/" not in urlparse(href).path.lower(): continue
+        yield anchor,href
 
-    results = {}
+def best_card_text(anchor):
+    own=anchor.text()
+    if len(own)>=25 and "Verfügbar" in own: return own
+    for ancestor in ancestors(anchor):
+        if len(unique_product_links(ancestor))!=1: continue
+        text=ancestor.text()
+        if len(text)>=25 and "Verfügbar" in text: return text
+    return None
 
-    for anchor in anchors:
-        href = absolute_product_url(anchor.attrs.get("href"))
-        if not href:
-            continue
+def find_existing_product(products,action_id,action_name):
+    id_keys=id_variants(action_id); name_key=normalize_name(action_name)
+    for product in products:
+        ids=set()
+        for key in (product.get("retailerProductId"),product.get("remoteObjectId")): ids.update(id_variants(key))
+        if id_keys.intersection(ids): return product
+    for product in products:
+        if normalize_name(product.get("name"))==name_key: return product
+    return None
 
-        text = anchor.text()
-        if (
-            not text
-            or len(text) < 25
-            or not DATE_MARKER_RE.search(text)
-        ):
-            current = anchor.parent
-            depth = 0
-            while current is not None and depth < 20:
-                if len(unique_product_hrefs(current)) == 1:
-                    candidate = current.text()
-                    if (
-                        len(candidate) >= 25
-                        and DATE_MARKER_RE.search(candidate)
-                    ):
-                        text = candidate
-                        break
-                current = current.parent
-                depth += 1
+def clear_old_promotions(products):
+    for product in products:
+        if product.get("promotionVerified") is True or product.get("promotion"):
+            product["salePrice"]=None
+            product["promotion"]=None
+            product["promotionVerified"]=False
+            product["promotionObservedAt"]=None
+            product["validFrom"]=None
+            product["validUntil"]=None
+            product["optimizerEligible"]=False
 
-        parsed = parse_card_text(text)
-        if not parsed:
-            continue
-
-        valid_from = parsed.get("validFrom")
-        if valid_from:
-            try:
-                start = datetime.strptime(valid_from, "%Y-%m-%d").date()
-            except ValueError:
-                continue
-
-            today = today_date()
-            if (
-                start < today - timedelta(days=ACTION_WINDOW_DAYS)
-                or start > today + timedelta(days=ACTION_WINDOW_DAYS)
-            ):
-                continue
-
-        article_id = extract_identifier(href)
-        if not article_id:
-            continue
-
-        parsed["articleNumber"] = article_id
-        parsed["productUrl"] = href
-        parsed["cardTextHash"] = hashlib.sha256(
-            text.encode("utf-8")
-        ).hexdigest()[:16]
-
-        key = next(iter(normalize_identifier(article_id)))
-        existing = results.get(key)
-        if existing is None:
-            results[key] = parsed
-
-    return results
-
-
-def fetch_all_actions():
-    found = {}
-    for url in ACTION_URLS:
-        print(f"HOFER: lade {url}")
-        text = fetch_text(url)
-        rows = extract_action_cards(text)
-        print(
-            f"HOFER: {url} → {len(rows)} sichere Aktionskarten"
-        )
-        for key, row in rows.items():
-            found.setdefault(key, row)
-    return found
-
-
-def load_payload():
-    if not DATA_PATH.exists():
-        raise RuntimeError(
-            "data/hofer.json fehlt. Zuerst scripts/update_hofer.py ausführen."
-        )
-
-    try:
-        payload = json.loads(DATA_PATH.read_text(encoding="utf-8"))
-    except Exception as exc:
-        raise RuntimeError(f"data/hofer.json ist ungültig: {exc}") from exc
-
-    if (
-        not isinstance(payload, dict)
-        or not isinstance(payload.get("products"), list)
-    ):
-        raise RuntimeError("data/hofer.json hat nicht das erwartete Format.")
-
-    if len(payload["products"]) < MIN_EXPECTED_PRODUCTS:
-        raise RuntimeError(
-            f"Unplausibel wenige HOFER-Produkte: {len(payload['products'])}"
-        )
-
-    return payload
-
-
-def load_status():
-    try:
-        payload = json.loads(STATUS_PATH.read_text(encoding="utf-8"))
-        if isinstance(payload, dict):
-            return payload
-    except Exception:
-        pass
-    return {"schemaVersion": 1, "updatedAt": None, "stores": {}}
-
-
-def write_status(stale, error=None, promotion_count=None):
-    payload = load_status()
-    payload["schemaVersion"] = 1
-    payload["updatedAt"] = now_iso()
-    payload.setdefault("stores", {})
-    store = payload["stores"].setdefault("hofer", {})
-    store["promotionStale"] = bool(stale)
-    store["promotionSource"] = ", ".join(ACTION_URLS)
-
-    if promotion_count is not None:
-        store["promotionCount"] = int(promotion_count)
-
-    store["promotionError"] = error
-    STATUS_PATH.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-
-def product_map_key_variants(product):
-    values = [
-        product.get("retailerProductId"),
-        product.get("remoteObjectId"),
-        product.get("sku"),
-        product.get("productId"),
-        product.get("articleNumber"),
-    ]
-
-    variants = set()
-    for value in values:
-        variants.update(normalize_identifier(value))
-    return variants
-
-
-def clear_previous_actions(product):
-    for field in (
-        "regularPrice",
-        "salePrice",
-        "promotion",
-        "promotionVerified",
-        "promotionObservedAt",
-        "validFrom",
-        "validUntil",
-        "promotionProductUrl",
-        "promotionSource",
-        "promotionOfficialLabel",
-    ):
-        product.pop(field, None)
-
-
-def update_unit_price(product):
-    price = number(
-        product.get("salePrice")
-        if product.get("salePrice") is not None
-        else product.get("currentPrice") or product.get("regularPrice")
-    )
-    amount = number(product.get("amount"))
-    unit = product.get("unit")
-
-    if price is None or amount is None or amount <= 0:
-        return
-
-    if unit == "g":
-        product["unitPrice"] = round(price / (amount / 1000), 2)
-        product["unitPriceUnit"] = "kg"
-    elif unit == "kg":
-        product["unitPrice"] = round(price / amount, 2)
-        product["unitPriceUnit"] = "kg"
-    elif unit == "ml":
-        product["unitPrice"] = round(price / (amount / 1000), 2)
-        product["unitPriceUnit"] = "l"
-    elif unit == "l":
-        product["unitPrice"] = round(price / amount, 2)
-        product["unitPriceUnit"] = "l"
-    elif unit == "Stk":
-        product["unitPrice"] = round(price / amount, 2)
-        product["unitPriceUnit"] = "Stk"
-
-
-def apply_action(product, action, observed_at):
-    product["regularPrice"] = action.get("regularPrice")
-    product["salePrice"] = action.get("salePrice")
-    product["promotion"] = action.get("promotion")
-    product["promotionVerified"] = True
-    product["promotionObservedAt"] = observed_at
-    product["promotionProductUrl"] = action.get("productUrl")
-    product["promotionSource"] = ", ".join(ACTION_URLS)
-    product["promotionOfficialLabel"] = action.get("actionLabel")
-    product["validFrom"] = action.get("validFrom")
-    product["validUntil"] = None
-    update_unit_price(product)
-
-
-def action_is_current(action):
-    valid_from = str(action.get("validFrom") or "")[:10]
-    return not valid_from or valid_from <= today_date().isoformat()
-
-
-def write_payload(payload):
-    temp = DATA_PATH.with_suffix(".json.tmp")
-    temp.write_text(
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n",
-        encoding="utf-8",
-    )
-    temp.replace(DATA_PATH)
-
+def apply_action(product,action,source_url):
+    product["salePrice"]=action["salePrice"]
+    product["promotion"]=action["promotion"]
+    product["promotionVerified"]=True
+    product["promotionObservedAt"]=now_iso()
+    product["validFrom"]=action["validFrom"]
+    product["validUntil"]=None
+    product["promotionSource"]=ACTION_URL
+    product["promotionProductUrl"]=source_url
+    product["actionLabel"]=action["promotion"].get("officialLabel") or action["promotion"].get("label")
+    if action.get("unitPrice") is not None:
+        product["unitPrice"]=action["unitPrice"]
+        product["unitPriceUnit"]=action.get("unitPriceUnit")
+    if action.get("amount") is not None and action.get("unit"):
+        product["amount"]=action["amount"]; product["unit"]=action["unit"]
+        product["packageAmount"]=action["amount"]; product["packageUnit"]=action["unit"]
+        product["packageAmountKnown"]=True
+    product["optimizerEligible"]=bool(action.get("amount") is not None and action.get("unit") and action["salePrice"] is not None)
 
 def main():
-    payload = load_payload()
-
+    if not DATA_PATH.exists(): raise SystemExit("data/hofer.json fehlt – zuerst HOFER-Grundpreise importieren.")
+    payload=json.loads(DATA_PATH.read_text(encoding="utf-8"))
+    products=payload.get("products") or []
+    if not isinstance(products,list) or len(products)<MIN_EXPECTED_PRODUCTS:
+        raise SystemExit("data/hofer.json ist leer oder unplausibel klein.")
     try:
-        found = fetch_all_actions()
+        source_html=fetch_html(ACTION_URL)
+        actions=[]; seen=set()
+        for anchor,href in candidate_nodes(source_html):
+            card=best_card_text(anchor)
+            if not card: continue
+            action=parse_action_card(card)
+            if not action: continue
+            product_id=product_id_from_url(href)
+            key=product_id or normalize_name(action["name"])
+            if key in seen: continue
+            seen.add(key)
+            actions.append({"id":product_id,"url":href,**action})
+        if len(actions)<MIN_EXPECTED_ACTIONS:
+            raise RuntimeError(f"Unplausibel wenige HOFER-Aktionsartikel erkannt: {len(actions)}")
+        clear_old_promotions(products)
+        matched=appended=0
+        for action in actions:
+            product=find_existing_product(products,action.get("id"),action["name"])
+            if product is None:
+                action_id=action.get("id") or ("action-"+str(abs(hash(action["name"]))))
+                product={
+                    "store":"hofer","remoteObjectId":action_id,"retailerProductId":action_id,
+                    "name":action["name"],"description":"",
+                    "amount":action.get("amount") if action.get("amount") is not None else 1,
+                    "unit":action.get("unit") or "Stk",
+                    "currentPrice":action["salePrice"],"unitPrice":action.get("unitPrice"),
+                    "unitPriceUnit":action.get("unitPriceUnit"),
+                    "source":"hofer.at (Aktuelle Angebote)","history":[]
+                }
+                products.append(product); appended+=1
+            else:
+                matched+=1
+            apply_action(product,action,action["url"])
+        payload["productCount"]=len(products)
+        payload["promotionCount"]=len(actions)
+        payload["promotionUpdatedAt"]=now_iso()
+        payload["promotionObservedAt"]=now_iso()
+        payload["promotionSource"]=ACTION_URL
+        payload["promotionStale"]=False
+        payload["promotionLastError"]=None
+        payload["promotionParserVersion"]=1
+        DATA_PATH.write_text(json.dumps(payload,ensure_ascii=False,separators=(",",":"))+"\\n",encoding="utf-8")
+        print(f"HOFER-Aktionen: {len(actions)} erkannt; {matched} bestehende Produkte aktualisiert; {appended} Aktionsprodukte ergänzt.")
+        return 0
     except Exception as exc:
-        old_count = int(payload.get("promotionCount") or 0)
-        payload["promotionStale"] = True
-        payload["promotionLastError"] = str(exc)
-        write_payload(payload)
-        write_status(True, str(exc), old_count)
+        payload["promotionStale"]=True
+        payload["promotionLastError"]=str(exc)
+        DATA_PATH.write_text(json.dumps(payload,ensure_ascii=False,separators=(",",":"))+"\\n",encoding="utf-8")
+        print(f"WARNUNG: HOFER-Aktionen konnten nicht frisch importiert werden: {exc}",file=sys.stderr)
+        return 0
 
-        if old_count:
-            print(
-                f"WARNUNG: HOFER-Aktionsquelle nicht erreichbar; "
-                f"alter Bestand ({old_count}) bleibt stale.",
-                file=sys.stderr,
-            )
-            return 0
-
-        print(f"FEHLER: {exc}", file=sys.stderr)
-        return 1
-
-    if len(found) < MIN_EXPECTED_PROMOTIONS:
-        error = (
-            f"HOFER-Aktionsimport lieferte nur {len(found)} sichere Produkte; "
-            f"Mindestwert für einen erfolgreichen Lauf ist "
-            f"{MIN_EXPECTED_PROMOTIONS}."
-        )
-        old_count = int(payload.get("promotionCount") or 0)
-        payload["promotionStale"] = True
-        payload["promotionLastError"] = error
-        write_payload(payload)
-        write_status(True, error, old_count)
-
-        if old_count:
-            print(
-                f"WARNUNG: {error} Alter Bestand bleibt stale.",
-                file=sys.stderr,
-            )
-            return 0
-
-        print(f"FEHLER: {error}", file=sys.stderr)
-        return 1
-
-    lookup = {}
-    name_lookup = {}
-
-    for product in payload["products"]:
-        if not isinstance(product, dict):
-            continue
-
-        for key in product_map_key_variants(product):
-            lookup.setdefault(key, product)
-
-        name = normalize_space(product.get("name"))
-        if name:
-            name_lookup.setdefault(name.casefold(), []).append(product)
-
-    matches = []
-
-    for action in found.values():
-        product = None
-
-        for key in normalize_identifier(action.get("articleNumber")):
-            product = lookup.get(key)
-            if product is not None:
-                break
-
-        if product is None:
-            exact = name_lookup.get(
-                normalize_space(action.get("name")).casefold(), []
-            )
-            if len(exact) == 1:
-                product = exact[0]
-
-        if product is not None:
-            matches.append((product, action))
-
-    if len(matches) < MIN_EXPECTED_PROMOTIONS:
-        error = (
-            f"HOFER-Aktionsimport konnte nur {len(matches)} sichere Produkte "
-            f"mit dem öffentlichen Bestand verknüpfen."
-        )
-        old_count = int(payload.get("promotionCount") or 0)
-        payload["promotionStale"] = True
-        payload["promotionLastError"] = error
-        write_payload(payload)
-        write_status(True, error, old_count)
-
-        if old_count:
-            print(
-                f"WARNUNG: {error} Alter Bestand bleibt stale.",
-                file=sys.stderr,
-            )
-            return 0
-
-        print(f"FEHLER: {error}", file=sys.stderr)
-        return 1
-
-    for product in payload["products"]:
-        clear_previous_actions(product)
-
-    observed_at = now_iso()
-    current_count = 0
-    seen_product_ids = set()
-
-    for product, action in matches:
-        product_id = str(
-            product.get("retailerProductId")
-            or product.get("remoteObjectId")
-            or id(product)
-        )
-
-        if product_id in seen_product_ids:
-            continue
-
-        seen_product_ids.add(product_id)
-        apply_action(product, action, observed_at)
-
-        if action_is_current(action):
-            current_count += 1
-
-    payload["promotionCount"] = current_count
-    payload["promotionUpdatedAt"] = observed_at
-    payload["promotionSource"] = ", ".join(ACTION_URLS)
-    payload["promotionStale"] = False
-    payload["promotionLastError"] = None
-    write_payload(payload)
-    write_status(False, None, current_count)
-
-    print(
-        f"HOFER: {len(found)} Aktionskarten gefunden; "
-        f"{len(matches)} sicher verknüpft; "
-        f"{current_count} aktuell."
-    )
-    return 0
-
-
-if __name__ == "__main__":
+if __name__=="__main__":
     raise SystemExit(main())

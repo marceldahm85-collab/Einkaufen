@@ -46,3 +46,7 @@ anderen Händlern lokal im Browser und werden nicht nach GitHub geschrieben.
 
 ### LIDL
 Die öffentlichen LIDL-Grundpreise in `data/lidl.json` sind Händlerdaten und enthalten keine persönlichen Einkaufslisten, Einstellungen oder privaten Zuordnungen. Automatische Kandidatenpools und persönliche Auswahlentscheidungen bleiben lokal im Browser.
+
+
+### HOFER
+`data/hofer.json` enthält ausschließlich öffentliche HOFER-Produkt- und Aktionsdaten. Persönliche HOFER-Auswahlen und automatische Kandidatenpools bleiben im Browser-localStorage.

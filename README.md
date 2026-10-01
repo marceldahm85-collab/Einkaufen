@@ -1,4 +1,4 @@
-# PreisPilot Osttirol – Version 13.3
+# PreisPilot Osttirol – Version 14.0
 
 BILLA erhält in Mehr jetzt dieselbe sichtbare Aktions-/Flugblatt-Ebene wie die anderen integrierten Händler.
 
@@ -1118,3 +1118,8 @@ zu machen. Die bisherigen No-Force-Push-Regeln bleiben unverändert.
 Lidl ist jetzt vollständig in den öffentlichen Grundpreis-/Produktbestand integriert. Der Händlerkatalog, die automatische Produktzuordnung und der bestehende Optimierer können Lidl-Kandidaten verwenden. Persönliche Verknüpfungen bleiben lokal. Lidl-Aktionsdaten und das regionale Flugblatt folgen separat.
 
 Quelle des Grundbestands ist der öffentliche Heisse-Preise-Datensatz, der Lidl als eigenen österreichischen Händler führt. Der offizielle Lidl-Auftritt stellt zusätzlich aktuelle Angebote und regionale Flugblätter bereit; diese werden in einem separaten Schritt angebunden.
+
+
+## Version 14.0 – HOFER
+
+HOFER ist in Grundpreise, Händlerkatalog, automatische Zuordnung, aktuelle Aktionsansicht und offiziellen Flugblatteinstieg integriert.

@@ -33,6 +33,7 @@
       spar: { enabled: true, lastSync: null, lastError: null },
       tg: { enabled: true, lastSync: null, lastError: null },
       billa: { enabled: true, lastSync: null, lastError: null },
+      hofer: { enabled: true, lastSync: null, lastError: null },
       lidl: { enabled: true, lastSync: null, lastError: null }
     },
     shopping: [
@@ -104,7 +105,8 @@
   const OFFICIAL_FLYER_URLS = {
     mpreis: "https://www.mpreis.at/aktionen/flugblatt?region=osttirol",
     spar: "https://www.interspar.at/aktionen/osttirol",
-    billa: "https://www.billa.at/unsere-aktionen/flugblatt"
+    billa: "https://www.billa.at/unsere-aktionen/flugblatt",
+    hofer: "https://www.hofer.at/flugblatt"
   };
 
   let currentView = "shopping";
@@ -122,8 +124,8 @@
   let catalogLoading = false;
   let selectedCatalogItem = null;
   const CATALOG_PAGE_SIZE = 50;
-  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa", "lidl"];
-  const AUTO_MATCH_ENGINE_VERSION = 4;
+  const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa", "hofer", "lidl"];
+  const AUTO_MATCH_ENGINE_VERSION = 5;
   const AUTO_MATCH_LIMIT_PER_STORE = 40;
   const AUTO_MATCH_SEARCH_LIMIT = 400;
   const AUTO_MATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -146,6 +148,7 @@
   let sparPublicStatus = null;
   let tgPublicStatus = null;
   let billaPublicStatus = null;
+  let hoferPublicStatus = null;
   let lidlPublicStatus = null;
 
   const $ = (sel, root=document) => root.querySelector(sel);
@@ -183,6 +186,10 @@
         billa: {
           ...initialState.live.billa,
           ...(input.live?.billa || {})
+        },
+        hofer: {
+          ...initialState.live.hofer,
+          ...(input.live?.hofer || {})
         },
         lidl: {
           ...initialState.live.lidl,
@@ -671,6 +678,7 @@
     if (store === "spar") return window.SparLive;
     if (store === "tg") return window.TgLive;
     if (store === "billa") return window.BillaLive;
+    if (store === "hofer") return window.HoferLive;
     if (store === "lidl") return window.LidlLive;
     return null;
   }
@@ -1425,6 +1433,7 @@
     if (store === "spar") return window.SparLive;
     if (store === "tg") return window.TgLive;
     if (store === "billa") return window.BillaLive;
+    if (store === "hofer") return window.HoferLive;
     if (store === "lidl") return window.LidlLive;
     return null;
   }
@@ -1447,7 +1456,7 @@
 
     const promoButton = $("#catalogPromotionFilter");
     if (promoButton) {
-      const promotionsSupported = ["mpreis", "spar", "tg", "billa"].includes(currentCatalogRetailer);
+      const promotionsSupported = ["mpreis", "spar", "tg", "billa", "hofer"].includes(currentCatalogRetailer);
       if (!promotionsSupported) catalogPromotionsOnly = false;
       promoButton.disabled = !promotionsSupported;
       promoButton.textContent = "🔥 Aktionen";
@@ -1458,7 +1467,7 @@
   }
 
   function setCatalogRetailer(store) {
-    if (!["mpreis", "spar", "tg", "billa", "lidl"].includes(store)) return;
+    if (!["mpreis", "spar", "tg", "billa", "hofer", "lidl"].includes(store)) return;
     if (currentCatalogRetailer === store) return;
 
     currentCatalogRetailer = store;
@@ -1817,6 +1826,7 @@
     else if (store === "spar") linkSparResult(productId, item);
     else if (store === "tg") linkTgResult(productId, item);
     else if (store === "billa") linkBillaResult(productId, item);
+    else if (store === "hofer") linkHoferResult(productId, item);
     else if (store === "lidl") linkLidlResult(productId, item);
     else return;
 
@@ -1862,6 +1872,7 @@
     else if (store === "spar") linkSparResult(product.id, item);
     else if (store === "tg") linkTgResult(product.id, item);
     else if (store === "billa") linkBillaResult(product.id, item);
+    else if (store === "hofer") linkHoferResult(product.id, item);
     else if (store === "lidl") linkLidlResult(product.id, item);
 
     selectedCatalogItem = null;
@@ -3726,6 +3737,314 @@
   }
 
 
+  function renderHoferLiveStatus() {
+    const live = state.live?.hofer || {};
+    const linked = state.products.filter(p => p.liveLinks?.hofer).length;
+    const autoLinked = state.products.filter(p => Array.isArray(p.autoMatches?.stores?.hofer) && p.autoMatches.stores.hofer.length).length;
+    const linkedEl = $("#hoferLinkedCount");
+    const lastEl = $("#hoferLastSync");
+    const statusEl = $("#hoferLiveStatus");
+    const promoBtn = $("#showHoferPromotionsBtn");
+    const flyerBtn = $("#openHoferFlyerBtn");
+    if (!linkedEl || !lastEl || !statusEl) return;
+
+    linkedEl.textContent = autoLinked
+      ? autoLinked + " Artikel automatisch" + (linked ? " · " + linked + " manuell" : "")
+      : linked + " Artikel manuell verknüpft";
+
+    statusEl.className = "status-badge";
+    if (live.lastError) {
+      statusEl.textContent = "Fehler";
+      statusEl.classList.add("live-error");
+    } else if (hoferPublicStatus?.updatedAt) {
+      statusEl.textContent = "Aktuell";
+      statusEl.classList.add("live-ok");
+    } else {
+      statusEl.textContent = "Bereit";
+    }
+
+    if (hoferPublicStatus?.updatedAt) {
+      const date = new Date(hoferPublicStatus.updatedAt);
+      const promoText = hoferPublicStatus.promotionStale
+        ? "Aktionsdaten veraltet"
+        : (hoferPublicStatus.promotionCount || 0) + " Aktionen";
+      lastEl.textContent = "GitHub-Datenstand: " +
+        date.toLocaleString("de-AT", {
+          day: "2-digit", month: "2-digit", year: "numeric",
+          hour: "2-digit", minute: "2-digit"
+        }) +
+        " · " + (hoferPublicStatus.productCount || 0) + " Produkte · " + promoText;
+    } else {
+      lastEl.textContent = "Noch keine importierten HOFER-Daten vorhanden";
+    }
+
+    if (promoBtn) {
+      const count = hoferPublicStatus?.promotionCount || 0;
+      const stale = hoferPublicStatus?.promotionStale === true;
+      promoBtn.disabled = stale || count === 0;
+      promoBtn.textContent = stale
+        ? "🔥 Aktionen derzeit nicht verfügbar"
+        : (count ? "🔥 " + count + " HOFER-Aktionen anzeigen" : "🔥 HOFER-Aktionen anzeigen");
+    }
+
+    if (flyerBtn) {
+      const url = OFFICIAL_FLYER_URLS.hofer;
+      flyerBtn.disabled = !url;
+      flyerBtn.dataset.flyerUrl = url || "";
+      flyerBtn.textContent = url ? "📄 Flugblatt" : "📄 Flugblatt nicht verfügbar";
+    }
+  }
+
+  async function openHoferPromotions() {
+    const stateEl = $("#hoferPromotionsState");
+    const listEl = $("#hoferPromotionsList");
+    if (!stateEl || !listEl) return;
+
+    openSheet("hoferPromotionsSheet");
+    stateEl.textContent = "HOFER-Aktionen werden geladen …";
+    listEl.innerHTML = "";
+
+    if (!window.HoferLive?.promotions) {
+      stateEl.textContent = "Die HOFER-Aktionsansicht konnte nicht geladen werden.";
+      return;
+    }
+
+    try {
+      const items = await window.HoferLive.promotions();
+      const updated = hoferPublicStatus?.promotionUpdatedAt
+        ? " · Datenstand " + new Date(hoferPublicStatus.promotionUpdatedAt).toLocaleString("de-AT", {
+            day: "2-digit", month: "2-digit", year: "numeric",
+            hour: "2-digit", minute: "2-digit"
+          })
+        : "";
+
+      stateEl.textContent = items.length
+        ? items.length + " aktuelle HOFER-Aktionsartikel" + updated
+        : "Aktuell wurden keine verifizierten HOFER-Aktionen gefunden.";
+
+      listEl.innerHTML = items.map(item => {
+        const promotion = item.promotion || {};
+        const condition = promotion.label || promotion.officialLabel || "Aktion";
+        const salePrice = item.salePrice ?? item.currentPrice;
+        const regularPrice = item.regularPrice;
+
+        return '<article class="product-card hofer-promo-card">' +
+          '<div class="product-main">' +
+            '<div class="product-name">' + escapeHtml(item.name) + '</div>' +
+            '<div class="product-meta">' +
+              '<span>' + escapeHtml(formatLiveAmount(item)) + '</span>' +
+              (item.unitPrice ? '<span>·</span><span>' + money(item.unitPrice) + '/' + escapeHtml(item.unitPriceUnit || "") + '</span>' : "") +
+            '</div>' +
+            '<div class="offer-extra"><span class="offer-badge condition">' + escapeHtml(condition) + '</span></div>' +
+          '</div>' +
+          '<div class="product-price-wrap">' +
+            (salePrice != null
+              ? '<div class="product-price sale">' + money(salePrice) + '</div>' +
+                (regularPrice != null && Number(regularPrice) !== Number(salePrice)
+                  ? '<div class="old-price">' + money(regularPrice) + '</div>' : "")
+              : '<div class="tg-no-price">ohne Fixpreis</div>') +
+          '</div>' +
+        '</article>';
+      }).join("");
+    } catch (error) {
+      stateEl.textContent = "HOFER-Aktionen konnten nicht geladen werden: " + error.message;
+      listEl.innerHTML = "";
+    }
+  }
+
+  async function refreshHoferPublicStatus(force = false) {
+    try {
+      if (!window.HoferLive?.status) throw new Error("HOFER-Datenmodul fehlt");
+      hoferPublicStatus = await window.HoferLive.status(force);
+      state.live.hofer.lastError = null;
+    } catch (error) {
+      hoferPublicStatus = null;
+      state.live.hofer.lastError = error.message;
+    }
+    saveState();
+    renderHoferLiveStatus();
+  }
+
+  function linkHoferResult(productId, liveItem) {
+    const product = productById(productId);
+    if (!product || !liveItem) return;
+
+    product.liveLinks = product.liveLinks || {};
+    product.liveLinks.hofer = {
+      remoteObjectId: liveItem.remoteObjectId,
+      retailerProductId: liveItem.retailerProductId,
+      name: liveItem.name,
+      amount: Array.isArray(liveItem.amount) ? null : (Number(liveItem.amount) || null),
+      unit: liveItem.unit || null,
+      linkedAt: new Date().toISOString()
+    };
+
+    applyHoferLivePrice(product, liveItem);
+    state.live.hofer.lastSync = new Date().toISOString();
+    state.live.hofer.lastError = null;
+    saveState();
+    renderAll();
+    showToast("HOFER-Produkt verknüpft");
+    closeSheets();
+  }
+
+  function applyHoferLivePrice(product, liveItem) {
+    const now = liveItem.retrievedAt || new Date().toISOString();
+    const date = now.slice(0, 10);
+    let offer = (product.offers || []).find(o => o.store === "hofer");
+
+    if (!offer) {
+      offer = { store: "hofer", history: [] };
+      product.offers = product.offers || [];
+      product.offers.push(offer);
+    }
+
+    const historyMap = new Map();
+    (Array.isArray(offer.history) ? offer.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) {
+        historyMap.set(h.date, {date:h.date, price:Number(h.price)});
+      }
+    });
+    (Array.isArray(liveItem.history) ? liveItem.history : []).forEach(h => {
+      if (h?.date && Number.isFinite(Number(h.price))) {
+        historyMap.set(h.date, {date:h.date, price:Number(h.price)});
+      }
+    });
+
+    const currentPrice = liveItem.currentPrice ?? liveItem.displayPrice ?? liveItem.regularPrice ?? liveItem.salePrice;
+    if (Number.isFinite(Number(currentPrice))) historyMap.set(date, {date, price:Number(currentPrice)});
+
+    const history = [...historyMap.values()]
+      .sort((a,b) => b.date.localeCompare(a.date))
+      .slice(0,250);
+
+    Object.assign(offer, {
+      retailerProductId: liveItem.retailerProductId,
+      remoteObjectId: liveItem.remoteObjectId,
+      ...livePackageFields(liveItem),
+      regularPrice: liveItem.regularPrice ?? liveItem.currentPrice,
+      salePrice: liveItem.salePrice ?? null,
+      unitPrice: liveItem.unitPrice,
+      unitPriceUnit: liveItem.unitPriceUnit,
+      validFrom: liveItem.validFrom ?? null,
+      validUntil: liveItem.validUntil ?? null,
+      updatedAt: date,
+      source: liveItem.promotionVerified ? "hofer.at" : (liveItem.source || "heisse-preise.io (HOFER)"),
+      retrievedAt: now,
+      promotion: liveItem.promotion ?? null,
+      promotionVerified: Boolean(liveItem.promotionVerified),
+      history
+    });
+  }
+
+  async function syncLinkedHofer({ silent = false } = {}) {
+    const linkedProducts = state.products.filter(p => p.liveLinks?.hofer);
+    if (!linkedProducts.length) {
+      if (!silent) showToast("Noch keine HOFER-Produkte manuell verknüpft");
+      return;
+    }
+
+    if (!window.HoferLive) {
+      state.live.hofer.lastError = "Live-Modul fehlt";
+      saveState();
+      renderHoferLiveStatus();
+      if (!silent) showToast("HOFER-Datenmodul fehlt");
+      return;
+    }
+
+    const button = $("#syncHoferBtn");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Lädt …";
+    }
+
+    let updated = 0;
+    const errors = [];
+
+    for (let i = 0; i < linkedProducts.length; i += 4) {
+      const batch = linkedProducts.slice(i, i + 4);
+      const results = await Promise.allSettled(batch.map(async product => {
+        const link = product.liveLinks.hofer;
+        let item;
+        try {
+          item = await window.HoferLive.getObject(link.remoteObjectId || link.retailerProductId);
+        } catch {
+          const candidates = await window.HoferLive.search(link.name || product.name, 10);
+          item = candidates.find(c =>
+            c.remoteObjectId === link.remoteObjectId ||
+            c.retailerProductId === link.retailerProductId
+          );
+          if (!item) throw new Error(product.name + ": Produkt nicht mehr gefunden");
+        }
+        applyHoferLivePrice(product, item);
+        product.liveLinks.hofer = {
+          ...product.liveLinks.hofer,
+          remoteObjectId: item.remoteObjectId,
+          retailerProductId: item.retailerProductId,
+          name: item.name
+        };
+      }));
+      results.forEach(result => {
+        if (result.status === "fulfilled") updated += 1;
+        else errors.push(String(result.reason?.message || result.reason || "Unbekannter Fehler"));
+      });
+    }
+
+    state.live.hofer.lastSync = new Date().toISOString();
+    state.live.hofer.lastError = errors.length ? errors.join(" | ") : null;
+    saveState();
+    renderAll();
+
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Neu laden";
+    }
+    if (!silent) {
+      showToast(errors.length
+        ? updated + " aktualisiert · " + errors.length + " Fehler"
+        : updated + " HOFER-Preise aktualisiert"
+      );
+    }
+  }
+
+  async function reloadAndSyncHofer() {
+    const button = $("#syncHoferBtn");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Lädt …";
+    }
+
+    try {
+      if (!window.HoferLive?.reload) throw new Error("HOFER-Datenmodul fehlt");
+      hoferPublicStatus = await window.HoferLive.reload();
+      state.live.hofer.lastError = null;
+      saveState();
+      renderHoferLiveStatus();
+      await syncLinkedHofer({ silent: true });
+      await refreshAllAutoMatches({ force: true, silent: true });
+      showToast("HOFER-Daten und Auto-Treffer aktualisiert");
+    } catch (error) {
+      state.live.hofer.lastError = error.message;
+      saveState();
+      renderHoferLiveStatus();
+      showToast("HOFER-Daten konnten nicht neu geladen werden");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Neu laden";
+      }
+    }
+  }
+
+  function shouldAutoSyncHofer() {
+    const linked = state.products.some(p => p.liveLinks?.hofer);
+    if (!linked || !navigator.onLine) return false;
+    const last = state.live?.hofer?.lastSync;
+    if (!last) return true;
+    return (Date.now() - new Date(last).getTime()) > 6 * 60 * 60 * 1000;
+  }
+
+
   function renderLidlLiveStatus() {
     const live = state.live?.lidl || {};
     const linked = state.products.filter(p => p.liveLinks?.lidl).length;
@@ -4147,6 +4466,7 @@
             <span>SPAR ${counts.spar || 0}</span>
             <span>T&G ${counts.tg || 0}</span>
             <span>BILLA ${counts.billa || 0}</span>
+            <span>HOFER ${counts.hofer || 0}</span>
             <span>LIDL ${counts.lidl || 0}</span>
           </div>
           <div class="muted small">${total} passende Kandidaten · ${autoState}</div>
@@ -4177,6 +4497,7 @@
     renderSparLiveStatus();
     renderTgLiveStatus();
     renderBillaLiveStatus();
+    renderHoferLiveStatus();
     renderLidlLiveStatus();
 
     $$("#themeSegmented button").forEach(b => b.classList.toggle("is-active", b.dataset.themeValue === state.settings.theme));
@@ -4756,6 +5077,12 @@
     const addDb = e.target.closest('[data-action="open-add-product"]');
     if (addDb) return openSheet("addProductSheet");
 
+    const syncHofer = e.target.closest("#syncHoferBtn");
+    if (syncHofer) return reloadAndSyncHofer();
+
+    const showHoferPromotions = e.target.closest("#showHoferPromotionsBtn");
+    if (showHoferPromotions) return openHoferPromotions();
+
     const syncLidl = e.target.closest("#syncLidlBtn");
     if (syncLidl) return reloadAndSyncLidl();
 
@@ -4788,6 +5115,9 @@
 
     const billaFlyer = e.target.closest("#openBillaFlyerBtn");
     if (billaFlyer) return openOfficialFlyer("billa");
+
+    const hoferFlyer = e.target.closest("#openHoferFlyerBtn");
+    if (hoferFlyer) return openOfficialFlyer("hofer");
 
     const tgLink = e.target.closest("[data-link-tg]");
     if (tgLink) return openTgLink(tgLink.dataset.linkTg);
@@ -4889,6 +5219,7 @@
   $("#syncSparBtn").addEventListener("click", reloadAndSyncSpar);
   $("#syncTgBtn").addEventListener("click", reloadAndSyncTg);
   $("#syncBillaBtn").addEventListener("click", reloadAndSyncBilla);
+  $("#syncHoferBtn").addEventListener("click", reloadAndSyncHofer);
   $("#shoppingSort").addEventListener("change", (e) => {
     state.settings.shoppingSort = e.target.value;
     saveState(); renderShopping();
@@ -4980,6 +5311,12 @@
   refreshBillaPublicStatus().then(() => {
     if (shouldAutoSyncBilla()) {
       setTimeout(() => syncLinkedBilla({ silent: true }).catch(() => {}), 850);
+    }
+  });
+
+  refreshHoferPublicStatus().then(() => {
+    if (shouldAutoSyncHofer()) {
+      setTimeout(() => syncLinkedHofer({ silent: true }).catch(() => {}), 930);
     }
   });
 

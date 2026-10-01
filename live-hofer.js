@@ -295,7 +295,7 @@
     const live = currentItem(item);
     return {
       ...live,
-      source: live.source || "hofer.at",
+      source: live.source || "heisse-preise.io (HOFER)",
       retrievedAt: payload.updatedAt || new Date().toISOString()
     };
   }
@@ -309,5 +309,5 @@
       .trim();
   }
 
-  window.HoferLive = { search, browse, matchCandidates, getObject, promotions, status, reload };
+  window.HOFERLive = { search, browse, matchCandidates, getObject, promotions, status, reload };
 })();

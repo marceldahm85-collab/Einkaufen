@@ -70,3 +70,10 @@ Die offizielle BILLA-Aktionsseite ist **noch nicht** als verifizierte
 Aktionsquelle freigeschaltet. Insbesondere `ab N`, `N+M`, jö-/Treuebedingungen
 und Gültigkeitszeiträume werden erst in einer separaten Aktionsstufe verwendet,
 wenn sie strukturiert und eindeutig einem Produkt zugeordnet werden können.
+
+
+## HOFER-Integration (Version 14.0)
+
+Grundpreise: `https://heisse-preise.io/data/latest-canonical.json` mit `store=hofer`.
+
+Aktionspreise: offizielle HOFER-Angebotsseite `https://www.hofer.at/angebote`. Das offizielle Flugblatt ist über `https://www.hofer.at/flugblatt` erreichbar. Die persönlichen Matchingprofile und Kandidatenpools bleiben lokal.
