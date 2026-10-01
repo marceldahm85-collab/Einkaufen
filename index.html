@@ -349,8 +349,20 @@
             <button class="secondary-btn" id="syncLidlBtn">Neu laden</button>
           </div>
 
+          <div class="retailer-action-row">
+            <button class="secondary-btn lidl-promo-btn" id="showLidlPromotionsBtn" type="button">
+              🔥 Lidl-Aktionen anzeigen
+            </button>
+            <button class="secondary-btn retailer-flyer-btn lidl-flyer-btn" id="openLidlFlyerBtn" type="button">
+              📄 Flugblatt
+            </button>
+          </div>
+          <div class="flyer-source-line">
+            <span>Flugblatt: Lidl</span>
+            <span>Österreich</span>
+          </div>
           <p class="muted small live-note">
-            Lidl-Grundpreise und Preisverläufe werden aus dem öffentlichen Heisse-Preise-Datensatz aktualisiert. Der vollständige Lidl-Bestand steht im Händlerkatalog und in der automatischen Produktzuordnung zur Verfügung. Lidl-Aktionen und das regionale Flugblatt werden separat angebunden.
+            Lidl-Grundpreise und Preisverläufe werden aus dem öffentlichen Heisse-Preise-Datensatz aktualisiert. Aktuelle Lidl-Aktionen werden separat aus der offiziellen Lidl-Seite eingelesen. Das offizielle österreichische Flugblatt ist direkt erreichbar.
           </p>
         </div>
 
@@ -811,6 +823,19 @@
       BILLA-Aktionen werden geladen …
     </div>
     <div id="billaPromotionsList" class="stack live-result-list"></div>
+  </section>
+
+  <section class="bottom-sheet" id="lidlPromotionsSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <div class="eyebrow">LIDL AKTIONEN</div>
+        <h2>Aktuelle Aktionsartikel</h2>
+      </div>
+      <button class="icon-btn" data-action="close-sheets">✕</button>
+    </div>
+    <div id="lidlPromotionsState" class="muted small live-search-state">Lidl-Aktionen werden geladen …</div>
+    <div id="lidlPromotionsList" class="stack live-result-list"></div>
   </section>
 
   <section class="bottom-sheet" id="hoferPromotionsSheet" aria-hidden="true">
