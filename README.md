@@ -1120,6 +1120,31 @@ Lidl ist jetzt vollständig in den öffentlichen Grundpreis-/Produktbestand inte
 Quelle des Grundbestands ist der öffentliche Heisse-Preise-Datensatz, der Lidl als eigenen österreichischen Händler führt. Der offizielle Lidl-Auftritt stellt zusätzlich aktuelle Angebote und regionale Flugblätter bereit; diese werden in einem separaten Schritt angebunden.
 
 
+## Version 14.1 – Lidl-Aktionen und Flugblatt
+
+Lidl erhält die zweite Integrationsstufe.
+
+### Aktionen
+
+`scripts/update_lidl_actions.py` liest aktuelle Lidl-Angebote von der offiziellen österreichischen Lidl-Seite ein. Verifizierte Aktionen werden in `data/lidl.json` mit Aktionspreis, Normalpreis, Gültigkeit und – sofern ausdrücklich veröffentlicht – Mengen-/Bundle-Bedingung gespeichert.
+
+- `4+2 gratis` und ähnliche explizite Bundles werden als Bundle behandelt.
+- `ab N` / `bei N Stück` werden als Mengenaktion übernommen.
+- `Mit Lidl Plus` wird als Treuebedingung gekennzeichnet.
+- Nicht sicher erkennbare Aktionsbedingungen werden nicht erfunden.
+- Bei einem technischen Fehler bleibt der letzte gültige Aktionsbestand erhalten und wird über `promotionStale` deaktiviert.
+
+### App
+
+Unter `Mehr → Lidl` gibt es nun:
+- `🔥 Lidl-Aktionen anzeigen`
+- `📄 Flugblatt`
+- Aktionsanzahl und Aktionsdatenstand im Lidl-Status
+
+Der Händlerkatalog kann Lidl-Aktionen ebenfalls über `🔥 Aktionen` filtern.
+
+Das offizielle österreichische Lidl-Flugblatt wird direkt über die aktuelle Lidl-Flugblattseite geöffnet.
+
 ## Version 14.0 – HOFER
 
 HOFER ist in Grundpreise, Händlerkatalog, automatische Zuordnung, aktuelle Aktionsansicht und offiziellen Flugblatteinstieg integriert.
