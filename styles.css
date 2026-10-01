@@ -1716,6 +1716,42 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
   cursor: default;
 }
 
+/* Version 14.1 – Lidl Aktionen und Flugblatt */
+.lidl-promo-btn,
+.lidl-flyer-btn {
+  width: 100%;
+  margin-top: 11px;
+}
+
+.lidl-promo-btn {
+  border-color: color-mix(in srgb, #0050aa 25%, var(--line));
+  background: color-mix(in srgb, #0050aa 9%, var(--surface-2));
+}
+
+.lidl-flyer-btn {
+  margin-top: 8px;
+}
+
+.lidl-promo-card {
+  align-items: start;
+}
+
+.lidl-promo-card .product-price {
+  color: #0050aa;
+}
+
+#lidlPromotionsSheet .live-result-list {
+  padding-bottom: 10px;
+}
+
+#lidlPromotionsSheet .product-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.22;
+}
+
+
 /* Version 13.3 – BILLA Aktionen und Flugblatt */
 .billa-live-card::before {
   background: linear-gradient(#e30613, #ff4a56);
