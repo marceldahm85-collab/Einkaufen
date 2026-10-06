@@ -35,7 +35,7 @@ assert(workflow.includes('python scripts/test_update_hofer.py'), "HOFER-Importte
 assert(workflow.includes('python scripts/test_update_hofer_actions.py'), "HOFER-Aktionstest fehlt im Workflow");
 assert(workflow.includes('node --check live-hofer.js'), "HOFER-JS wird im Workflow nicht geprüft");
 assert(workflow.includes('node scripts/test_hofer_integration.js'), "HOFER-Integrationstest fehlt im Workflow");
-assert(workflow.includes('live-hofer.js manifest.webmanifest'), "live-hofer.js wird nicht nach Pages kopiert");
+assert(workflow.includes("live-hofer.js") && workflow.includes("manifest.webmanifest") && workflow.includes("cp index.html"), "live-hofer.js wird nicht nach Pages kopiert");
 
 assert(integrity.includes('"hofer": DATA_DIR / "hofer.json"'), "HOFER fehlt im Integritätscheck");
 assert(sw.includes('./live-hofer.js'), "HOFER fehlt im Service Worker");
