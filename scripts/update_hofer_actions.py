@@ -181,7 +181,7 @@ def parse_action_card(text,today=None):
     if start>today or start<today-timedelta(days=MAX_ACTION_AGE_DAYS): return None
     if re.search(r"\bONLINESHOP\b",text[:140],re.I): return None
     body=text[m.end():].strip()
-    price_text=re.sub(r"\([^)]*€/[^)]*\)","",body)
+    price_text=re.sub(r"\([^)]*€\s*[^)]*/[^)]*\)","",body)
     prices=visible_prices(price_text)
     if not prices: return None
     sale=prices[0]
