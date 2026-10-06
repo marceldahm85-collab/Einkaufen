@@ -333,7 +333,7 @@ def main():
         payload["promotionStale"]=False
         payload["promotionLastError"]=None
         payload["promotionParserVersion"]=1
-        serialized = json.dumps(payload,ensure_ascii=False,separators=(",",":"))+"\\n"
+        serialized = json.dumps(payload,ensure_ascii=False,separators=(",",":"))+ "\n"
         temp_path = DATA_PATH.with_suffix(".json.tmp")
         temp_path.write_text(serialized,encoding="utf-8")
         with temp_path.open("r",encoding="utf-8") as fh:
@@ -344,7 +344,7 @@ def main():
     except Exception as exc:
         payload["promotionStale"]=True
         payload["promotionLastError"]=str(exc)
-        serialized = json.dumps(payload,ensure_ascii=False,separators=(",",":"))+"\\n"
+        serialized = json.dumps(payload,ensure_ascii=False,separators=(",",":"))+ "\n"
         temp_path = DATA_PATH.with_suffix(".json.tmp")
         temp_path.write_text(serialized,encoding="utf-8")
         with temp_path.open("r",encoding="utf-8") as fh:
