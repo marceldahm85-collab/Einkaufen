@@ -14,3 +14,18 @@ assert item["unitPrice"] == 1.29
 assert item["history"][0]["price"] == 1.29
 assert ns["normalize_item"]({"store":"spar","name":"Falsch","price":1}) is None
 print("Lidl importer tests OK")
+
+fixture = {
+  "gridbox": {"data": {
+    "productId": "10045677",
+    "fullTitle": "Test Vollmilch",
+    "price": {"price": 1.29, "basePrice": {"text": "Je 1 l"}},
+    "keyfacts": {"description": "Test"},
+    "canonicalPath": "/p/test/p10045677"
+  }, "meta": {}}
+}
+parsed = ns["normalize_lidl_search_item"](fixture)
+assert parsed["id"] == "10045677"
+assert parsed["price"] == 1.29
+assert parsed["unit"] == "l"
+print("Lidl search API parser test OK")
