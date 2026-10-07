@@ -47,96 +47,163 @@ def fetch_json(url, attempts=4):
 
 
 def fetch_lidl_direct(attempts=4):
-    # Lidl hat die Schreibweise des bisher von Heisse Preise verwendeten
-    # Endpunkts geändert. Beide Varianten werden versucht.
-    urls = [
-        "https://www.lidl.at/p/api/gridboxes/AT/de?max=30000",
-        "https://www.lidl.at/p/api/gridboxes/AT/de/?max=30000",
-        "https://www.lidl.at/p/api/gridboxes/AT/de?max=32000",
-        "https://www.lidl.at/p/api/gridboxes/AT/de/?max=32000",
-    ]
+    """Liest das aktuelle Lidl-AT-Such-API statt des veralteten gridboxes-Endpoints."""
+    base_url = "https://www.lidl.at/q/api/search"
+    category_id = "10068374"  # Essen & Trinken inkl. Unterkategorien
     headers = {
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "de-AT,de;q=0.9,en;q=0.8",
         "Referer": "https://www.lidl.at/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 PreisPilot-Osttirol-GitHubAction/1.0",
     }
 
-    last = None
-    for url in urls:
+    products = []
+    offset = 0
+    limit = 500
+
+    while True:
+        params = (
+            f"assortment=AT&locale=de_AT&version=v2.0.0"
+            f"&sort=relevancy&category.id={category_id}"
+            f"&offset={offset}&limit={limit}"
+        )
+        url = f"{base_url}?{params}"
+        last = None
+
         for attempt in range(attempts):
             try:
                 req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, timeout=90) as response:
                     data = json.load(response)
-                if not isinstance(data, list):
-                    raise RuntimeError("Lidl-API liefert kein Array.")
-                return data
+                if not isinstance(data, dict):
+                    raise RuntimeError("Lidl-Such-API liefert kein Objekt.")
+                break
             except Exception as exc:
                 last = exc
                 if attempt + 1 < attempts:
                     time.sleep(2 ** attempt)
+        else:
+            raise RuntimeError(f"Lidl-Such-API fehlgeschlagen: {last}")
 
-    raise RuntimeError(f"Lidl-Direktabruf fehlgeschlagen: {last}")
+        items = data.get("items") or []
+        for item in items:
+            parsed = normalize_lidl_search_item(item)
+            if parsed is not None:
+                products.append(parsed)
+
+        num_found = int(data.get("numFound") or 0)
+        fetched = offset + len(items)
+
+        if not items or fetched >= num_found:
+            break
+
+        offset = fetched
+        time.sleep(0.5)
+
+    return products
 
 
-def normalize_lidl_api_item(item):
+def _parse_lidl_base_price(text):
+    if not text:
+        return None, None
+
+    match = re.search(
+        r"\\(1\\s+(kg(?:\\s+Abtr\\.\\s*G\\.)?|l|Stk\\.?|100\\s*(?:g|ml))"
+        r"\\s*=\\s*([\\d.,]+)\\)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        raw_unit = match.group(1).strip().lower()
+        value = number(match.group(2).replace(",", "."))
+        if value is not None:
+            if "kg" in raw_unit:
+                return value, "kg"
+            if raw_unit == "l":
+                return value, "l"
+            if "100" in raw_unit and "ml" in raw_unit:
+                return value, "100ml"
+            if "100" in raw_unit and "g" in raw_unit:
+                return value, "100g"
+            return value, "Stk"
+
+    match = re.search(r"(?:Je|je)\\s+(kg|l|Stk\\.?)", text)
+    if match:
+        return None, normalize_unit(match.group(1))
+
+    return None, None
+
+
+def normalize_lidl_search_item(item):
     if not isinstance(item, dict):
         return None
 
-    price_obj = item.get("price") or {}
-    price = number(price_obj.get("price"))
+    gridbox = item.get("gridbox") or {}
+    data = gridbox.get("data") or {}
+    price_info = data.get("price") or {}
 
-    keyfacts = item.get("keyfacts") or {}
-    name = keyfacts.get("supplementalDescription") or ""
-    name = (str(name) + " " + str(item.get("fullTitle") or "")).strip()
-
-    if price is None or not name:
+    price = number(price_info.get("price"))
+    if price is None:
+        lidl_plus = data.get("lidlPlus") or []
+        if lidl_plus:
+            price = number((lidl_plus[0].get("price") or {}).get("price"))
+    if price is None:
         return None
 
-    base = str((price_obj.get("basePrice") or {}).get("text") or "").strip().lower().replace(",", ".")
+    product_id = data.get("productId") or data.get("erpNumber")
+    name = str(data.get("fullTitle") or "").strip()
+    if not product_id or not name:
+        return None
+
+    base_text = str((price_info.get("basePrice") or {}).get("text") or "")
+    unit_price, unit = _parse_lidl_base_price(base_text)
+
     quantity = 1.0
-    unit = "Stk"
-
-    if base == "per kg":
-        unit = "kg"
-    else:
-        text_value = base
-        if text_value.startswith("bei") and "je " in text_value:
-            text_value = text_value[text_value.find("je "):]
-
+    if base_text:
+        cleaned = base_text.lower().replace(",", ".")
         for prefix in ("ab ", "je ", "ca. ", "z.b.: ", "z.b. "):
-            text_value = text_value.replace(prefix, "").strip()
-
-        match = re.match(r"^([0-9.x ]+)(.*)$", text_value)
-        if match:
+            cleaned = cleaned.replace(prefix, "").strip()
+        m = re.match(r"^([0-9.x ]+)(.*)$", cleaned)
+        if m:
             quantity = 1.0
-            for q in match.group(1).split("x"):
+            for part in m.group(1).split("x"):
                 try:
-                    quantity *= float(q.split("/")[0])
+                    quantity *= float(part.split("/")[0])
                 except ValueError:
                     pass
+            if unit is None:
+                raw_unit = m.group(2).split("/")[0].strip().split(" ")[0]
+                unit = normalize_unit(raw_unit.split("-")[0])
 
-            raw_unit = match.group(2).split("/")[0].strip().split(" ")[0]
-            unit = normalize_unit(raw_unit.split("-")[0])
+    if unit is None:
+        unit = "Stk"
+
+    # Die von Lidl gelieferte Einheitspreis-Angabe ist bereits auf die
+    # jeweilige Basiseinheit normiert; sie hat Vorrang vor einer eigenen
+    # Berechnung, sofern vorhanden.
+    description = str((data.get("keyfacts") or {}).get("description") or "").strip()
+    category = ""
+    breadcrumbs = (gridbox.get("meta") or {}).get("wonCategoryBreadcrumbs") or []
+    if breadcrumbs and breadcrumbs[0]:
+        category = str((breadcrumbs[0][-1] or {}).get("name") or "")
 
     return {
         "store": "lidl",
-        "id": item.get("productId"),
+        "id": str(product_id),
         "name": name,
         "price": price,
         "quantity": quantity,
         "unit": unit,
-        "description": keyfacts.get("description") or "",
+        "description": description,
         "bio": "bio" in name.casefold(),
-        "priceHistory": [
-            {
-                "date": datetime.now(timezone.utc).date().isoformat(),
-                "price": price,
-            }
-        ],
+        "priceHistory": [{
+            "date": datetime.now(timezone.utc).date().isoformat(),
+            "price": price,
+        }],
+        "unitPriceFromSource": unit_price,
+        "category": category,
+        "productUrl": data.get("canonicalPath") or data.get("canonicalUrl"),
     }
-
 
 def stable_id(item):
     material = "|".join([
