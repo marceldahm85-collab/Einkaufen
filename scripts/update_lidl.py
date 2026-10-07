@@ -41,6 +41,54 @@ def fetch_json(url, attempts=4):
     raise RuntimeError(f"Rohdaten-Abruf fehlgeschlagen: {last}")
 
 
+def fetch_lidl_direct(attempts=4):
+    url="https://www.lidl.at/p/api/gridboxes/AT/de/?max=32000"
+    headers={"Accept":"application/json","User-Agent":"Mozilla/5.0 PreisPilot-Osttirol-GitHubAction/1.0"}
+    last=None
+    for attempt in range(attempts):
+        try:
+            req=urllib.request.Request(url,headers=headers)
+            with urllib.request.urlopen(req,timeout=90) as response:
+                data=json.load(response)
+            if not isinstance(data,list): raise RuntimeError("Lidl-API liefert kein Array.")
+            return data
+        except Exception as exc:
+            last=exc
+            if attempt+1<attempts: time.sleep(2**attempt)
+    raise RuntimeError(f"Lidl-Direktabruf fehlgeschlagen: {last}")
+
+
+def normalize_lidl_api_item(item):
+    if not isinstance(item,dict): return None
+    price_obj=item.get("price") or {}
+    price=number(price_obj.get("price"))
+    name=((item.get("keyfacts") or {}).get("supplementalDescription") or "")
+    name=(str(name)+" "+str(item.get("fullTitle") or "")).strip()
+    if price is None or not name: return None
+    base=((price_obj.get("basePrice") or {}).get("text") or "").strip().lower().replace(",", ".")
+    quantity=1.0; unit="Stk"
+    if base=="per kg":
+        unit="kg"; quantity=1.0
+    else:
+        text_value=base
+        if text_value.startswith("bei") and "je " in text_value: text_value=text_value[text_value.find("je "):]
+        for prefix in ("ab ","je ","ca. ","z.b.: ","z.b. "): text_value=text_value.replace(prefix,"").strip()
+        m=re.match(r"^([0-9.x ]+)(.*)$",text_value)
+        if m:
+            quantity=1.0
+            for q in m.group(1).split("x"):
+                try: quantity*=float(q.split("/")[0])
+                except ValueError: pass
+            raw_unit=m.group(2).split("/")[0].strip().split(" ")[0]
+            unit=normalize_unit(raw_unit.split("-")[0])
+    return {
+        "store":"lidl","id":item.get("productId"),"name":name,
+        "price":price,"quantity":quantity,"unit":unit,
+        "description":((item.get("keyfacts") or {}).get("description") or ""),
+        "bio":"bio" in name.casefold(),
+        "priceHistory":[{"date":datetime.now(timezone.utc).date().isoformat(),"price":price}]
+    }
+
 def stable_id(item):
     material="|".join([str(item.get("store") or ""),str(item.get("name") or ""),str(item.get("quantity") or ""),str(item.get("unit") or ""),str(item.get("description") or "")])
     return "hp-"+hashlib.sha256(material.encode()).hexdigest()[:20]
@@ -114,6 +162,9 @@ def main():
     raw=fetch_json(SOURCE_URL)
     if not isinstance(raw,list): raise RuntimeError("Heisse-Preise-Datenformat unerwartet.")
     products=[p for item in raw if (p:=normalize_item(item))]
+    if len(products)<MIN_EXPECTED_PRODUCTS:
+        direct=fetch_lidl_direct()
+        products=[p for item in direct if (p:=normalize_item(normalize_lidl_api_item(item) or {}))]
     if len(products)<MIN_EXPECTED_PRODUCTS:
         store_counts={}
         for item in raw:
