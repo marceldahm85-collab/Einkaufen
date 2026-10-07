@@ -108,8 +108,8 @@ def _parse_lidl_base_price(text):
         return None, None
 
     match = re.search(
-        r"\\(1\\s+(kg(?:\\s+Abtr\\.\\s*G\\.)?|l|Stk\\.?|100\\s*(?:g|ml))"
-        r"\\s*=\\s*([\\d.,]+)\\)",
+        r"\(1\s+(kg(?:\s+Abtr\.\s*G\.)?|l|Stk\.?|100\s*(?:g|ml))"
+        r"\s*=\s*([\d.,]+)\)",
         text,
         flags=re.IGNORECASE,
     )
@@ -127,7 +127,7 @@ def _parse_lidl_base_price(text):
                 return value, "100g"
             return value, "Stk"
 
-    match = re.search(r"(?:Je|je)\\s+(kg|l|Stk\\.?)", text)
+    match = re.search(r"(?:Je|je)\s+(kg|l|Stk\.?)", text)
     if match:
         return None, normalize_unit(match.group(1))
 
