@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-29T06:27:52Z",
+  "updatedAt": "2026-10-07T12:38:10Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -9,11 +9,11 @@
       "error": null,
       "provider": "heisse-preise.io",
       "promotions": {
-        "status": "ok",
+        "status": "stale",
         "verifiedCount": 728,
-        "pagesChecked": 28,
-        "updatedAt": "2026-09-29T06:25:15Z",
-        "error": null,
+        "pagesChecked": 2,
+        "updatedAt": "2026-10-07T12:36:09Z",
+        "error": "Zu wenige eindeutig erkannte Aktionen (0). Grundpreise bleiben unverändert.",
         "source": "mpreis.at"
       }
     },
@@ -27,7 +27,7 @@
         "status": "ok",
         "verifiedCount": 460,
         "rawProductsScanned": 22364,
-        "updatedAt": "2026-09-29T06:26:34Z",
+        "updatedAt": "2026-10-07T12:36:48Z",
         "error": null,
         "source": "spar.at / FactFinder",
         "breakdown": {
@@ -48,32 +48,28 @@
         "status": "ok",
         "productCount": 53,
         "linkableCount": 23,
-        "updatedAt": "2026-09-29T06:28:07Z",
+        "updatedAt": "2026-10-07T12:38:22Z",
         "error": null,
         "source": "T&G Osttirol Flugblatt"
       }
     },
     "billa": {
       "status": "ok",
-      "productCount": 19793,
+      "productCount": 19807,
       "stale": false,
       "error": null,
       "provider": "heisse-preise.io",
       "promotionStale": false,
       "promotionSource": "https://shop.billa.at/aktionen",
-      "promotionCount": 333,
+      "promotionCount": 313,
       "promotionError": null
     },
     "hofer": {
       "status": "ok",
-      "productCount": 1080,
+      "productCount": 6520,
       "stale": false,
       "error": null,
-      "provider": "hofer.at",
-      "promotionStale": false,
-      "promotionSource": "https://www.hofer.at/angebote, https://www.hofer.at/produkte",
-      "promotionCount": 28,
-      "promotionError": null
+      "provider": "heisse-preise.io"
     }
   }
 }
