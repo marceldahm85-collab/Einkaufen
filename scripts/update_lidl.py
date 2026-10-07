@@ -351,7 +351,7 @@ def main():
         products = [
             p
             for item in direct
-            if (p := normalize_item(normalize_lidl_api_item(item) or {}))
+            if (p := normalize_item(item))
         ]
 
     if len(products) < MIN_EXPECTED_PRODUCTS:
