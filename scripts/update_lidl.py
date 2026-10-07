@@ -83,8 +83,13 @@ def normalize_history(raw,current):
     return out[-250:]
 
 
+def is_lidl_store(value):
+    key = "".join(ch for ch in str(value or "").casefold() if ch.isalnum())
+    return key in {"lidl", "lidlat", "lidlosterreich", "lidlösterreich"} or key.startswith("lidl")
+
+
 def normalize_item(item):
-    if str(item.get("store") or "").lower()!="lidl": return None
+    if not is_lidl_store(item.get("store")): return None
     name=str(item.get("name") or "").strip(); price=number(item.get("price"))
     if not name or price is None: return None
     quantity=number(item.get("quantity"))
@@ -109,7 +114,15 @@ def main():
     raw=fetch_json(SOURCE_URL)
     if not isinstance(raw,list): raise RuntimeError("Heisse-Preise-Datenformat unerwartet.")
     products=[p for item in raw if (p:=normalize_item(item))]
-    if len(products)<MIN_EXPECTED_PRODUCTS: raise RuntimeError(f"Lidl-Datenbestand zu klein: {len(products)}")
+    if len(products)<MIN_EXPECTED_PRODUCTS:
+        store_counts={}
+        for item in raw:
+            if isinstance(item,dict):
+                key=str(item.get("store") or "").strip()
+                if key:
+                    store_counts[key]=store_counts.get(key,0)+1
+        top=", ".join(f"{key}={count}" for key,count in sorted(store_counts.items(), key=lambda x:x[1], reverse=True)[:20])
+        raise RuntimeError(f"Lidl-Datenbestand zu klein: {len(products)}. Erkannte Store-Werte: {top}")
     payload={
       "store":"lidl","region":"Österreich","scope":"Österreich","source":SOURCE_URL,
       "updatedAt":now_iso(),"productCount":len(products),"promotionCount":0,"promotionUpdatedAt":None,
