@@ -124,6 +124,43 @@ def parse(anchor,href):
     if not name: return None
     return {"id":product_id(href),"url":href,"name":name,"salePrice":round(sale,2),"regularPrice":round(regular,2) if regular is not None else None,"amount":amount,"unit":unit,"promotion":promo,"validFrom":start.isoformat(),"validUntil":end.isoformat()}
 
+def parse_grid_offers(html_text, page_url):
+    """Liest aktuelle Lidl-Angebote aus eingebettetem data-grid-data-JSON."""
+    offers=[]; seen=set()
+    for blob in re.findall(r'data-grid-data="([^\"]+)"', html_text):
+        try: rec=json.loads(html.unescape(blob))
+        except json.JSONDecodeError: continue
+        if not isinstance(rec,dict): continue
+        pid=rec.get("productId"); name=norm(rec.get("fullTitle") or rec.get("title") or "")
+        if not pid or not name: continue
+        price=rec.get("price") or {}; loyalty=False
+        if num(price.get("price")) is None:
+            plus=rec.get("lidlPlus") or []
+            if plus and isinstance(plus[0],dict):
+                pp=plus[0].get("price") or {}
+                if num(pp.get("price")) is not None: price=pp; loyalty=True
+        sale=num(price.get("price"))
+        if sale is None: continue
+        regular=num(price.get("oldPrice")); disc=price.get("discount") or {}
+        if regular is None: regular=num(disc.get("deletedPrice"))
+        def as_date(v):
+            try:
+                ts=int(v); ts=ts//1000 if ts>10_000_000_000 else ts
+                return datetime.fromtimestamp(ts,tz=ZoneInfo("Europe/Vienna")).date().isoformat()
+            except (TypeError,ValueError,OSError): return None
+        vf,vu=as_date(rec.get("storeStartDate")),as_date(rec.get("storeEndDate"))
+        if vf and vu and not (date.fromisoformat(vf)<=today()<=date.fromisoformat(vu)): continue
+        key=str(pid)
+        if key in seen: continue
+        seen.add(key)
+        promo={"type":"price_drop","label":"Lidl Plus" if loyalty else "Lidl Aktion","officialLabel":"Lidl Plus" if loyalty else "Lidl Aktion","verified":True,"source":page_url,"loyaltyRequired":loyalty,"loyaltyProgram":"Lidl Plus" if loyalty else None}
+        pct=disc.get("percentageDiscount")
+        if pct: promo["discountPercent"]=int(pct)
+        url=rec.get("canonicalUrl") or rec.get("canonicalPath") or page_url
+        if isinstance(url,str) and url.startswith("/"): url=urljoin(page_url,url)
+        offers.append({"id":key,"url":url,"name":name,"salePrice":round(sale,2),"regularPrice":round(regular,2) if regular is not None else None,"amount":None,"unit":None,"promotion":promo,"validFrom":vf or today().isoformat(),"validUntil":vu or today().isoformat()})
+    return offers
+
 def idset(v):
     s=str(v or "").strip(); d=re.sub(r"\D+","",s)
     return {s.casefold(),d,d.lstrip("0") or "0"} if s else set()
@@ -145,17 +182,15 @@ def main():
     products=payload.get("products") or []
     if len(products)<MIN_PRODUCTS: raise SystemExit("Lidl-Grundbestand fehlt oder ist unplausibel klein.")
     try:
-        parser=Parser(); parser.feed(fetch(ACTION_URL)); parser.close()
+        offer_pages=["/c/jetzt-noch-mehr-sparen-mit-lidl-plus/a10103873"]
         actions=[]; seen=set()
-        for a in walk(parser.root):
-            if a.tag.lower()!="a": continue
-            href=urljoin(ACTION_URL,html.unescape(str(a.attrs.get("href") or "").strip())).split("?",1)[0]
-            if "lidl.at" not in urlparse(href).netloc or not ("/p/" in urlparse(href).path.lower() or "/c/" not in urlparse(href).path.lower()): continue
-            item=parse(a,href)
-            if not item: continue
-            key=item.get("id") or nname(item["name"])
-            if key in seen: continue
-            seen.add(key); actions.append(item)
+        for path in offer_pages:
+            page_url=urljoin(ACTION_URL,path)
+            page=fetch(page_url)
+            for item in parse_grid_offers(page,page_url):
+                key=item.get("id") or nname(item["name"])
+                if key in seen: continue
+                seen.add(key); actions.append(item)
         if len(actions)<MIN_ACTIONS: raise RuntimeError(f"Unplausibel wenige Lidl-Aktionen erkannt: {len(actions)}")
         clear(products); matched=0; appended=0
         for a in actions:
