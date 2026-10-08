@@ -359,11 +359,12 @@ jobs:
             echo "Arbeitsbaum vor dem Rebase:"
             git status --short
 
-            # Ein paralleler/automatischer Schritt kann neben dem bereits
-            # committeten Daten-Commit noch lokale Änderungen hinterlassen.
-            # --autostash sichert solche Änderungen für die Dauer des Rebase,
-            # sodass ein transienter Dirty-Tree den Push nicht mehr blockiert.
-            git rebase --autostash origin/main
+            # Die Dateien unter data/ sind vollständig generierte Artefakte.
+            # Bei einem zwischenzeitlichen Update von main dürfen sie deshalb
+            # nicht zeilenweise zusammengeführt werden: Der gerade ausgeführte
+            # Import enthält den vollständigen, konsistenten Datenstand.
+            # "theirs" bezieht sich beim Rebase auf genau diesen Daten-Commit.
+            git rebase --autostash -X theirs origin/main
           done
 
       - name: GitHub Pages konfigurieren
