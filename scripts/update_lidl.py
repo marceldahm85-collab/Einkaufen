@@ -181,6 +181,10 @@ def normalize_lidl_search_item(item):
     # Die von Lidl gelieferte Einheitspreis-Angabe ist bereits auf die
     # jeweilige Basiseinheit normiert; sie hat Vorrang vor einer eigenen
     # Berechnung, sofern vorhanden.
+    if unit_price is not None and unit in {"kg", "l"} and price > 0:
+        quantity = price / unit_price
+    elif unit_price is not None and unit == "Stk" and price > 0:
+        quantity = price / unit_price
     description = str((data.get("keyfacts") or {}).get("description") or "").strip()
     category = ""
     breadcrumbs = (gridbox.get("meta") or {}).get("wonCategoryBreadcrumbs") or []
@@ -333,7 +337,7 @@ def normalize_item(item):
         "unitPriceUnit": base_unit(unit),
         "weighted": bool(item.get("isWeighted", False)),
         "bio": bool(item.get("bio", False)),
-        "source": "heisse-preise.io (Lidl)",
+        "source": "lidl.at (Lidl Such-API)",
         "history": normalize_history(item.get("priceHistory"), price),
     }
 
@@ -380,7 +384,7 @@ def main():
         "store": "lidl",
         "region": "Österreich",
         "scope": "Österreich",
-        "source": SOURCE_URL,
+        "source": "https://www.lidl.at/q/api/search",
         "updatedAt": now_iso(),
         "productCount": len(products),
         "promotionCount": 0,
