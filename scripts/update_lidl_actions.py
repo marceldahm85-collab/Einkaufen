@@ -127,7 +127,7 @@ def parse(anchor,href):
 def parse_grid_offers(html_text, page_url):
     """Liest aktuelle Lidl-Angebote aus eingebettetem data-grid-data-JSON."""
     offers=[]; seen=set()
-    for m in re.finditer(r'data-grid-data\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')', html_text, re.I):
+    for m in re.finditer(r'data-grid-data\s*=\s*(?:"([^"]*)"|\'([^\']*)\')', html_text, re.I):
         blob = m.group(1) or m.group(2)
         try: rec=json.loads(html.unescape(blob))
         except json.JSONDecodeError: continue
