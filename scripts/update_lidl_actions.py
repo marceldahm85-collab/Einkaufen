@@ -127,7 +127,8 @@ def parse(anchor,href):
 def parse_grid_offers(html_text, page_url):
     """Liest aktuelle Lidl-Angebote aus eingebettetem data-grid-data-JSON."""
     offers=[]; seen=set()
-    for blob in re.findall(r'data-grid-data="([^\"]+)"', html_text):
+    for m in re.finditer(r'data-grid-data\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')', html_text, re.I):
+        blob = m.group(1) or m.group(2)
         try: rec=json.loads(html.unescape(blob))
         except json.JSONDecodeError: continue
         if not isinstance(rec,dict): continue
@@ -202,7 +203,7 @@ def main():
             else: matched+=1
             p["salePrice"]=a["salePrice"]; p["regularPrice"]=a.get("regularPrice") or p.get("regularPrice")
             p["promotion"]=a["promotion"]; p["promotionVerified"]=True; p["promotionObservedAt"]=now()
-            p["validFrom"]=a["validFrom"]; p["validUntil"]=a["validUntil"]; p["promotionSource"]=ACTION_URL; p["promotionProductUrl"]=a["url"]
+            p["validFrom"]=a["validFrom"]; p["validUntil"]=a["validUntil"]; p["promotionSource"]=a["promotion"].get("source") or ACTION_URL; p["promotionProductUrl"]=a["url"]
             if a.get("amount") and a.get("unit"):
                 p["amount"]=a["amount"]; p["unit"]=a["unit"]; p["packageAmount"]=a["amount"]; p["packageUnit"]=a["unit"]; p["packageAmountKnown"]=True; p["optimizerEligible"]=True
             elif p.get("amount") and p.get("unit"):
