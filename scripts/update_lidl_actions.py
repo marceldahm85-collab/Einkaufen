@@ -182,7 +182,7 @@ def main():
     products=payload.get("products") or []
     if len(products)<MIN_PRODUCTS: raise SystemExit("Lidl-Grundbestand fehlt oder ist unplausibel klein.")
     try:
-        offer_pages=["/c/jetzt-noch-mehr-sparen-mit-lidl-plus/a10103873"]
+        offer_pages=["/c/jetzt-noch-mehr-sparen-mit-lidl-plus/"]
         actions=[]; seen=set()
         for path in offer_pages:
             page_url=urljoin(ACTION_URL,path)
