@@ -1800,3 +1800,40 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
 .lidl-live-card { position: relative; overflow: hidden; }
 .lidl-live-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #0050aa; }
 .lidl-live-btn { color: #0050aa; border-color: color-mix(in srgb, #0050aa 50%, transparent); }
+
+
+/* Barcode scanner */
+.barcode-open-btn {
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 24%, var(--line));
+  background: color-mix(in srgb, var(--accent-blue) 10%, var(--surface-2));
+}
+.barcode-camera-wrap {
+  position: relative; display: grid; place-items: center; overflow: hidden;
+  width: 100%; aspect-ratio: 4 / 3; max-height: 34dvh; border-radius: 18px; background: #111;
+}
+.barcode-camera-wrap video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.barcode-scan-frame {
+  position: absolute; width: 78%; height: 36%; border: 2px solid rgba(255,255,255,.92);
+  border-radius: 12px; box-shadow: 0 0 0 999px rgba(0,0,0,.16); pointer-events: none;
+}
+.barcode-state { margin: 10px 0; min-height: 18px; }
+.barcode-manual-form { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.barcode-lookup-result { display: grid; gap: 10px; margin-top: 14px; padding-bottom: 12px; }
+.barcode-product-card {
+  display: flex; align-items: center; gap: 12px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 15px; background: var(--surface-2);
+}
+.barcode-product-card img { width: 64px; height: 64px; object-fit: contain; flex: 0 0 auto; border-radius: 10px; background: #fff; }
+.barcode-product-card strong { display: block; font-size: 14px; line-height: 1.35; }
+.barcode-candidate-title { font-size: 12px; font-weight: 800; margin-top: 2px; }
+.barcode-candidate {
+  width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 11px 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface);
+  text-align: left; cursor: pointer;
+}
+.barcode-candidate span:first-child { min-width: 0; }
+.barcode-candidate strong, .barcode-candidate small { display: block; }
+.barcode-candidate strong { font-size: 12px; }
+.barcode-candidate small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.barcode-candidate span:last-child { flex: 0 0 auto; color: var(--accent-blue); font-size: 11px; font-weight: 800; }
+.barcode-disclaimer { margin: 0; }
