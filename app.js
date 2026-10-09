@@ -4765,6 +4765,7 @@
       id,
       name: formData.name,
       brand: formData.brand || "",
+      barcode: normalizeBarcode(formData.barcode || ""),
       category: formData.category,
       amount: Number(formData.amount),
       unit: formData.unit,
@@ -4831,6 +4832,7 @@
     $("#editProductTitle").textContent = product.name;
     $("#editProductName").value = product.name || "";
     $("#editProductBrand").value = product.brand || "";
+    $("#editProductBarcode").value = product.barcode || "";
     $("#editProductCategory").value = product.category || "Sonstiges";
     $("#editProductAmount").value = Number(product.amount) || 1;
     $("#editProductUnit").value = normalizeMeasureUnit(product.unit) || "Stk";
@@ -4871,6 +4873,7 @@
     // ID, liveLinks, offers, history, favorite and shopping references stay intact.
     product.name = name;
     product.brand = brand;
+    product.barcode = normalizeBarcode(values.barcode ?? product.barcode ?? "");
     product.category = category;
     product.amount = cleanComparisonAmount(amount, unit);
     product.unit = unit;
@@ -4902,6 +4905,7 @@
     const ok = updateProductCore(product, {
       name: $("#editProductName").value,
       brand: $("#editProductBrand").value,
+      barcode: $("#editProductBarcode").value,
       category: $("#editProductCategory").value,
       amount: $("#editProductAmount").value,
       unit: $("#editProductUnit").value
@@ -5328,6 +5332,7 @@
     addDatabaseProduct({
       name: $("#newProductName").value.trim(),
       brand: $("#newProductBrand").value.trim(),
+      barcode: $("#newProductBarcode").value.trim(),
       category: $("#newProductCategory").value,
       amount: $("#newProductAmount").value,
       unit: $("#newProductUnit").value,
