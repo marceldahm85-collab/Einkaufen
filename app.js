@@ -5075,7 +5075,8 @@
     // ID, liveLinks, offers, history, favorite and shopping references stay intact.
     product.name = name;
     product.brand = brand;
-    product.barcode = normalizeBarcode(values.barcode ?? product.barcode ?? "");
+    const barcodeValue = String(values.barcode ?? product.barcode ?? "").replace(/\D/g, "");
+    product.barcode = barcodeValue.length >= 8 && barcodeValue.length <= 14 ? barcodeValue : "";
     product.category = category;
     product.amount = cleanComparisonAmount(amount, unit);
     product.unit = unit;
