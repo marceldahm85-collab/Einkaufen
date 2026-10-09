@@ -174,6 +174,18 @@
       .trim();
   }
 
+  function normalizeBarcode(value) {
+    const digits = String(value || "").replace(/\D/g, "");
+    return digits.length >= 8 && digits.length <= 14 ? digits : "";
+  }
+
+  function barcodeForItem(entry) {
+    const item = entry?.item || entry || {};
+    return normalizeBarcode(
+      item.barcode ?? item.ean ?? item.ean13 ?? item.gtin ?? item.gtin13
+    );
+  }
+
   function padded(value) {
     return ` ${normalize(value)} `;
   }
