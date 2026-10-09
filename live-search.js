@@ -497,6 +497,7 @@
     return {
       query,
       normalizedQuery,
+      barcode: normalizeBarcode(product?.barcode),
       categoryIds,
       requiredAny,
       requiredBrand: stored.requiredBrand != null
@@ -516,6 +517,14 @@
     const p = profile || {};
     const nameHay = entry?.name || "";
     const categories = Array.isArray(entry?.categories) ? entry.categories : [];
+
+    // An exact EAN/GTIN match is stronger evidence than name/category heuristics.
+    // Retailer feeds without barcode data continue through the existing matcher.
+    const requestedBarcode = normalizeBarcode(p.barcode);
+    const candidateBarcode = barcodeForItem(entry);
+    if (requestedBarcode && candidateBarcode && requestedBarcode === candidateBarcode) {
+      return { matched: true, score: -100, reason: "barcode" };
+    }
 
     if (Array.isArray(p.categoryIds) && p.categoryIds.length) {
       if (!p.categoryIds.some(id => categories.includes(id))) {
