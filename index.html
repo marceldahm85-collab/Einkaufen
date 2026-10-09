@@ -25,6 +25,7 @@
           </div>
           <div class="hero-actions">
             <button class="pill-btn accent" data-action="open-add-shopping">＋ Artikel</button>
+            <button class="pill-btn barcode-open-btn" data-action="open-barcode-scanner" type="button">▦ Barcode scannen</button>
             <button class="pill-btn" id="clearShoppingBtn">Liste leeren</button>
           </div>
         </div>
@@ -507,6 +508,11 @@
       </label>
 
       <label>
+        Barcode / EAN
+        <input id="editProductBarcode" type="text" inputmode="numeric" autocomplete="off" placeholder="optional">
+      </label>
+
+      <label>
         Kategorie
         <select id="editProductCategory" required></select>
       </label>
@@ -656,6 +662,10 @@
       <label>
         Marke
         <input id="newProductBrand" type="text" placeholder="optional">
+      </label>
+      <label>
+        Barcode / EAN
+        <input id="newProductBarcode" type="text" inputmode="numeric" autocomplete="off" placeholder="optional">
       </label>
       <label>
         Kategorie
@@ -877,6 +887,28 @@
 
     <div id="catalogPersonalState" class="muted small live-search-state"></div>
     <div id="catalogPersonalResults" class="stack catalog-personal-results"></div>
+  </section>
+
+  <section class="bottom-sheet barcode-sheet" id="barcodeScannerSheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div><div class="eyebrow">ARTIKEL ERKENNEN</div><h2>Barcode scannen</h2></div>
+      <button class="icon-btn" data-action="close-sheets" type="button" aria-label="Scanner schließen">✕</button>
+    </div>
+    <p class="muted small barcode-help">Richte die Kamera auf den EAN-Code. Der Code wird mit Open Food Facts abgeglichen. Für die Kamera muss die App über HTTPS geöffnet sein.</p>
+    <div class="barcode-camera-wrap" id="barcodeCameraWrap">
+      <video id="barcodeVideo" playsinline muted aria-label="Kamerabild zum Scannen"></video>
+      <div class="barcode-scan-frame" aria-hidden="true"></div>
+    </div>
+    <div class="barcode-state muted small" id="barcodeScannerState" role="status" aria-live="polite">Kamera wird vorbereitet …</div>
+    <button class="secondary-btn full" id="barcodeRetryCameraBtn" type="button">Kamera erneut starten</button>
+    <form id="barcodeManualForm" class="form-grid barcode-manual-form">
+      <label>Barcode manuell eingeben
+        <input id="barcodeManualInput" type="text" inputmode="numeric" autocomplete="off" placeholder="EAN-8, EAN-13 oder UPC" pattern="[0-9]{8,14}" required>
+      </label>
+      <button class="primary-btn full" type="submit">Code suchen</button>
+    </form>
+    <div id="barcodeLookupResult" class="barcode-lookup-result"></div>
   </section>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
