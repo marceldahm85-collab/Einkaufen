@@ -4819,8 +4819,37 @@
     if (brand) result += '<div class="muted small">' + escapeHtml(brand) + '</div>';
     if (product.quantity) result += '<div class="muted small">' + escapeHtml(product.quantity) + '</div>';
     result += '<div class="muted small">EAN: ' + escapeHtml(code) + '</div></div></div>';
+    const tokens = String(title).toLocaleLowerCase("de").split(/[^\\p{L}\\p{N}]+/u).filter(token => token.length > 2);
+    const candidates = state.products.map(item => {
+      const haystack = (item.name + " " + (item.brand || "")).toLocaleLowerCase("de");
+      return { item, score: tokens.filter(token => haystack.includes(token)).length };
+    }).filter(row => row.score > 0).sort((a,b) => b.score - a.score).slice(0,5);
+    if (candidates.length) {
+      result += '<div class="barcode-candidate-title">Passt möglicherweise zu einem vorhandenen Artikel</div><div class="stack">';
+      result += candidates.map(row => '<button type="button" class="barcode-candidate" data-barcode-link="' + escapeAttr(row.item.id) + '"><span><strong>' +
+        escapeHtml(row.item.name) + '</strong><small>' + escapeHtml(row.item.brand || row.item.category) +
+        '</small></span><span>Verknüpfen</span></button>').join("");
+      result += '</div>';
+    }
     result += '<button class="primary-btn full" type="button" data-barcode-create>Als neuen Artikel übernehmen</button>';
     target.innerHTML = result;
+  }
+
+  function linkBarcodeToProduct(productId) {
+    const product = productById(productId);
+    const scan = scannedBarcodeProduct;
+    if (!product || !scan || !scan.code) return;
+    const conflict = state.products.find(item => item.id !== product.id && normalizeBarcode(item.barcode) === scan.code);
+    if (conflict) {
+      showToast('Barcode ist bereits mit "' + conflict.name + '" verknüpft');
+      return;
+    }
+    product.barcode = scan.code;
+    saveState();
+    renderAll();
+    showToast('Barcode mit "' + product.name + '" verknüpft');
+    renderProductDetail(product.id);
+    openSheet("productDetailSheet");
   }
 
   function createProductFromBarcode() {
@@ -5212,6 +5241,8 @@
     if (openScanner) return openBarcodeScanner();
     const barcodeCreate = e.target.closest("[data-barcode-create]");
     if (barcodeCreate) return createProductFromBarcode();
+    const barcodeLink = e.target.closest("[data-barcode-link]");
+    if (barcodeLink) return linkBarcodeToProduct(barcodeLink.dataset.barcodeLink);
 
     const close = e.target.closest('[data-action="close-sheets"]');
     if (close) return closeSheets();
