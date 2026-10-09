@@ -25,6 +25,26 @@ assert(rows.find(r => r.item.name === "Lavazza").searchHay.includes("kaffee"));
 assert(rows.find(r => r.item.name === "Barilla").searchHay.includes("nudeln"));
 assert(rows.find(r => r.item.name === "Vöslauer").searchHay.includes("wasser"));
 
+const barcodeRows = api.buildIndex([
+  { name: "Gösser Märzen", description: "0,5 l", barcode: "9001234567890" },
+  { name: "Barilla Spaghetti", description: "500 g", barcode: "8001234567897" }
+]);
+const barcodeProfile = api.profileForProduct({
+  name: "Unbekanntes Produkt",
+  brand: "verschiedene",
+  barcode: "9 001234567890",
+  matchingProfile: { query: "Unbekanntes Produkt" }
+});
+assert.strictEqual(barcodeProfile.barcode, "9001234567890");
+assert.strictEqual(
+  api.matchProfile(barcodeRows.find(row => row.item.name === "Gösser Märzen"), barcodeProfile).reason,
+  "barcode"
+);
+assert.strictEqual(
+  api.matchProfile(barcodeRows.find(row => row.item.name === "Barilla Spaghetti"), barcodeProfile).matched,
+  false
+);
+
 const safetyItems = [
   { name: "Gösser Märzen", description: "20 x 0,5 l" },
   { name: "Gösser Radler", description: "6 x 0,5 l" },
