@@ -4819,7 +4819,7 @@
     if (brand) result += '<div class="muted small">' + escapeHtml(brand) + '</div>';
     if (product.quantity) result += '<div class="muted small">' + escapeHtml(product.quantity) + '</div>';
     result += '<div class="muted small">EAN: ' + escapeHtml(code) + '</div></div></div>';
-    const tokens = String(title).toLocaleLowerCase("de").split(/[^\\p{L}\\p{N}]+/u).filter(token => token.length > 2);
+    const tokens = String(title).toLocaleLowerCase("de").split(/[^\p{L}\p{N}]+/u).filter(token => token.length > 2);
     const candidates = state.products.map(item => {
       const haystack = (item.name + " " + (item.brand || "")).toLocaleLowerCase("de");
       return { item, score: tokens.filter(token => haystack.includes(token)).length };
