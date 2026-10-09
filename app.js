@@ -4867,7 +4867,7 @@
 
   function closeSheets() {
     stopBarcodeScanner();
-    $(".bottom-sheet").forEach(s => {
+    $$(".bottom-sheet").forEach(s => {
       s.classList.remove("is-open");
       s.setAttribute("aria-hidden", "true");
     });
