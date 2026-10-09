@@ -4683,6 +4683,178 @@
     if ($("#editProductCategory")) $("#editProductCategory").innerHTML = categoryOptions;
   }
 
+  let barcodeStream = null;
+  let barcodeAnimationFrame = null;
+  let barcodeDetector = null;
+  let barcodeScanActive = false;
+  let scannedBarcodeProduct = null;
+
+  function normalizeBarcode(value) {
+    const code = String(value || "").replace(/\D/g, "");
+    return code.length >= 8 && code.length <= 14 ? code : "";
+  }
+
+  function stopBarcodeScanner() {
+    barcodeScanActive = false;
+    if (barcodeAnimationFrame !== null) cancelAnimationFrame(barcodeAnimationFrame);
+    barcodeAnimationFrame = null;
+    if (barcodeStream) barcodeStream.getTracks().forEach(track => track.stop());
+    barcodeStream = null;
+    const video = $("#barcodeVideo");
+    if (video) video.srcObject = null;
+  }
+
+  async function openBarcodeScanner() {
+    scannedBarcodeProduct = null;
+    $("#barcodeLookupResult").innerHTML = "";
+    $("#barcodeManualInput").value = "";
+    $("#barcodeScannerState").textContent = "Kamera wird vorbereitet …";
+    openSheet("barcodeScannerSheet");
+    await startBarcodeScanner();
+  }
+
+  async function startBarcodeScanner() {
+    stopBarcodeScanner();
+    const video = $("#barcodeVideo");
+    const stateEl = $("#barcodeScannerState");
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      stateEl.textContent = "Kamerazugriff nicht verfügbar. Gib den Barcode unten manuell ein.";
+      return;
+    }
+    if (!window.isSecureContext) {
+      stateEl.textContent = "Die Kamera benötigt HTTPS. Gib den Barcode unten manuell ein.";
+      return;
+    }
+    if (!("BarcodeDetector" in window)) {
+      stateEl.textContent = "Dieser Browser unterstützt keine Barcode-Erkennung. Gib den Code manuell ein.";
+      return;
+    }
+    try {
+      const supported = await BarcodeDetector.getSupportedFormats();
+      const formats = ["ean_13", "ean_8", "upc_a", "upc_e"].filter(format => supported.includes(format));
+      if (!formats.length) {
+        stateEl.textContent = "Keine passende Barcode-Erkennung verfügbar. Bitte den Code manuell eingeben.";
+        return;
+      }
+      barcodeDetector = new BarcodeDetector({ formats });
+      barcodeStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      video.srcObject = barcodeStream;
+      await video.play();
+      barcodeScanActive = true;
+      stateEl.textContent = "Kamera aktiv – Barcode in den Rahmen halten.";
+      const scanFrame = async () => {
+        if (!barcodeScanActive) return;
+        try {
+          if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            const codes = await barcodeDetector.detect(video);
+            const code = codes.map(item => normalizeBarcode(item.rawValue)).find(Boolean);
+            if (code) {
+              stopBarcodeScanner();
+              $("#barcodeManualInput").value = code;
+              await lookupBarcode(code);
+              return;
+            }
+          }
+        } catch {}
+        if (barcodeScanActive) barcodeAnimationFrame = requestAnimationFrame(scanFrame);
+      };
+      barcodeAnimationFrame = requestAnimationFrame(scanFrame);
+    } catch (error) {
+      stopBarcodeScanner();
+      stateEl.textContent = error && error.name === "NotAllowedError"
+        ? "Kein Kamerazugriff erlaubt. Erlaube die Kamera oder gib den Barcode manuell ein."
+        : "Kamera konnte nicht gestartet werden. Gib den Barcode manuell ein.";
+    }
+  }
+
+  async function lookupBarcode(rawCode) {
+    const code = normalizeBarcode(rawCode);
+    if (!code) {
+      $("#barcodeScannerState").textContent = "Bitte einen gültigen Barcode mit 8 bis 14 Ziffern eingeben.";
+      return;
+    }
+    stopBarcodeScanner();
+    const existing = state.products.find(product => normalizeBarcode(product.barcode) === code);
+    if (existing) {
+      renderProductDetail(existing.id);
+      openSheet("productDetailSheet");
+      return;
+    }
+    $("#barcodeScannerState").textContent = "Barcode " + code + " erkannt – Produkt wird gesucht …";
+    $("#barcodeLookupResult").innerHTML = "";
+    try {
+      const response = await fetch("https://world.openfoodfacts.org/api/v2/product/" + encodeURIComponent(code) +
+        ".json?fields=code,product_name,product_name_de,brands,quantity,categories_tags,image_front_small_url", {
+          headers: { "Accept": "application/json" }
+        });
+      if (!response.ok) throw new Error("lookup_failed");
+      const data = await response.json();
+      const product = data && data.status === 1 && data.product ? data.product : null;
+      scannedBarcodeProduct = { code, product };
+      renderBarcodeLookup(code, product, "");
+      $("#barcodeScannerState").textContent = product ? "Produkt gefunden." : "Kein Produkt gefunden – du kannst es selbst anlegen.";
+    } catch {
+      scannedBarcodeProduct = { code, product: null };
+      renderBarcodeLookup(code, null, "Produktdatenbank nicht erreichbar. Du kannst den Artikel trotzdem anlegen.");
+      $("#barcodeScannerState").textContent = "Produktdatenbank nicht erreichbar.";
+    }
+  }
+
+  function renderBarcodeLookup(code, product, message) {
+    const target = $("#barcodeLookupResult");
+    if (!product) {
+      target.innerHTML = '<div class="info-box"><strong>Barcode ' + escapeHtml(code) + '</strong><p class="muted small">' +
+        escapeHtml(message || "Kein Produkt gefunden. Du kannst es trotzdem als eigenen Artikel anlegen.") +
+        '</p><button class="primary-btn full" type="button" data-barcode-create>Artikel mit diesem Barcode anlegen</button></div>';
+      return;
+    }
+    const title = product.product_name_de || product.product_name || "";
+    const brand = product.brands || "";
+    let result = '<div class="barcode-product-card">';
+    if (product.image_front_small_url) result += '<img src="' + escapeAttr(product.image_front_small_url) + '" alt="" loading="lazy">';
+    result += '<div><strong>' + escapeHtml(title || "Unbekannter Artikel") + '</strong>';
+    if (brand) result += '<div class="muted small">' + escapeHtml(brand) + '</div>';
+    if (product.quantity) result += '<div class="muted small">' + escapeHtml(product.quantity) + '</div>';
+    result += '<div class="muted small">EAN: ' + escapeHtml(code) + '</div></div></div>';
+    result += '<button class="primary-btn full" type="button" data-barcode-create>Als neuen Artikel übernehmen</button>';
+    target.innerHTML = result;
+  }
+
+  function createProductFromBarcode() {
+    if (!scannedBarcodeProduct || !scannedBarcodeProduct.code) return;
+    const scan = scannedBarcodeProduct;
+    const data = scan.product || {};
+    const name = String(data.product_name_de || data.product_name || "").trim() || ("Artikel " + scan.code);
+    const brand = String(data.brands || "").split(",")[0].trim();
+    const quantity = String(data.quantity || "");
+    const match = quantity.replace(",", ".").match(/(\d+(?:\.\d+)?)\s*(kg|g|l|ml|stk|stück|stueck)\b/i);
+    const unit = match ? (["kg","g","l","ml"].includes(match[2].toLowerCase()) ? match[2].toLowerCase() : "Stk") : "Stk";
+    const amount = match ? Number(match[1]) : 1;
+    const text = (name + " " + (data.categories_tags || []).join(" ")).toLowerCase();
+    let category = "Sonstiges";
+    if (/milch|käse|kaese|joghurt|butter|rahm/.test(text)) category = "Milchprodukte";
+    else if (/obst|gemüse|gemuese|apfel|banane|tomate/.test(text)) category = "Obst & Gemüse";
+    else if (/wasser|saft|cola|bier|getränk|getraenk|kaffee|tee/.test(text)) category = "Getränke";
+    else if (/brot|gebäck|gebaeck|semmel|toast/.test(text)) category = "Brot & Gebäck";
+    else if (/fleisch|wurst|schinken|huhn|rind/.test(text)) category = "Fleisch & Wurst";
+    else if (/nudel|reis|mehl|zucker|pasta/.test(text)) category = "Vorrat";
+    closeSheets();
+    openSheet("addProductSheet");
+    $("#newProductName").value = name;
+    $("#newProductBrand").value = brand;
+    $("#newProductBarcode").value = scan.code;
+    $("#newProductCategory").value = category;
+    $("#newProductAmount").value = Number.isFinite(amount) && amount > 0 ? amount : 1;
+    $("#newProductUnit").value = unit;
+    $("#newProductStore").value = "";
+    $("#newProductRegularPrice").value = "";
+    $("#newProductSalePrice").value = "";
+    showToast("Barcode-Daten übernommen – bitte prüfen und speichern");
+  }
+
   function openSheet(id) {
     closeSheets();
     const sheet = document.getElementById(id);
@@ -4694,7 +4866,8 @@
   }
 
   function closeSheets() {
-    $$(".bottom-sheet").forEach(s => {
+    stopBarcodeScanner();
+    $(".bottom-sheet").forEach(s => {
       s.classList.remove("is-open");
       s.setAttribute("aria-hidden", "true");
     });
@@ -5035,6 +5208,11 @@
     const openAdd = e.target.closest('[data-action="open-add-shopping"]');
     if (openAdd) return openAddShopping();
 
+    const openScanner = e.target.closest('[data-action="open-barcode-scanner"]');
+    if (openScanner) return openBarcodeScanner();
+    const barcodeCreate = e.target.closest("[data-barcode-create]");
+    if (barcodeCreate) return createProductFromBarcode();
+
     const close = e.target.closest('[data-action="close-sheets"]');
     if (close) return closeSheets();
 
@@ -5254,6 +5432,12 @@
     e.preventDefault();
     saveEditedProduct();
   });
+
+  $("#barcodeManualForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    lookupBarcode($("#barcodeManualInput").value);
+  });
+  $("#barcodeRetryCameraBtn").addEventListener("click", startBarcodeScanner);
 
   $("#articleSearch").addEventListener("input", renderArticles);
 
