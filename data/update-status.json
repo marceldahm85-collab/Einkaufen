@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-09T06:12:21Z",
+  "updatedAt": "2026-10-09T13:18:10Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -10,9 +10,9 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 748,
-        "pagesChecked": 30,
-        "updatedAt": "2026-10-09T06:10:04Z",
+        "verifiedCount": 428,
+        "pagesChecked": 15,
+        "updatedAt": "2026-10-09T13:15:35Z",
         "error": null,
         "source": "mpreis.at"
       }
@@ -27,7 +27,7 @@
         "status": "ok",
         "verifiedCount": 460,
         "rawProductsScanned": 22364,
-        "updatedAt": "2026-10-09T06:10:51Z",
+        "updatedAt": "2026-10-09T13:16:21Z",
         "error": null,
         "source": "spar.at / FactFinder",
         "breakdown": {
@@ -48,7 +48,7 @@
         "status": "ok",
         "productCount": 63,
         "linkableCount": 25,
-        "updatedAt": "2026-10-09T06:12:35Z",
+        "updatedAt": "2026-10-09T13:18:23Z",
         "error": null,
         "source": "T&G Osttirol Flugblatt"
       }
