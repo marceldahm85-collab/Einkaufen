@@ -277,7 +277,9 @@ main { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
 .status-badge { font-size: 10px; font-weight: 850; padding: 7px 9px; border-radius: 999px; background: var(--surface-2); }
 .status-badge.success { color: var(--success); }
 
+.database-search-wrap { display: grid; gap: 6px; margin: 12px 0 8px; }
 .database-list { display: grid; gap: 7px; }
+.database-empty { padding: 14px 2px; }
 .database-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
 .database-item:first-child { border-top: 0; }
 .database-item strong { font-size: 13px; }
