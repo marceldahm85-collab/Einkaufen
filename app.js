@@ -4521,7 +4521,7 @@
       .trim()
       .toLocaleLowerCase("de-AT")
       .normalize("NFD")
-      .replace(/[\\u0300-\\u036f]/g, "");
+      .replace(/\p{M}/gu, "");
     const databaseProducts = state.products.filter(p => {
       if (!databaseQuery) return true;
       const searchable = [
@@ -4533,7 +4533,7 @@
         p.matchingProfile?.query
       ].filter(Boolean).join(" ").toLocaleLowerCase("de-AT")
         .normalize("NFD")
-        .replace(/[\\u0300-\\u036f]/g, "");
+        .replace(/\p{M}/gu, "");
       return searchable.includes(databaseQuery);
     });
     const countLabel = $("#databaseCountLabel");
