@@ -126,7 +126,7 @@
   let selectedCatalogItem = null;
   const CATALOG_PAGE_SIZE = 50;
   const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa", "hofer", "lidl"];
-  const AUTO_MATCH_ENGINE_VERSION = 5;
+  const AUTO_MATCH_ENGINE_VERSION = 6;
   const AUTO_MATCH_LIMIT_PER_STORE = 40;
   const AUTO_MATCH_SEARCH_LIMIT = 400;
   const AUTO_MATCH_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -2222,6 +2222,18 @@
     };
   }
 
+  function compareAutoMatchCandidates(a, b) {
+    const scoreA = Number.isFinite(Number(a?.candidate?.matchScore))
+      ? Number(a.candidate.matchScore)
+      : Infinity;
+    const scoreB = Number.isFinite(Number(b?.candidate?.matchScore))
+      ? Number(b.candidate.matchScore)
+      : Infinity;
+    return (scoreA - scoreB) ||
+      (a.pricing.lineTotal - b.pricing.lineTotal) ||
+      (a.pricing.effectiveBaseUnitPrice - b.pricing.effectiveBaseUnitPrice);
+  }
+
   async function refreshAutoMatchesForProduct(product, { silent = true } = {}) {
     if (!product) return { updated: 0, errors: [] };
 
@@ -2267,11 +2279,9 @@
           });
         }
 
-        candidates.sort((a, b) =>
-          (a.pricing.lineTotal - b.pricing.lineTotal) ||
-          (a.pricing.effectiveBaseUnitPrice - b.pricing.effectiveBaseUnitPrice) ||
-          (a.candidate.matchScore - b.candidate.matchScore)
-        );
+        // Keep the strongest product matches before truncating the list.
+        // The comparison UI still sorts these retained candidates by price/unit price.
+        candidates.sort(compareAutoMatchCandidates);
 
         nextStores[store] = candidates
           .slice(0, AUTO_MATCH_LIMIT_PER_STORE)
