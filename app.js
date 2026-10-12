@@ -4517,7 +4517,33 @@
   }
 
   function renderMore() {
-    $("#databaseList").innerHTML = state.products.map(p => {
+    const databaseQuery = ($("#databaseSearch")?.value || "")
+      .trim()
+      .toLocaleLowerCase("de-AT")
+      .normalize("NFD")
+      .replace(/[\\u0300-\\u036f]/g, "");
+    const databaseProducts = state.products.filter(p => {
+      if (!databaseQuery) return true;
+      const searchable = [
+        p.name,
+        p.brand,
+        p.category,
+        fmtAmount(p),
+        p.barcode,
+        p.matchingProfile?.query
+      ].filter(Boolean).join(" ").toLocaleLowerCase("de-AT")
+        .normalize("NFD")
+        .replace(/[\\u0300-\\u036f]/g, "");
+      return searchable.includes(databaseQuery);
+    });
+    const countLabel = $("#databaseCountLabel");
+    if (countLabel) {
+      countLabel.textContent = databaseQuery
+        ? `${databaseProducts.length} von ${state.products.length} Artikeln gefunden`
+        : `${state.products.length} Artikel in deiner Datenbank`;
+    }
+
+    $("#databaseList").innerHTML = databaseProducts.map(p => {
       const counts = autoMatchCountsByStore(p);
       const total = autoMatchCount(p);
       const profile = matchingProfile(p);
@@ -5472,6 +5498,7 @@
   $("#barcodeRetryCameraBtn").addEventListener("click", startBarcodeScanner);
 
   $("#articleSearch").addEventListener("input", renderArticles);
+  $("#databaseSearch").addEventListener("input", renderMore);
 
   $("#retailerCatalogSearch").addEventListener("input", () => {
     clearTimeout(catalogSearchTimer);
