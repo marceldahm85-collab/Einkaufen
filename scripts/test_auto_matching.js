@@ -28,7 +28,7 @@ const names = [
   "normalizeMeasureUnit", "normalizeMeasure", "packageMeasureForOffer",
   "promotionDateStatus", "normalizedOffer", "offerPricingForQuantity",
   "promotionCandidatePackageCounts", "offerPricingForTarget", "offerPricingForTargetSortMode",
-  "autoCandidateKey", "matchingProfile", "storedAutoCandidates",
+  "autoCandidateKey", "compareAutoMatchCandidates", "matchingProfile", "storedAutoCandidates",
   "activeAutoCandidates", "baseOffersForProduct", "validOffers",
   "pricedOfferForStore", "cheapestPricedOffer", "rankedAutoOptions"
 ];
@@ -55,7 +55,20 @@ ${names.map(extractFunction).join("\n")}
 this.api = { validOffers, pricedOfferForStore, cheapestPricedOffer, rankedAutoOptions };
 `, context);
 
-const { validOffers, pricedOfferForStore, cheapestPricedOffer, rankedAutoOptions } = context.api;
+const { validOffers, pricedOfferForStore, cheapestPricedOffer, rankedAutoOptions, compareAutoMatchCandidates } = context.api;
+
+const byMatchQuality = [
+  { candidate: { matchScore: 18 }, pricing: { lineTotal: 4, effectiveBaseUnitPrice: 2 } },
+  { candidate: { matchScore: 2 }, pricing: { lineTotal: 9, effectiveBaseUnitPrice: 4.5 } },
+  { candidate: { matchScore: 7 }, pricing: { lineTotal: 3, effectiveBaseUnitPrice: 1.5 } }
+].sort(compareAutoMatchCandidates);
+assert.deepStrictEqual(byMatchQuality.map(row => row.candidate.matchScore), [2, 7, 18]);
+// Price only breaks ties between candidates with the same match score.
+const equalQuality = [
+  { candidate: { matchScore: 3 }, pricing: { lineTotal: 5, effectiveBaseUnitPrice: 2.5 } },
+  { candidate: { matchScore: 3 }, pricing: { lineTotal: 4, effectiveBaseUnitPrice: 2 } }
+].sort(compareAutoMatchCandidates);
+assert.strictEqual(equalQuality[0].pricing.lineTotal, 4);
 const close = (a,b,eps=1e-9) => assert(Math.abs(a-b)<=eps, `${a} != ${b}`);
 
 function candidate(store, id, name, offer) {
