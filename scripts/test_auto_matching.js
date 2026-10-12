@@ -52,7 +52,7 @@ vm.runInContext(`
 const AUTO_MATCH_STORES = ["mpreis", "spar", "tg", "billa", "hofer"];
 const todayISO = () => "2026-09-21";
 ${names.map(extractFunction).join("\n")}
-this.api = { validOffers, pricedOfferForStore, cheapestPricedOffer, rankedAutoOptions };
+this.api = { validOffers, pricedOfferForStore, cheapestPricedOffer, rankedAutoOptions, compareAutoMatchCandidates };
 `, context);
 
 const { validOffers, pricedOfferForStore, cheapestPricedOffer, rankedAutoOptions, compareAutoMatchCandidates } = context.api;
