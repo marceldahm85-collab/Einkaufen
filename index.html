@@ -154,9 +154,14 @@
           <div class="auto-match-toolbar">
             <div>
               <strong>Automatische Produktzuordnung</strong>
-              <div class="muted small">MPREIS, SPAR, T&G, BILLA und Lidl werden automatisch durchsucht.</div>
+              <div class="muted small">MPREIS, SPAR, T&G, BILLA, HOFER und Lidl werden automatisch durchsucht.</div>
             </div>
             <button class="secondary-btn" id="refreshAutoMatchesBtn" type="button">Neu suchen</button>
+          </div>
+          <div class="database-search-wrap">
+            <input id="databaseSearch" class="search-input" type="search"
+                   placeholder="Artikel, Marke, Kategorie oder Barcode suchen …" autocomplete="off">
+            <div id="databaseCountLabel" class="muted small" aria-live="polite"></div>
           </div>
           <div id="databaseList" class="database-list"></div>
         </div>
