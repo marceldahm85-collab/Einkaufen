@@ -4543,7 +4543,7 @@
         : `${state.products.length} Artikel in deiner Datenbank`;
     }
 
-    $("#databaseList").innerHTML = databaseProducts.map(p => {
+    $("#databaseList").innerHTML = databaseProducts.length ? databaseProducts.map(p => {
       const counts = autoMatchCountsByStore(p);
       const total = autoMatchCount(p);
       const profile = matchingProfile(p);
@@ -4579,7 +4579,7 @@
           </div>
         </details>
       </div>`;
-    }).join("");
+    }).join("") : '<div class="muted small database-empty">Keine Artikel gefunden.</div>';
 
     const autoRefreshButton = $("#refreshAutoMatchesBtn");
     if (autoRefreshButton) {
