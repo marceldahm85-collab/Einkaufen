@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-15T21:25:29Z",
+  "updatedAt": "2026-10-16T04:34:47Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -10,9 +10,9 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 561,
-        "pagesChecked": 20,
-        "updatedAt": "2026-10-15T21:23:32Z",
+        "verifiedCount": 806,
+        "pagesChecked": 32,
+        "updatedAt": "2026-10-16T04:32:38Z",
         "error": null,
         "source": "mpreis.at"
       }
@@ -27,7 +27,7 @@
         "status": "ok",
         "verifiedCount": 460,
         "rawProductsScanned": 22364,
-        "updatedAt": "2026-10-15T21:24:12Z",
+        "updatedAt": "2026-10-16T04:33:20Z",
         "error": null,
         "source": "spar.at / FactFinder",
         "breakdown": {
@@ -48,7 +48,7 @@
         "status": "ok",
         "productCount": 63,
         "linkableCount": 25,
-        "updatedAt": "2026-10-15T21:25:39Z",
+        "updatedAt": "2026-10-16T04:34:56Z",
         "error": null,
         "source": "T&G Osttirol Flugblatt"
       }
@@ -61,7 +61,7 @@
       "provider": "heisse-preise.io",
       "promotionStale": false,
       "promotionSource": "https://shop.billa.at/aktionen",
-      "promotionCount": 294,
+      "promotionCount": 290,
       "promotionError": null
     },
     "hofer": {
