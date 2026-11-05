@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-04T23:47:38Z",
+  "updatedAt": "2026-11-05T06:48:47Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -10,9 +10,9 @@
       "provider": "heisse-preise.io",
       "promotions": {
         "status": "ok",
-        "verifiedCount": 1003,
-        "pagesChecked": 35,
-        "updatedAt": "2026-11-04T23:44:30Z",
+        "verifiedCount": 1004,
+        "pagesChecked": 37,
+        "updatedAt": "2026-11-05T06:47:05Z",
         "error": null,
         "source": "mpreis.at"
       }
@@ -27,38 +27,38 @@
         "status": "stale",
         "verifiedCount": 460,
         "rawProductsScanned": 0,
-        "updatedAt": "2026-11-04T23:44:58Z",
+        "updatedAt": "2026-11-05T06:47:32Z",
         "error": "SPAR FactFinder-Abruf fehlgeschlagen: HTTP Error 400: Bad Request",
         "source": "spar.at / FactFinder",
         "breakdown": {}
       }
     },
     "tg": {
-      "status": "ok",
-      "productCount": 71,
-      "promotionCount": 74,
-      "stale": false,
-      "error": null,
+      "status": "stale",
+      "productCount": 68,
+      "promotionCount": 71,
+      "stale": true,
+      "error": "Unplausibel wenige T&G-Aktionen (0). Vorhandene Daten werden nicht überschrieben.",
       "provider": "tundg.at",
       "scope": "Spezialaktionen + Osttirol-Flugblatt",
       "flyer": {
         "status": "ok",
         "productCount": 66,
         "linkableCount": 30,
-        "updatedAt": "2026-11-04T23:47:48Z",
+        "updatedAt": "2026-11-05T06:48:59Z",
         "error": null,
         "source": "T&G Osttirol Flugblatt"
       }
     },
     "billa": {
       "status": "ok",
-      "productCount": 19909,
+      "productCount": 19916,
       "stale": false,
       "error": null,
       "provider": "heisse-preise.io",
       "promotionStale": false,
       "promotionSource": "https://shop.billa.at/aktionen",
-      "promotionCount": 66,
+      "promotionCount": 282,
       "promotionError": null
     },
     "hofer": {
