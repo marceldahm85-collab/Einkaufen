@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-14T06:18:57Z",
+  "updatedAt": "2026-11-14T13:37:43Z",
   "stores": {
     "mpreis": {
       "status": "ok",
@@ -12,7 +12,7 @@
         "status": "stale",
         "verifiedCount": 850,
         "pagesChecked": 2,
-        "updatedAt": "2026-11-14T06:17:16Z",
+        "updatedAt": "2026-11-14T13:36:07Z",
         "error": "Zu wenige eindeutig erkannte Aktionen (0). Grundpreise bleiben unverändert.",
         "source": "mpreis.at"
       }
@@ -27,7 +27,7 @@
         "status": "stale",
         "verifiedCount": 460,
         "rawProductsScanned": 0,
-        "updatedAt": "2026-11-14T06:17:45Z",
+        "updatedAt": "2026-11-14T13:36:34Z",
         "error": "SPAR FactFinder-Abruf fehlgeschlagen: HTTP Error 400: Bad Request",
         "source": "spar.at / FactFinder",
         "breakdown": {}
@@ -45,7 +45,7 @@
         "status": "ok",
         "productCount": 66,
         "linkableCount": 30,
-        "updatedAt": "2026-11-14T06:19:07Z",
+        "updatedAt": "2026-11-14T13:37:54Z",
         "error": null,
         "source": "T&G Osttirol Flugblatt"
       }
